@@ -25,7 +25,7 @@ jobs:
       - run: npm test
       # astro build, then _headers, csp-check, preflight and bundle-budget (the exact 16 KB gzip gate).
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dist
           path: apps/web/dist
@@ -40,7 +40,7 @@ jobs:
       - run: node tests/browser/a11y.mjs
       - run: node tests/browser/tour-smoke.mjs
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gate-output
           path: |
