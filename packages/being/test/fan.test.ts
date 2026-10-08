@@ -44,7 +44,7 @@ test('lines are dealt round the nodes, and the default nodes fan down the right 
   assert.equal(lineTarget(0, 5), 0);
   assert.equal(lineTarget(7, 5), 2);
   assert.equal(lineTarget(3, 0), 0);
-  assert.equal(FAN_LINES, 120);
+  assert.equal(FAN_LINES, 60);
   assert.ok(DEFAULT_FAN_TARGETS.length > 0 && DEFAULT_FAN_TARGETS.length <= FAN_MAX_TARGETS);
   for (const target of DEFAULT_FAN_TARGETS) {
     assert.ok(target.x > 0.5 && target.x <= 1, 'on the right');

@@ -115,6 +115,14 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
     if (!m.loading && !m.device.reducedMotion) void loadBeing(m);
   });
   document.addEventListener('keydown', (event) => onKey(m, event));
+  // Talk (scripts/talk.ts) asks for the being here rather than making a second one: the detail is a callback that
+  // receives the handle, or null when this device shows the poster.
+  document.addEventListener('em:being-request', (event) => {
+    const reply = (event as CustomEvent<unknown>).detail;
+    if (typeof reply !== 'function') return;
+    const loading = m.device.reducedMotion ? Promise.resolve(null) : loadBeing(m);
+    void loading.then((handle) => (reply as (being: BeingHandle | null) => void)(handle));
+  });
 
   if (m.device.reducedMotion) {
     m.noVoice = 'still';
@@ -218,16 +226,16 @@ function loadBeing(m: Mount): Promise<BeingHandle | null> {
       if (!caps.webgl2 || caps.reducedMotion) return fail(m, 'still');
       const assetUrl = pickAsset(stage, caps);
       if (!assetUrl) return fail(m, 'still');
-      // The look is the face: the head alone, large, as wire over its own depth cloud, assembling from pieces on
-      // its first frame (at most 1.2 s). Nothing else: no bloom pass, no ribbon, no mirrored floor and no data
-      // ring (the shared contract in docs/research/minimal-brief.md); the fan's anchors are the runtime's own.
+      // The look is kinect-demo: head and shoulders as a dense field of tiny glowing shards from a fixed sensor,
+      // seen by a view that orbits with the pointer, assembling from pieces on its first frame (at most 1.2 s).
+      // Nothing else: no bloom pass, no ribbon, no mirrored floor and no data ring; the fan's anchors are the runtime's.
       const options: BeingOptions & { ring?: boolean } = {
         canvas,
         assetUrl,
         theme: currentTheme(),
         quality: caps.suggestedQuality,
         bloom: false,
-        look: 'face',
+        look: 'kinect-demo',
         intro: true,
         ribbon: false,
         reflection: false,
@@ -552,11 +560,8 @@ function scrollTargetTop(target: Element): number {
 function openTalk(m: Mount): void {
   const sheet = m.el.talkSheet;
   if (!sheet || sheet.hidden || sheet.open) return;
-  try {
-    sheet.showModal();
-  } catch {
-    // Phase 1 has nothing behind the sheet; a browser without <dialog> support simply keeps it closed.
-  }
+  // talk-boot.ts opens the sheet and loads the talk code; Phase 1 renders the sheet hidden, so nothing happens.
+  document.dispatchEvent(new CustomEvent('em:talk-open'));
 }
 
 function onKey(m: Mount, event: KeyboardEvent): void {
@@ -673,11 +678,13 @@ function createCaptionBeing(): BeingHandle {
     setShatter: noop,
     fan: { setTargets: noop, setActivity: noop, setEnabled: noop },
     setDepthSource: noop,
+    face: { pushArkit: noop },
     kinect: {
       setClipping: noop,
       setPointSize: noop,
       setZOffset: noop,
       setMode: noop,
+      setHeadWire: noop,
       setDisplacement: noop,
       setBrightness: noop,
       setContrast: noop,

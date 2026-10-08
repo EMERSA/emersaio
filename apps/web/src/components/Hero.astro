@@ -12,6 +12,7 @@ import '../styles/hud.css';
 import BeingStage from './BeingStage.astro';
 import Captions from './Captions.astro';
 import TalkSheet from './TalkSheet.astro';
+import { TALK_ENABLED } from '../lib/phase.ts';
 
 // The avatar pipeline produces these files and a fresh checkout may lack them. Whatever exists reaches the scripts
 // through data attributes; a missing attribute means the procedural cloud and the poster stand in.
@@ -59,7 +60,7 @@ const { hero, tour, a11y } = site;
       <div class="hero-ctas">
         <a class="btn btn-primary" href={hero.primary.href} data-tour-start>{hero.primary.label}</a>
         <a class="btn btn-ghost" href={hero.secondary.href}>{hero.secondary.label}</a>
-        <a class="btn btn-ghost" href={hero.talk.href} data-talk-open hidden>{hero.talk.label}</a>
+        <a class="btn btn-ghost" href={hero.talk.href} data-talk-open hidden={!TALK_ENABLED}>{hero.talk.label}</a>
       </div>
     </div>
   </div>
@@ -69,6 +70,7 @@ const { hero, tour, a11y } = site;
 <script>
   import '../scripts/hero.ts';
   import '../scripts/being-mount.ts';
+  import '../scripts/talk-boot.ts';
 </script>
 
 <style>

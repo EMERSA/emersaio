@@ -13,7 +13,8 @@
     "./audio": "./src/speech/audioUnlock.ts",
     "./face": "./src/face/index.ts",
     "./depth": "./src/data/depth/index.ts",
-    "./framing": "./src/stage/framing.ts"
+    "./framing": "./src/stage/framing.ts",
+    "./talk": "./src/talk/index.ts"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json"

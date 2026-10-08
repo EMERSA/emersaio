@@ -5,7 +5,7 @@
  */
 import type { FanTarget } from '../types.ts';
 
-export const FAN_LINES = 120;
+export const FAN_LINES = 60;
 /** The most nodes the shader holds; further targets are ignored. */
 export const FAN_MAX_TARGETS = 8;
 /** The nodes sit on a plane this far in front of the head's centre. */
@@ -13,7 +13,7 @@ export const FAN_PLANE_M = 0.3;
 /** Node sprite diameter in CSS pixels: a small ice dot, not a glow. */
 export const FAN_NODE_PX = 6;
 /** The lines' alpha on dark; cream gets a little more ink for the same read. */
-export const FAN_LINE_ALPHA = 0.18;
+export const FAN_LINE_ALPHA = 0.12;
 /** The nodes as shares of the canvas from the left and from the top: x 94 percent, y 16, 26, 36 and 46 percent. */
 export const FAN_NODE_SHARES: ReadonlyArray<readonly [number, number]> = [
   [0.94, 0.16],

@@ -10,14 +10,20 @@ export type Theme = 'dark' | 'light';
 /**
  * How the figure is drawn: 'wire' is all wire triangles, 'kinect' is all point cloud (the head wire hidden),
  * 'hybrid' keeps the head as wire and draws the body as the cloud with its wire hidden, and 'face' hides the body
- * and frames the head alone, large, as wire over a dense Kinect-style depth cloud of the head.
+ * and frames the head alone, large, as wire over a dense Kinect-style depth cloud of the head. 'kinect-demo' is
+ * three's webgl_video_kinect done in tiny triangles: head and shoulders, no wire, a dense lattice of glowing shards
+ * from a fixed sensor, seen by a view camera that orbits with the pointer.
  */
-export type Look = 'wire' | 'kinect' | 'hybrid' | 'face';
+export type Look = 'wire' | 'kinect' | 'hybrid' | 'face' | 'kinect-demo';
 /** What the shell may ask for: the looks, plus the shared contract's name for the face, 'kinect-face'. */
 export type LookRequest = Look | 'kinect-face';
 
-/** How the kinect cloud draws its depth grid: points (the default), wire triangles, or a solid metallic surface. */
-export type KinectMode = 'points' | 'wire' | 'mesh';
+/**
+ * How the kinect cloud draws its depth grid: points (the default), wire triangles, a solid metallic surface, or
+ * shards: every lattice cell as two small separate triangles shrunk toward their centroids, glowing facets with a
+ * crisp edge (the kinect-demo look's default).
+ */
+export type KinectMode = 'points' | 'wire' | 'mesh' | 'shards';
 
 /** A node of the data fan in canvas-normalised coordinates: -1..1, x right, y up. */
 export interface FanTarget {
@@ -150,6 +156,8 @@ export interface BeingHandle {
     setPointSize(px: number): void;
     setZOffset(m: number): void;
     setMode(mode: KinectMode): void;
+    /** The kinect-demo look's wire head over its shards; off by default. */
+    setHeadWire(on: boolean): void;
     /** Depth relief about the figure's distance; 1 is true to the depth. */
     setDisplacement(value: number): void;
     setBrightness(value: number): void;
@@ -157,6 +165,14 @@ export interface BeingHandle {
     setOpacity(value: number): void;
     /** Stroke width of the wire mode in CSS pixels. */
     setLineWidth(px: number): void;
+  };
+  /**
+   * Live face input. pushArkit feeds one 61-value ARKit frame (the order of ARKIT_ORDER_61, as Convai streams it)
+   * to the face's stream source at priority 20; 200 ms without a frame and the face returns to its own sources.
+   * The source's code loads on the first push, so a page that never talks never fetches it.
+   */
+  readonly face: {
+    pushArkit(frame: ArrayLike<number>): void;
   };
   /**
    * Frame statistics for the HUD: points is the cloud's grid size while it draws; depth is the range its colour
@@ -192,6 +208,8 @@ export interface BeingOptions {
   echo?: boolean;
   /** 'hybrid' by default: wire head, point-cloud body. The shell asks for 'face' (or the contract's 'kinect-face'). */
   look?: LookRequest;
+  /** Draw the wire head over the shards in the kinect-demo look (off by default). */
+  headWire?: boolean;
   /** The data ring round the hips (on by default; never constructed when false, as on the home page). */
   ring?: boolean;
   /** The lighting behind the figure: the one rim light ('rim-only', the default) or nothing. */

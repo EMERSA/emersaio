@@ -1,21 +1,23 @@
 /**
  * The hero point cloud on the home page. It waits for the heading to paint (the LCP element) and for an idle moment
  * before pulling in the renderer, then follows scroll, pointer, theme and token events. When the being reports
- * ready the cloud dissolves into it and releases its WebGL context. The hero shows the head alone (the being's
- * face look), so the cloud is cut to the head region here and framed where the runtime will draw the head, and
+ * ready the cloud dissolves into it and releases its WebGL context. The hero shows the head and shoulders (the
+ * being's kinect-demo look), so the cloud is cut to that region here and framed where the runtime will draw it, and
  * the crossfade lands in place.
  */
-import { faceLayoutT, layoutT } from '@emersa/being/framing';
+import { BUST_FLOOR_SHARE, BUST_SHARE, layoutT } from '@emersa/being/framing';
 import type { HeroCloud, HeroCloudFrame, HeroCloudOptions } from '@emersa/being/hero-cloud';
 
 type Theme = 'dark' | 'light';
-/** Which part of the figure the cloud shows: the whole 1.75 m figure, or the head and neck alone. */
+/** Which part of the figure the cloud shows: the whole 1.75 m figure, or the head and shoulders. */
 type Region = 'figure' | 'head';
 
 interface CloudOptions {
   region: Region;
 }
 
+/** The figure's crown in the sampled cloud, in metres. */
+const CROWN_Y_M = 1.75;
 const LCP_TIMEOUT_MS = 2500;
 const IDLE_TIMEOUT_MS = 1500;
 const HANDOVER_MS = 720;
@@ -23,14 +25,10 @@ const HANDOVER_MS = 720;
 /** The EMCL header: "EMCL", uint16 version 1, uint32 count, 6 reserved bytes; then int16 xyz in metres * 10000. */
 const EMCL_HEADER = 16;
 /**
- * The head region: every point from here up, in metres * 10000. The runtime's face look frames the head mesh,
- * which is cut where the neck meets the shoulders (its lowest vertex sits at about 1.40 m); the sampled cloud's
- * neck base is at 1.42.
+ * The head-and-shoulders region: every point from here up, in metres * 10000; the runtime's kinect-demo look crops
+ * its depth at the same share of the 1.75 m figure (1.25 m).
  */
-const HEAD_MIN_Y = 14200;
-/** The head mesh's span the runtime frames, in metres: the crown and its lowest vertex. */
-const CROWN_Y = 1.75;
-const HEAD_MESH_MIN_Y = 1.4;
+const HEAD_MIN_Y = Math.round(CROWN_Y_M * BUST_FLOOR_SHARE * 10000);
 /** The cloud fits its points to this share of the frame's height (HeroCloud.ts). */
 const CLOUD_FIT = 0.9;
 
@@ -150,30 +148,14 @@ async function boot(canvas: HTMLCanvasElement, { region }: CloudOptions): Promis
   cleanups.push(() => document.removeEventListener('em:tokens', onTokens));
 }
 
-/** The runtime's face framing (stage/framing.ts): crown and chin air on a landscape canvas, the head's share on a portrait one. */
-const FACE_CROWN_AIR = 0.06;
-const FACE_CHIN_AIR = 0.47;
-const FACE_PORTRAIT_SHARE = 0.7;
-const FACE_PORTRAIT_LIFT = 0;
-
 /**
- * The frame that lands the head cloud on the runtime's head (framing.ts, the face look): a landscape canvas puts
- * the crown 6% below the top edge and the chin 47% above the bottom, a portrait canvas scales the head mesh to
- * 70% of the height, centred, and the two blend as the camera does (faceLayoutT: portrait up to aspect 1.0,
- * landscape from 1.6). The cloud fits its own points to 90% of the frame's height, centred on the frame, and the
- * sampled head (from 1.42 m) is a little shorter than the mesh
- * (from 1.40 m), so the span is scaled to keep the crown in place.
+ * The frame that lands the cloud on the runtime's head and shoulders (framing.ts, the kinect-demo look): the bust,
+ * from BUST_FLOOR_SHARE of the crown's height up to the crown, fills BUST_SHARE of the stage's height, centred, on
+ * any aspect. The cloud fits its own points (cut at the same height) to 90% of the frame's height, centred.
  */
 function headFrame(s: DOMRect, c: DOMRect): HeroCloudFrame {
-  const t = faceLayoutT(s.width / s.height);
-  const portraitTop = (1 - FACE_PORTRAIT_SHARE) / 2 - FACE_PORTRAIT_LIFT;
-  const landscapeSpan = 1 - FACE_CROWN_AIR - FACE_CHIN_AIR;
-  const top = portraitTop + (FACE_CROWN_AIR - portraitTop) * t;
-  const meshSpan = FACE_PORTRAIT_SHARE + (landscapeSpan - FACE_PORTRAIT_SHARE) * t;
-  const cloudSpan = (meshSpan * (CROWN_Y - HEAD_MIN_Y / 10000)) / (CROWN_Y - HEAD_MESH_MIN_Y);
-  const height = (cloudSpan / CLOUD_FIT) * s.height;
-  const centre = (top + cloudSpan / 2) * s.height;
-  return { x: s.left - c.left, y: s.top - c.top + centre - height / 2, width: s.width, height };
+  const height = (BUST_SHARE / CLOUD_FIT) * s.height;
+  return { x: s.left - c.left, y: s.top - c.top + (s.height - height) / 2, width: s.width, height };
 }
 
 /**

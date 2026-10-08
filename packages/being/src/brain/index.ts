@@ -1,6 +1,7 @@
 /**
  * @emersa/being/brain: providers behind one Brain interface, the middleware that shapes context and events,
- * and compose() to chain them. Phase 1 ships MockBrain; NimBrain and ConvaiBrain are typed stubs.
+ * and compose() to chain them: MockBrain, and NimBrain (the Worker's /api/brain stream). ConvaiBrain lives in
+ * @emersa/being/talk so the Convai SDK never reaches this chunk.
  */
 import { compose } from './compose.ts';
 import { type GuardrailsOptions, guardrails } from './middleware/guardrails.ts';
@@ -42,7 +43,6 @@ export {
 export { PAGE_EXCERPT_MAX_CHARS, type PageContextOptions, pageContext } from './middleware/pageContext.ts';
 export { COMMA_CHUNK_CHARS, SentenceBuffer, sentenceChunker } from './middleware/sentenceChunker.ts';
 export { countUnits, type TokenUnit, tokenMeter } from './middleware/tokenMeter.ts';
-export { CONVAI_NOT_YET, ConvaiBrain, type ConvaiBrainOptions } from './providers/ConvaiBrain.ts';
 export {
   bestStop,
   type FaqEntry,
@@ -51,7 +51,15 @@ export {
   sectionFor,
   tokensOf,
 } from './providers/MockBrain.ts';
-export { NIM_NOT_YET, NimBrain, type NimBrainOptions } from './providers/NimBrain.ts';
+export {
+  NimBrain,
+  type NimBrainOptions,
+  readSse,
+  type SseMessage,
+  SseParser,
+  speakSentences,
+  toBrainEvent,
+} from './providers/NimBrain.ts';
 
 export interface StandardChainOptions {
   memory?: MemoryRecallOptions;

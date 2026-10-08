@@ -18,9 +18,9 @@ If your browser reports a Content Security Policy violation, we count the direct
 
 Cloudflare serves the pages and runs the small edge program that answers the contact form. Postmark delivers the email. There is no other processor in this phase. Questions about personal data go to privacy@emersa.io.
 
-## Planned: memory, with consent
+## Memory, with consent
 
-The next phase of the site lets you talk to the guide out loud. That changes what is stored, and we are writing the rules down before it ships. The plan is this:
+Talk to Emily lets you talk to the guide out loud or by typing. It changes what is stored, so the rules are written down here and in the privacy policy before it is switched on:
 
 - Nothing is stored before you tap "Start talking" and read what it means.
 - Memory is tied to this browser through a signed, random identifier set only after consent, not to your name or your address.
@@ -28,8 +28,11 @@ The next phase of the site lets you talk to the guide out loud. That changes wha
 - A "What you remember about me" panel shows everything, and "Forget me" erases it in one request, including anything held by the voice provider.
 - Memory not used for twelve months is purged on its own.
 - A text-only path exists for anyone who does not want to use a microphone.
+- You can add one file at a time (a PDF, .txt or .md file up to 2 MB) for Emily to read. Only the text is kept, at most 20,000 characters, and Forget me deletes it with the rest. The file itself is never stored or passed on.
+- The processors are Cloudflare (the site, the person check and the database) and Convai Technologies in the United States (speech to text, Emily's replies and her voice). Microsoft joins only if we move speech to Azure, and this page will say so first.
+- Emily is an AI and may make mistakes.
 
-Treat all of this as planned, not live. The privacy policy will change on the day it does.
+Until the Talk button appears on the home page, none of this is live; the privacy policy changes on the day it is.
 
 ## How the beings are secured
 

@@ -38,6 +38,7 @@ uniform float uDropMix;
 uniform float uQuantise;
 uniform vec4 uMaskA;
 uniform vec4 uMaskB;
+uniform float uMinY;
 uniform vec3 uDot;
 uniform vec3 uWire;
 uniform vec3 uGlow;
@@ -133,6 +134,7 @@ void main() {
   float scatterFade = 1.0 - smoothstep(0.0, 0.35, travel) * 0.8;
 
   vec4 world = modelMatrix * vec4(pos, 1.0);
+  hit *= step(uMinY, world.y);
 
   float protectA = 1.0 - smoothstep(uMaskA.w * 0.7, uMaskA.w, distance(world.xyz, uMaskA.xyz));
   float protectB = 1.0 - smoothstep(uMaskB.w * 0.7, uMaskB.w, distance(world.xyz, uMaskB.xyz));

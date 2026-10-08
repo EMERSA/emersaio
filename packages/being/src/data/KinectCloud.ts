@@ -89,6 +89,8 @@ type CloudUniforms = {
   uQuantise: IUniform<number>;
   uMaskA: IUniform<Vector4>;
   uMaskB: IUniform<Vector4>;
+  uShrink: IUniform<number>;
+  uMinY: IUniform<number>;
   uMirrorPlane: SharedUniforms['uMirrorPlane'];
   uViewport: SharedUniforms['uViewport'];
   uDot: SharedUniforms['uDot'];
@@ -105,6 +107,8 @@ export const DEFAULT_POINT_SIZE_PX = POINT_CSS_PX;
 const RAMP_HALF_M = 0.35;
 /** The ramp eases toward each new measurement over this time. */
 const RAMP_EASE_S = 0.5;
+/** The shards' ramp about the sensor's subject, in metres toward and away from the sensor. */
+const SHARD_RAMP_M = { near: 0.14, far: 0.22 } as const;
 /** A stand-alone sensor is imagined on a tripod at this height, level, facing the figure. */
 const SENSOR_HEIGHT_M = 1;
 /** For a sensor source, a surface this far from it stands on the figure's axis unless setZOffset says otherwise. */
@@ -112,11 +116,16 @@ const SENSOR_Z_OFFSET_M = 2;
 const ENCODING: Readonly<Record<DepthEncoding, number>> = { perspective: 0, grey: 1, metres: 2 };
 /** A keep zone nowhere, so the mask never bites until setKeepZones() places it. */
 const NO_ZONE = new Vector4(0, -1000, 0, 0);
+/** A crop height nothing lies under. */
+const NO_CROP = -1000;
+/** How far each shard is pulled toward its centroid: the hairline gaps that part the lattice into facets. */
+export const SHARD_SHRINK = 0.2;
 
 /**
  * The kinect cloud: a dense regular grid that back-projects the current DepthSource the way three's
  * webgl_video_kinect example does, drawn as points (the default), as wire triangles or as a solid metallic mesh
- * (Three-Kinectron's modes; the triangle modes sample a fixed 160 x 120 lattice). A perspective source (the
+ * (Three-Kinectron's modes; they sample a fixed 160 x 120 lattice), or as shards, the point grid's own lattice of
+ * tiny separate facets. A perspective source (the
  * being's own depth) places the cloud with its sensor camera's lens and transform; a grey or metric source stands
  * where the figure stands, seen from a virtual sensor one metre up. Nothing here writes depth, and the cloud draws
  * under the wire.
@@ -175,6 +184,8 @@ export class KinectCloud {
       uQuantise: { value: 0 },
       uMaskA: { value: NO_ZONE.clone() },
       uMaskB: { value: NO_ZONE.clone() },
+      uShrink: { value: SHARD_SHRINK },
+      uMinY: { value: NO_CROP },
       uMirrorPlane: shared.uMirrorPlane,
       uViewport: shared.uViewport,
       uDot: shared.uDot,
@@ -269,7 +280,27 @@ export class KinectCloud {
 
   setMode(mode: KinectMode): void {
     this.modeValue = mode;
-    this.uniforms.uMode.value = mode === 'mesh' ? 1 : 0;
+    this.uniforms.uMode.value = mode === 'shards' ? 2 : mode === 'mesh' ? 1 : 0;
+    this.applyLattice();
+  }
+
+  /** Nothing below this world height is drawn (the head-and-shoulders crop); null draws everything. */
+  setCrop(minY: number | null): void {
+    this.uniforms.uMinY.value = minY !== null && Number.isFinite(minY) ? minY : NO_CROP;
+  }
+
+  /** The lattice the triangle modes draw: the point grid itself for shards, the fixed 160 x 120 otherwise. */
+  private lattice(): CloudGrid {
+    return this.modeValue === 'shards' ? { cols: this.cols, rows: this.rows } : GRID_LATTICE;
+  }
+
+  private applyLattice(): void {
+    const lattice = this.lattice();
+    const lu = this.uniforms.uLattice.value;
+    if (lu.x === lattice.cols && lu.y === lattice.rows) return;
+    lu.set(lattice.cols, lattice.rows);
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = gridGeometry(gridVertexCount(lattice));
   }
 
   mode(): KinectMode {
@@ -305,6 +336,7 @@ export class KinectCloud {
     this.uniforms.uGrid.value.set(cols, rows);
     this.points.geometry.dispose();
     this.points.geometry = gridGeometry(cols * rows);
+    this.applyLattice();
   }
 
   grid(): CloudGrid {
@@ -313,7 +345,8 @@ export class KinectCloud {
 
   /** Points in the grid being drawn: the point grid, or the triangle modes' lattice. */
   count(): number {
-    return this.modeValue === 'points' ? this.cols * this.rows : GRID_LATTICE.cols * GRID_LATTICE.rows;
+    const lattice = this.modeValue === 'points' ? { cols: this.cols, rows: this.rows } : this.lattice();
+    return lattice.cols * lattice.rows;
   }
 
   setEnabled(on: boolean): void {
@@ -343,7 +376,7 @@ export class KinectCloud {
     const asPoints = this.modeValue === 'points';
     this.points.visible = this.enabled && asPoints;
     this.mesh.visible = this.enabled && !asPoints;
-    // Wire triangles blend like the points (the theme keeps that material current); a solid mesh occludes.
+    // Wire triangles and shards blend like the points (the theme keeps that material current); a solid mesh occludes.
     this.mesh.material.blending = this.modeValue === 'mesh' ? NormalBlending : this.points.material.blending;
     if (!this.enabled) return;
     if (!source?.ready) {
@@ -373,8 +406,11 @@ export class KinectCloud {
       // each new reading; a fixed band around the sensor's distance to its target stands in until the first lands.
       const measured = source.range?.() ?? null;
       const reference = sensor.position.distanceTo(this.subject);
-      const near = measured ? measured.near : reference - RAMP_HALF_M;
-      const far = measured ? measured.far : reference + RAMP_HALF_M;
+      // Shards span a fixed band about the subject instead: the face from ice-white at the nose to navy behind the
+      // shoulders, whatever else the probe saw.
+      const shards = this.modeValue === 'shards';
+      const near = shards ? reference - SHARD_RAMP_M.near : measured ? measured.near : reference - RAMP_HALF_M;
+      const far = shards ? reference + SHARD_RAMP_M.far : measured ? measured.far : reference + RAMP_HALF_M;
       if (this.ramp) {
         const k = 1 - Math.exp(-dt / RAMP_EASE_S);
         this.ramp.near += (near - this.ramp.near) * k;

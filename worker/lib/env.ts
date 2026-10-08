@@ -21,6 +21,14 @@ export interface Env {
   /** Advisory per-connection limiters (wrangler.jsonc "ratelimits"); each fails open when absent or unavailable. */
   CONTACT_LIMITER?: RateLimit;
   CSP_LIMITER?: RateLimit;
+  /** POST /api/talk/session: 10 per minute per connection. */
+  TALK_LIMITER?: RateLimit;
+  /** POST /api/brain: 30 per minute. */
+  BRAIN_LIMITER?: RateLimit;
+  /** /api/memory and POST /api/talk/revoke: 60 per minute. */
+  MEMORY_LIMITER?: RateLimit;
+  /** POST /api/talk/upload: 5 per minute. */
+  UPLOAD_LIMITER?: RateLimit;
 
   /** Postmark server token. Without it the contact form answers 503 and names sales@emersa.io instead. */
   POSTMARK_TOKEN?: string;
@@ -32,6 +40,12 @@ export interface Env {
   VISITOR_HMAC_KEY?: string;
   /** Phase 2: Turnstile secret for POST /api/talk/session (lib/turnstile.ts). */
   TURNSTILE_SECRET?: string;
+  /** Phase 2: Convai API key; mints the one-hour token the browser holds (lib/convai.ts). Never sent to the browser. */
+  CONVAI_API_KEY?: string;
+  /** Dev/test only: origin of a mock Convai (tests/browser/talk-flow.mjs). Ignored when ENV is production. */
+  CONVAI_API_BASE?: string;
+  /** Phase 2, dev and beta only: the hosted NIM key behind POST /api/brain. */
+  NVIDIA_API_KEY?: string;
 
   /** "production" on emersa.io, "beta" on the preview Worker; wrangler dev runs with whichever it was started as. */
   ENV: string;

@@ -10,7 +10,7 @@ repository: `scripts/preflight.mjs` fails the build when a key shape or a secret
 | --- | --- | --- | --- |
 | `POSTMARK_TOKEN` | 1 | `worker/lib/email/postmark.ts` | Server API token of the Postmark server for emersa.io, transactional stream. Sender `noreply@emersa.io`, delivery to `4d@emersa.io`. |
 | `VISITOR_HMAC_KEY` | 2 | `worker/lib/consent.ts` | 32 random bytes as hex. Signs the `em_vid` cookie and derives the Convai `endUserId`. Rotating it signs every visitor out; they consent again. |
-| `TURNSTILE_SECRET` | 2 | `worker/lib/turnstile.ts` | Pair of the public `TURNSTILE_SITEKEY` var. |
+| `TURNSTILE_SECRET` | 2 | `worker/lib/turnstile.ts` | Pair of the public `TURNSTILE_SITEKEY` var, which the site build also needs as `PUBLIC_TURNSTILE_SITEKEY`. Local dev uses Cloudflare's test pair: site key `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA` (always passes). |
 | `CONVAI_API_KEY` | 2 | `worker/routes/talk.ts` | Mints the one-hour session tokens. Never reaches the browser. |
 | `NVIDIA_API_KEY` | beta only | `worker/lib/providers/nim.ts` | The hosted NIM endpoint is licensed for prototyping. Production points `NIM_BASE_URL` at a self-hosted NIM. |
 | `AZURE_SPEECH_KEY` | optional | `worker/lib/providers/azure.ts` | Speech S0 resource in `uksouth`, for live TTS on the NIM path. |

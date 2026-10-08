@@ -31,6 +31,7 @@ const fakeBeing = () => {
     setLook: () => undefined,
     getLook: () => 'hybrid',
     setShatter: () => undefined,
+    face: { pushArkit: () => undefined },
     fan: { setTargets: () => undefined, setActivity: () => undefined, setEnabled: () => undefined },
     setDepthSource: () => undefined,
     kinect: {
@@ -38,6 +39,7 @@ const fakeBeing = () => {
       setPointSize: () => undefined,
       setZOffset: () => undefined,
       setMode: () => undefined,
+      setHeadWire: () => undefined,
       setDisplacement: () => undefined,
       setBrightness: () => undefined,
       setContrast: () => undefined,

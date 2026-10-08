@@ -7,8 +7,11 @@
 import { site } from '../data/site';
 import LogoSlot from './LogoSlot.astro';
 import ThemeToggle from './ThemeToggle.astro';
+import { TALK_ENABLED } from '../lib/phase.ts';
 
 const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+/** The file-format build names the home page /index; the Talk link lives there only. */
+const isHome = path === '/' || path === '/index';
 
 /** A link is current on its own path and below it. Hash links to home sections and external links never are. */
 const isCurrent = (href: string): boolean => {
@@ -36,6 +39,13 @@ const isCurrent = (href: string): boolean => {
     </nav>
 
     <div class="header-actions">
+      {
+        TALK_ENABLED && isHome && (
+          <a class="nav-link talk-link" href={site.hero.talk.href} data-talk-open>
+            {site.talk.headerLink}
+          </a>
+        )
+      }
       <ThemeToggle />
       <details class="menu" data-menu>
         <summary class="menu-button" aria-label={site.a11y.menu}>
@@ -120,6 +130,11 @@ const isCurrent = (href: string): boolean => {
     bottom: 0.4rem;
     height: 1px;
     background: currentColor;
+  }
+
+  .talk-link {
+    margin-right: 0.75rem;
+    color: var(--accent-text);
   }
 
   .header-actions {

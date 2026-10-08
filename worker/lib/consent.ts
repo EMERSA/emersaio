@@ -3,8 +3,9 @@
  * with mac = HMAC-SHA-256(VISITOR_HMAC_KEY, id), so an altered or invented cookie verifies to nothing and the
  * database is only ever asked about ids this Worker issued.
  *
- * TODO Phase 2: set the cookie only after consent (POST /api/talk/session), clear it from "Forget me", and re-ask
- * when consent_version changes. Name and attributes are fixed there, next to the route that sets them.
+ * The cookie is set only after consent (POST /api/talk/session) and cleared by "Forget me" (DELETE /api/memory).
+ * Its attributes: HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age 13 months (Secure dropped on localhost only,
+ * where wrangler dev serves plain http).
  */
 const encoder = new TextEncoder();
 const ID_PATTERN = /^[0-9a-f]{32}$/;
@@ -56,4 +57,50 @@ export async function verifyVisitorId(secret: string, signed: string): Promise<s
   // subtle.verify compares in constant time; a string comparison of the two macs would not.
   const valid = await crypto.subtle.verify('HMAC', await hmacKey(secret), bytes, encoder.encode(id));
   return valid ? id : null;
+}
+
+/** The cookie's name and lifetime (13 months; the data itself goes after 12 idle months). */
+export const COOKIE_NAME = 'em_vid';
+export const COOKIE_MAX_AGE = 34_164_000;
+
+/** The consent copy the Talk sheet shows; a visitor who agreed to an older one is asked again. */
+export const CONSENT_VERSION = 1;
+
+/** One cookie's value from a Cookie header, or null. */
+export function readCookie(request: Request, name = COOKIE_NAME): string | null {
+  const header = request.headers.get('cookie');
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const at = part.indexOf('=');
+    if (at < 0) continue;
+    if (part.slice(0, at).trim() === name) return part.slice(at + 1).trim();
+  }
+  return null;
+}
+
+const attributes = (secure: boolean, maxAge: number): string =>
+  `HttpOnly;${secure ? ' Secure;' : ''} SameSite=Lax; Path=/api; Max-Age=${maxAge}`;
+
+/** Set-Cookie for a signed value. `secure` is false only for wrangler dev on a local host. */
+export const visitorCookie = (signed: string, secure: boolean): string =>
+  `${COOKIE_NAME}=${signed}; ${attributes(secure, COOKIE_MAX_AGE)}`;
+
+/** Set-Cookie that removes the cookie. */
+export const clearVisitorCookie = (secure: boolean): string => `${COOKIE_NAME}=; ${attributes(secure, 0)}`;
+
+/** The verified visitor id behind the request's cookie, or null. */
+export async function cookieVisitor(request: Request, secret: string | undefined): Promise<string | null> {
+  const value = readCookie(request);
+  if (!value || !secret) return null;
+  return verifyVisitorId(secret, value);
+}
+
+/**
+ * The opaque id Convai knows the visitor by: HMAC(key, "convai:" + id), 32 hex characters. It cannot be turned
+ * back into the cookie id, so Convai never holds anything that opens this database.
+ */
+export async function endUserId(secret: string, id: string): Promise<string> {
+  if (!secret) throw new Error('consent: VISITOR_HMAC_KEY is not set');
+  const mac = await crypto.subtle.sign('HMAC', await hmacKey(secret), encoder.encode(`convai:${id}`));
+  return Array.from(new Uint8Array(mac).slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
 }

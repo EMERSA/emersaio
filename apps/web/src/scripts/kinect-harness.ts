@@ -20,10 +20,10 @@ const TOKEN_WINDOW_MS = 2000;
 const HEALTH_URL = '/api/health';
 /** The point count on the HUD, with thousands separators (76,800). */
 const POINTS_FORMAT = new Intl.NumberFormat('en-GB');
-const LOOKS: readonly Look[] = ['face', 'hybrid', 'kinect', 'wire'];
-const MODES: readonly KinectMode[] = ['points', 'wire', 'mesh'];
+const LOOKS: readonly Look[] = ['kinect-demo', 'face', 'hybrid', 'kinect', 'wire'];
+const MODES: readonly KinectMode[] = ['points', 'wire', 'mesh', 'shards'];
 /** The look the being starts in, which is also the first option of the Look selector. */
-const START_LOOK: Look = 'face';
+const START_LOOK: Look = 'kinect-demo';
 
 const root = document.querySelector<HTMLElement>('[data-kinect-harness]');
 if (root && root.dataset.mounted === undefined) {

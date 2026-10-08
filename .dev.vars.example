@@ -19,3 +19,10 @@ VISITOR_HMAC_KEY=
 # Phase 2: Turnstile secret for POST /api/talk/session (worker/lib/turnstile.ts). The Turnstile docs publish test
 # keys that always pass or always fail, for the browser flow in development.
 TURNSTILE_SECRET=
+
+# Phase 2: Convai API key. POST /api/talk/session mints a one-hour token with it (worker/lib/convai.ts); the key
+# itself never reaches the browser. Without it (or without CONVAI_CHARACTER_ID) Talk answers 503.
+CONVAI_API_KEY=
+
+# Phase 2, dev and beta only: NVIDIA NIM key for the text brain, POST /api/brain (needs NIM_BASE_URL set).
+NVIDIA_API_KEY=

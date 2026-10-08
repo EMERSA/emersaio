@@ -17,6 +17,7 @@ import {
   PERMISSIONS_POLICY_TALK,
   parseHeaders,
   render,
+  reportOnlyFrom,
   simulate,
   TALK_ORIGINS,
   trace,
@@ -245,4 +246,29 @@ test('parseHeaders round-trips what emit writes', () => {
     rules.map((rule) => rule.lines),
     build(2).map((rule) => rule.lines),
   );
+});
+
+test('REPORT_ONLY=1 and CSP_ROLLOUT=report-only both select the observation window; nothing else does', () => {
+  assert.equal(reportOnlyFrom({ REPORT_ONLY: '1' }), true);
+  assert.equal(reportOnlyFrom({ CSP_ROLLOUT: 'report-only' }), true);
+  assert.equal(reportOnlyFrom({}), false);
+  assert.equal(reportOnlyFrom({ REPORT_ONLY: '0' }), false);
+});
+
+test('Phase 2 report-only: "/" carries both policies once each, /docs carries neither the Talk hosts nor the mic', () => {
+  const text = emit(2, true);
+  const home = trace(text, '/');
+  assert.deepEqual(home.joined, []);
+  assert.equal(home.headers['Content-Security-Policy'], CSP_PHASE1);
+  const ro = home.headers['Content-Security-Policy-Report-Only'] ?? '';
+  for (const origin of [...TALK_ORIGINS.convai, ...TALK_ORIGINS.livekit, ...TALK_ORIGINS.turnstile]) {
+    assert.ok(ro.includes(origin), origin);
+  }
+  assert.match(home.headers['Permissions-Policy'] ?? '', /microphone=\(self\)/);
+  assert.equal(home.headers['Reporting-Endpoints'], 'csp="/api/csp"');
+  const docs = trace(text, '/docs').headers;
+  assert.equal(docs['Content-Security-Policy-Report-Only'], undefined);
+  assert.equal(docs['Content-Security-Policy'], CSP_PHASE1);
+  assert.match(docs['Permissions-Policy'] ?? '', /microphone=\(\)/);
+  assert.equal(/convai|livekit/.test(JSON.stringify(docs)), false);
 });

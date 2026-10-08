@@ -1,16 +1,235 @@
 ---
 /**
- * The Phase 2 talk sheet: consent, microphone and audio unlock, then the session. Phase 1 renders it hidden and
- * unwired so the dialog, its hook and its styles are in place. The consent copy itself arrives in site.ts with
- * Phase 2 and fills [data-talk-consent]; until then the paragraph stays empty.
+ * The Talk sheet (Phase 2). Two views inside one <dialog>: the consent view (what happens, who handles it, what is
+ * remembered and for how long, the AI notice, the Turnstile mount and one Start talking button) and the session
+ * view (the message list, the microphone, the typed fallback, file upload, the memory panel and End). Phase 1
+ * renders the dialog hidden and empty of controls. scripts/talk.ts wires it, loaded only on the first tap; the
+ * Turnstile script is added by that code when the sheet opens, never before. Copy comes from site.ts.
  */
 import { site } from '../data/site.ts';
+import { TALK_ENABLED, TURNSTILE_SITEKEY } from '../lib/phase.ts';
+
+const { talk } = site;
 ---
 
-<dialog class="talk-sheet" data-talk-sheet hidden aria-labelledby="talk-sheet-title">
-  <h2 id="talk-sheet-title" class="talk-sheet-title">{site.hero.talk.label}</h2>
-  <p class="talk-sheet-copy" data-talk-consent></p>
-  <form method="dialog">
-    <button type="submit" class="btn btn-ghost" data-talk-close>{site.hero.talk.close}</button>
-  </form>
-</dialog>
+{
+  TALK_ENABLED ? (
+    <dialog class="talk-sheet" data-talk-sheet aria-labelledby="talk-sheet-title">
+      <div class="talk-head">
+        <h2 id="talk-sheet-title" class="talk-sheet-title">
+          {talk.title}
+        </h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-ghost btn-sm" data-talk-close>
+            {talk.close}
+          </button>
+        </form>
+      </div>
+
+      <div class="talk-consent" data-talk-consent>
+        <p class="talk-sheet-copy">{talk.intro}</p>
+        <dl class="talk-terms">
+          {talk.consent.map((item) => (
+            <div class="talk-term">
+              <dt>{item.term}</dt>
+              <dd>{item.text}</dd>
+            </div>
+          ))}
+        </dl>
+        <p class="talk-ai">{talk.aiNotice}</p>
+        <p class="talk-privacy">
+          <a href={talk.privacyLink.href}>{talk.privacyLink.label}</a>
+        </p>
+        <div class="talk-turnstile" data-talk-turnstile data-sitekey={TURNSTILE_SITEKEY} />
+        <button type="button" class="btn btn-primary" data-talk-start>
+          {talk.start}
+        </button>
+      </div>
+
+      <div class="talk-session" data-talk-session hidden>
+        <p class="talk-state label" data-talk-state aria-live="polite" />
+        <ol class="talk-log" data-talk-log aria-live="polite" aria-label={talk.title} />
+        <form class="talk-type" data-talk-form>
+          <label class="sr-only" for="talk-input">
+            {talk.typeLabel}
+          </label>
+          <input
+            id="talk-input"
+            class="talk-input"
+            type="text"
+            maxlength="2000"
+            autocomplete="off"
+            placeholder={talk.typePlaceholder}
+            data-talk-input
+          />
+          <button type="submit" class="btn btn-ghost btn-sm">
+            {talk.send}
+          </button>
+        </form>
+        <div class="talk-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-talk-mic aria-pressed="false">
+            {talk.micOff}
+          </button>
+          <label class="btn btn-ghost btn-sm talk-upload">
+            {talk.upload}
+            <input
+              class="sr-only"
+              type="file"
+              accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+              data-talk-file
+            />
+          </label>
+          <button type="button" class="btn btn-ghost btn-sm" data-talk-memory-open aria-expanded="false">
+            {talk.memoryOpen}
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" data-talk-end>
+            {talk.end}
+          </button>
+        </div>
+        <p class="talk-hint">{talk.uploadHint}</p>
+
+        <section class="talk-memory" data-talk-memory hidden aria-labelledby="talk-memory-title">
+          <h3 id="talk-memory-title">{talk.memoryTitle}</h3>
+          <h4>{talk.memoryFacts}</h4>
+          <ul data-memory-facts />
+          <h4>{talk.memoryFiles}</h4>
+          <ul data-memory-files />
+          <h4>{talk.memoryTurns}</h4>
+          <ul data-memory-turns />
+          <button type="button" class="btn btn-ghost btn-sm" data-talk-forget>
+            {talk.forget}
+          </button>
+        </section>
+      </div>
+
+      <p class="talk-notice" data-talk-notice role="status" hidden />
+    </dialog>
+  ) : (
+    <dialog class="talk-sheet" data-talk-sheet hidden aria-labelledby="talk-sheet-title">
+      <h2 id="talk-sheet-title" class="talk-sheet-title">
+        {site.hero.talk.label}
+      </h2>
+      <form method="dialog">
+        <button type="submit" class="btn btn-ghost" data-talk-close>
+          {site.hero.talk.close}
+        </button>
+      </form>
+    </dialog>
+  )
+}
+
+<style>
+  .talk-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .talk-sheet-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: var(--text-h3);
+  }
+
+  .talk-terms {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+
+  .talk-term dt {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .talk-term dd {
+    margin: 0.25rem 0 0;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+  }
+
+  .talk-ai,
+  .talk-privacy,
+  .talk-hint,
+  .talk-notice {
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .talk-turnstile {
+    margin-block: 0.75rem;
+  }
+
+  .talk-log {
+    display: grid;
+    gap: 0.5rem;
+    max-height: 40svh;
+    margin: 0.75rem 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .talk-log :global(li) {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+  }
+
+  .talk-log :global(li[data-role='user']) {
+    justify-self: end;
+    background: var(--bg-3);
+  }
+
+  .talk-log :global(.talk-who) {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--ink-muted);
+  }
+
+  .talk-type {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .talk-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius-sm);
+    background: var(--field-bg);
+    color: var(--ink);
+  }
+
+  .talk-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .talk-upload {
+    cursor: pointer;
+  }
+
+  .talk-upload:focus-within {
+    outline: 2px solid var(--focus);
+  }
+
+  .talk-memory {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: var(--text-sm);
+  }
+
+  .talk-memory h3,
+  .talk-memory h4 {
+    margin: 0.5rem 0 0.25rem;
+    font-size: var(--text-sm);
+  }
+</style>

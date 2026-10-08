@@ -2,6 +2,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  BUST_LIFT,
+  BUST_SHARE,
+  bustBounds,
+  bustFramingFor,
   FACE_CHIN_AIR,
   FACE_CROWN_AIR,
   FACE_FOV,
@@ -88,4 +92,19 @@ test('the figure framings are unchanged and look at the axis', () => {
   assert.equal(small.fov, 28);
   assert.equal(small.targetY, 1.56);
   assert.equal(small.targetZ, 0);
+});
+
+test('the kinect-demo look frames the head and shoulders at 75 percent of the height, lifted on landscape', () => {
+  const head = { minY: 1.4, maxY: 1.75, centreZ: 0.02 };
+  const bust = bustBounds(head);
+  assert.ok(Math.abs(bust.minY - 1.25) < 1e-9);
+  assert.equal(bust.maxY, 1.75);
+  for (const aspect of [0.6, 1, 1.6, 2.2]) {
+    const f = bustFramingFor(aspect, bust);
+    const visible = 2 * f.distance * Math.tan((f.fov * Math.PI) / 360);
+    assert.ok(Math.abs((bust.maxY - bust.minY) / visible - BUST_SHARE) < 1e-9);
+    assert.ok(Math.abs(f.targetY - (1.5 - BUST_LIFT * f.t * visible)) < 1e-9);
+    assert.equal(f.targetZ, 0.02);
+  }
+  assert.equal(bustFramingFor(0.6, bust).targetY, 1.5);
 });

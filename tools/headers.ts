@@ -24,7 +24,11 @@ export const PHASE = Number(process.env.SITE_PHASE ?? 1);
  * Content-Security-Policy-Report-Only, which is the 48 hour observation the plan requires before any new origin
  * is enforced. Everything else about Phase 2 (microphone, reporting endpoint) is applied as normal.
  */
-export const REPORT_ONLY = process.env.CSP_ROLLOUT === 'report-only';
+export const reportOnlyFrom = (env: Record<string, string | undefined>): boolean =>
+  env.CSP_ROLLOUT === 'report-only' || env.REPORT_ONLY === '1' || env.REPORT_ONLY === 'true';
+
+/** Either spelling works: CSP_ROLLOUT=report-only (the runbook's) or REPORT_ONLY=1 (the Phase 2 contract's). */
+export const REPORT_ONLY = reportOnlyFrom(process.env);
 
 /** Cloudflare's documented limits for _headers. render() refuses to emit a file that breaks them. */
 export const MAX_RULES = 100;
@@ -400,7 +404,7 @@ export const simulate = (headersText: string, path: string): Record<string, stri
 export const trace = (headersText: string, path: string): Simulation => applyRules(parseHeaders(headersText), path);
 
 const usage = `usage:
-  node tools/headers.ts --emit <path>   write the _headers file (SITE_PHASE=1|2, CSP_ROLLOUT=report-only)
+  node tools/headers.ts --emit <path>   write the _headers file (SITE_PHASE=1|2, REPORT_ONLY=1 or CSP_ROLLOUT=report-only)
   node tools/headers.ts --print         print it to stdout`;
 
 function main(argv: readonly string[]): void {

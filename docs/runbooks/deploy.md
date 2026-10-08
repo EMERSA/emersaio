@@ -66,9 +66,22 @@ submit the domain at hstspreload.org. The header already carries `preload`. Prel
 
 ## Phase 2 header rollout
 
-1. Build and deploy with `SITE_PHASE=2` and `CSP_ROLLOUT=report-only`. The home page then carries the Phase 1
+0. Before the first Phase 2 deploy: set the secrets (`CONVAI_API_KEY`, `TURNSTILE_SECRET`, `VISITOR_HMAC_KEY`,
+   and `NVIDIA_API_KEY` on beta only; secrets.md), set the `TURNSTILE_SITEKEY` var in `wrangler.jsonc` and the
+   same key as the `PUBLIC_TURNSTILE_SITEKEY` build variable (the sheet reads it at build time), and apply
+   migration `0002_memory.sql` with `npm run db:migrate` (and `npm run db:migrate:beta`). Check it with
+   `npx wrangler d1 execute emersa-memory --remote --command "select name from sqlite_master"`: `visitor`,
+   `session`, `turn`, `fact`, `quota` and `document` must be listed.
+1. Build and deploy with `SITE_PHASE=2` and `REPORT_ONLY=1` (`CSP_ROLLOUT=report-only` is the same switch). The home page then carries the Phase 1
    policy enforced plus the Phase 2 policy as `Content-Security-Policy-Report-Only`, `microphone=(self)` and
    `Reporting-Endpoints` pointing at `/api/csp`.
 2. Watch the `emersa_metrics` dataset (Analytics Engine SQL API, kind `csp`) for 48 hours. Every report names a
    directive and a blocked host; explain each one or fix the policy in `tools/headers.ts`.
-3. At zero unexplained reports, remove `CSP_ROLLOUT` and deploy again. The policy is now enforced.
+   While the window is open the enforced Phase 1 policy still blocks Turnstile and Convai, so Talk shows its
+   "person check did not load" notice to real visitors. Keep the Talk button off the launch announcement until
+   step 3.
+3. At zero unexplained reports, remove `REPORT_ONLY` (or `CSP_ROLLOUT`) and deploy again. The policy is now
+   enforced. `bash tests/browser/probe.sh https://emersa.io` must show one `Content-Security-Policy` on `/` with
+   `api.convai.com` in it, and none on `/docs`.
+4. Rollback: build with `SITE_PHASE=1`. The home page loses the button and the policy in the same deploy; the
+   Worker routes stay and answer only same-origin calls.

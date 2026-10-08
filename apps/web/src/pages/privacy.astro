@@ -7,8 +7,9 @@
 import { legal } from '../data/legal';
 import { site } from '../data/site.ts';
 import Base from '../layouts/Base.astro';
+import { TALK_ENABLED } from '../lib/phase.ts';
 
-const updated = '7 October 2026';
+const updated = TALK_ENABLED ? '8 October 2026' : '7 October 2026';
 const browserKeys = [
   { key: 'em-theme', where: 'local storage', what: 'whether you chose the dark or the light theme.' },
   {
@@ -32,10 +33,19 @@ const browserKeys = [
     <header class="page-head">
       <p class="eyebrow">Legal</p>
       <h1>Privacy policy</h1>
-      <p class="lead">
+      {
+        TALK_ENABLED ? (
+          <p class="lead">
+            This site runs no analytics. We receive personal data only when you write to us, or when you choose to
+            talk with Emily.
+          </p>
+        ) : (
+          <p class="lead">
         This site sets no cookies and runs no analytics. The only personal data we receive is what you choose to send
         us through the contact form.
       </p>
+        )
+      }
       <p class="page-meta">Last updated {updated}</p>
     </header>
 
@@ -51,9 +61,21 @@ const browserKeys = [
 
       <h2 id="summary">The short version</h2>
       <ul>
-        <li>No cookies are set, by us or by anyone else.</li>
+        {
+          TALK_ENABLED ? (
+            <li>No cookies are set unless you choose to talk with Emily; then one, described below.</li>
+          ) : (
+            <li>No cookies are set, by us or by anyone else.</li>
+          )
+        }
         <li>No analytics, no advertising, no tracking pixels and no third-party scripts run on this site.</li>
-        <li>The contact form sends your message to us by email. That is the only time this site handles personal data.</li>
+        {
+          TALK_ENABLED ? (
+            <li>The contact form and, if you choose, a conversation with Emily are the only times this site handles personal data.</li>
+          ) : (
+            <li>The contact form sends your message to us by email. That is the only time this site handles personal data.</li>
+          )
+        }
         <li>We never store your IP address.</li>
       </ul>
 
@@ -107,31 +129,96 @@ const browserKeys = [
         count requests by route and outcome only, never by person.
       </p>
 
-      <h2 id="voice">Voice features: not yet enabled</h2>
-      <p>
-        This site is designed to be guided by a synthetic being, Emily. Today she follows a script: nothing you do
-        while she talks is recorded or sent anywhere. A later version of the site will let you talk with her. When that
-        arrives it will work like this, and this policy will be updated first:
-      </p>
-      <ul>
-        <li>
-          <strong>Microphone.</strong> Used only after you tap Start talking, only while a conversation is open, and
-          switched off the moment you end it.
-        </li>
-        <li>
-          <strong>Memory.</strong> What you say and what Emily replies, kept so she can pick the conversation up next
-          time. Nothing is stored before you give consent.
-        </li>
-        <li>
-          <strong>Consent.</strong> A single clear step before the microphone or memory is used, with a text-only
-          alternative that stores nothing.
-        </li>
-        <li>
-          <strong>What you remember about me, and Forget me.</strong> A panel that shows everything held about you and
-          a button that erases all of it in one go.
-        </li>
-      </ul>
-      <p>None of this is switched on today.</p>
+      {
+        TALK_ENABLED ? (
+          <Fragment>
+            <h2 id="voice">Talking with Emily</h2>
+            <p>
+              On the home page you can talk with Emily, by voice or by typing. Nothing about it starts until you read
+              what happens and tap Start talking.
+            </p>
+            <h3>What is collected</h3>
+            <ul>
+              <li>
+                <strong>Your voice</strong>, while a conversation is open. It is turned into words to answer you and
+                is not kept as a recording by us.
+              </li>
+              <li>
+                <strong>What you say and what Emily replies</strong>, as text, so she can pick the conversation up
+                next time.
+              </li>
+              <li>
+                <strong>A few facts</strong> picked out of the conversation, such as your name, your company or what
+                you are interested in.
+              </li>
+              <li>
+                <strong>Files you add.</strong> We keep only the text read from the file (at most 20,000 characters),
+                never the file itself.
+              </li>
+              <li>
+                <strong>One cookie</strong>, <code>em_vid</code>: a random identifier, set only after you tap Start
+                talking, readable only by our server, so Emily knows it is you next time. It is not used for anything
+                else and is not shared.
+              </li>
+            </ul>
+            <h3>Who handles it</h3>
+            <ul>
+              <li>
+                <strong>Cloudflare, Inc.</strong> runs the site and the database that holds the memory, and checks
+                that you are a person (Turnstile) before a conversation starts.
+              </li>
+              <li>
+                <strong>Convai Technologies Inc.</strong>, in the United States, turns your speech into text, writes
+                Emily's replies and speaks them. The transfer is covered by the safeguards UK law requires.
+              </li>
+              <li>
+                <strong>Microsoft</strong> handles speech only if we switch to its Azure speech service. We will
+                update this list before that happens.
+              </li>
+            </ul>
+            <h3>Why, and for how long</h3>
+            <p>
+              We rely on your consent, given when you tap Start talking. Memory is kept for 12 months after your last
+              conversation and then deleted automatically. Emily keeps at most 200 turns and 10 files a day.
+            </p>
+            <h3>Seeing and erasing it</h3>
+            <p>
+              In the Talk panel, What you remember shows everything held about you. Forget me deletes all of it at
+              once, including the copy at Convai, and removes the cookie. You can also type to Emily without using
+              the microphone at all.
+            </p>
+            <p>Emily is an AI and may make mistakes.</p>
+          </Fragment>
+        ) : (
+          <Fragment>
+          <h2 id="voice">Voice features: not yet enabled</h2>
+          <p>
+            This site is designed to be guided by a synthetic being, Emily. Today she follows a script: nothing you do
+            while she talks is recorded or sent anywhere. A later version of the site will let you talk with her. When that
+            arrives it will work like this, and this policy will be updated first:
+          </p>
+          <ul>
+            <li>
+              <strong>Microphone.</strong> Used only after you tap Start talking, only while a conversation is open, and
+              switched off the moment you end it.
+            </li>
+            <li>
+              <strong>Memory.</strong> What you say and what Emily replies, kept so she can pick the conversation up next
+              time. Nothing is stored before you give consent.
+            </li>
+            <li>
+              <strong>Consent.</strong> A single clear step before the microphone or memory is used, with a text-only
+              alternative that stores nothing.
+            </li>
+            <li>
+              <strong>What you remember about me, and Forget me.</strong> A panel that shows everything held about you and
+              a button that erases all of it in one go.
+            </li>
+          </ul>
+          <p>None of this is switched on today.</p>
+          </Fragment>
+        )
+      }
 
       <h2 id="rights">Your rights</h2>
       <p>

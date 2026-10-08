@@ -73,6 +73,11 @@ export function kinectV2GreyToMm(grey: number): number {
  * quantisation and the dropout read as a sensor's rather than as the viewer's own rays.
  */
 export const SENSOR_FACE = { distanceM: 1.05, belowEyeDeg: 7, fovDeg: 18 } as const;
+/**
+ * The kinect-demo look's sensor: 1.6 m from the head and shoulders, 4 degrees below their centre, its 22 degree
+ * lens about 0.62 m tall there, so the bust (0.5 m) fills the frame with a little air, as in three's recording.
+ */
+export const SENSOR_BUST = { distanceM: 1.6, belowDeg: 4, fovDeg: 22 } as const;
 /** The same sensor for the whole figure (the hybrid and kinect looks): on a tripod, level with the chest. */
 export const SENSOR_FIGURE = { distanceM: 3.2, heightM: 1, lookAtY: 0.9, fovDeg: 36 } as const;
 /** The eye line as a share of the head's height above the chin. */

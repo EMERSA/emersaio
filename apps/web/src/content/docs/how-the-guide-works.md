@@ -4,7 +4,7 @@ description: "The scripted tour behind the home page: stops, captions, voice cli
 section: beings
 order: 2
 tour: welcome
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 ## A tour, not a conversation
@@ -33,6 +33,10 @@ Start the tour from the hero, then use Next, Back, Replay and Mute. The keyboard
 
 If your system asks for reduced motion, the site listens. The page moves between stops without animation, and you advance with a tap or a key instead of a timer. The 3D being is replaced by a still poster, and nothing on the page animates. The tour then runs with captions only: the voice plays with the 3D guide, and a line under the controls says so.
 
+## Talking with Emily
+
+When Talk is switched on, the Talk to Emily button opens a sheet that says what happens before anything does: the microphone, who handles your voice, what Emily remembers and for how long. Start talking asks the site's edge program for a one-hour session; the voice service's key never reaches your browser. Emily then listens, answers in her own voice and her face moves with every sound she makes. Captions show both sides of the conversation. If you would rather not use the microphone, type instead. What you remember shows what is kept, Forget me erases it, and End closes the conversation and the microphone. A conversation lasts at most 20 minutes.
+
 ## Without JavaScript or WebGL
 
 Every page works without JavaScript: the content, the navigation and the contact form. The tour is then a set of captions you can read in order. Without WebGL, the being is a poster and the tour runs with captions only.
@@ -45,5 +49,6 @@ The order is chosen so that the headline paints first and nothing heavy gets in 
 2. A small site script of a few kilobytes. No request to the site's API is made at this point.
 3. On a desktop with a mouse, the 3D runtime loads after the headline has painted and the browser is idle. On a phone, it loads only when you tap "Start the tour", so your data plan is not spent on a being you did not ask for.
 4. Voice clips, one stop at a time.
+5. Talk to Emily loads nothing until you tap it. The tap opens the consent sheet and adds the person check; only Start talking fetches the voice code and connects.
 
 If the frame rate drops, the being steps down through simpler looks rather than stuttering.

@@ -13,9 +13,12 @@ import { compose, hostCheck, quota, rateLimit, readBody, sameSiteOnly, traversal
 import type { Env } from './lib/env.ts';
 import { dispatch, looksLikeTraversal, notFound, type Route } from './lib/http.ts';
 import { CONTACT_SENDS } from './lib/quota.ts';
+import { brain, MAX_BRAIN_BYTES } from './routes/brain.ts';
 import { contact, contactReplies, MAX_FORM_BYTES } from './routes/contact.ts';
 import { cspReport } from './routes/csp.ts';
 import { health } from './routes/health.ts';
+import { MAX_TURN_BYTES, memoryDelete, memoryGet, memoryTurn } from './routes/memory.ts';
+import { MAX_SESSION_BYTES, talkRevoke, talkSession, talkUpload } from './routes/talk.ts';
 import { runScheduled } from './scheduled.ts';
 
 /** Every /api/* path. The key is the path after /api/, without a trailing slash. */
@@ -44,6 +47,40 @@ const API: Readonly<Record<string, Route>> = {
       'csp',
       [traversalGuard, hostCheck, sameSiteOnly({ allowHeaderless: true }), rateLimit('CSP_LIMITER')],
       cspReport,
+    ),
+  },
+  // Phase 2. Visitor caps (sessions, turns, uploads) are per visitor, so the handlers take them from D1 once the
+  // cookie is verified; the D1 quota() middleware counts sitewide totals and is not needed here.
+  'talk/session': {
+    POST: compose(
+      'talk-session',
+      [traversalGuard, hostCheck, sameSiteOnly(), readBody(MAX_SESSION_BYTES), rateLimit('TALK_LIMITER')],
+      talkSession,
+    ),
+  },
+  'talk/revoke': {
+    POST: compose('talk-revoke', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('MEMORY_LIMITER')], talkRevoke),
+  },
+  // No readBody: multipart, read by the handler under its own 2 MB cap.
+  'talk/upload': {
+    POST: compose('talk-upload', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('UPLOAD_LIMITER')], talkUpload),
+  },
+  brain: {
+    POST: compose(
+      'brain',
+      [traversalGuard, hostCheck, sameSiteOnly(), readBody(MAX_BRAIN_BYTES), rateLimit('BRAIN_LIMITER')],
+      brain,
+    ),
+  },
+  memory: {
+    GET: compose('memory', [traversalGuard, hostCheck, rateLimit('MEMORY_LIMITER')], memoryGet),
+    DELETE: compose('memory', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('MEMORY_LIMITER')], memoryDelete),
+  },
+  'memory/turns': {
+    POST: compose(
+      'memory-turns',
+      [traversalGuard, hostCheck, sameSiteOnly(), readBody(MAX_TURN_BYTES), rateLimit('MEMORY_LIMITER')],
+      memoryTurn,
     ),
   },
 };

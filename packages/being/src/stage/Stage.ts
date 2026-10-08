@@ -10,7 +10,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { Backdrop, type BackdropUniforms } from './Backdrop.ts';
-import { type Framing, faceFramingFor, framingFor, type HeadBounds, visibleHeight } from './framing.ts';
+import { bustFramingFor, type Framing, faceFramingFor, framingFor, type HeadBounds, visibleHeight } from './framing.ts';
 import type { BloomChain, BloomChainOptions } from './postprocessing.ts';
 
 /** The figure stands with its feet at y = 0 and its crown here, facing +Z (avatar asset contract). */
@@ -35,6 +35,11 @@ const COMPILE_WAIT_MS = 6000;
 export const PARALLAX_YAW_DEG = 6;
 export const PARALLAX_PITCH_DEG = 3;
 const PARALLAX_EASE_S = 0.35;
+/** The kinect-demo look's orbit, like three's webgl_video_kinect, and its idle drift. */
+export const ORBIT_YAW_DEG = 25;
+export const ORBIT_PITCH_DEG = 12;
+const DRIFT_YAW_DEG = 4;
+const DRIFT_PITCH_DEG = 1.5;
 
 export interface StageOptions {
   canvas: HTMLCanvasElement;
@@ -94,6 +99,14 @@ export class Stage {
   private readonly parallaxGoal = new Vector2();
   private readonly parallax = new Vector2();
   private parallaxOn = false;
+  /** The parallax's reach in degrees; the kinect-demo look widens it into an orbit. */
+  private orbitYawDeg = PARALLAX_YAW_DEG;
+  private orbitPitchDeg = PARALLAX_PITCH_DEG;
+  /** Whether the view drifts slowly about the subject while idle, and the drift's clock. */
+  private drift = false;
+  private driftClock = 0;
+  /** Frame the bust (kinect-demo) rather than the head alone. */
+  private bust = false;
   private frame: FrameCallback = () => {};
   private layoutCallback: (() => void) | null = null;
   private wanted = false;
@@ -313,9 +326,10 @@ export class Stage {
   }
 
   /** Frame the head alone (the face look) or the whole figure (null). The small docked stage keeps its own framing. */
-  setFaceBounds(bounds: HeadBounds | null): void {
-    if (bounds === this.faceBounds) return;
+  setFaceBounds(bounds: HeadBounds | null, bust = false): void {
+    if (bounds === this.faceBounds && bust === this.bust) return;
     this.faceBounds = bounds;
+    this.bust = bust;
     this.layout();
   }
 
@@ -326,6 +340,18 @@ export class Stage {
   setParallax(x: number, y: number): void {
     this.parallaxGoal.set(MathUtils.clamp(x, -1, 1), MathUtils.clamp(y, -1, 1));
     this.parallaxOn = true;
+  }
+
+  /**
+   * The orbit the pointer drives, in degrees of yaw and pitch at the canvas edge, and whether the view drifts by a
+   * few degrees over about ten seconds when nobody moves it (never under reduced motion; the caller decides).
+   */
+  setOrbit(yawDeg: number, pitchDeg: number, drift: boolean): void {
+    this.orbitYawDeg = yawDeg;
+    this.orbitPitchDeg = pitchDeg;
+    this.drift = drift;
+    if (!drift) this.driftClock = 0;
+    this.placeCamera();
   }
 
   /** The drawing surface in CSS pixels. */
@@ -402,7 +428,12 @@ export class Stage {
 
     const aspect = width / height;
     const small = height < SMALL_STAGE_PX;
-    this.framing = small || !this.faceBounds ? framingFor(aspect, small) : faceFramingFor(aspect, this.faceBounds);
+    this.framing =
+      small || !this.faceBounds
+        ? framingFor(aspect, small)
+        : this.bust
+          ? bustFramingFor(aspect, this.faceBounds)
+          : faceFramingFor(aspect, this.faceBounds);
     this.camera.aspect = aspect;
     this.camera.fov = this.framing.fov;
     this.cameraTarget.set(0, this.framing.targetY, this.framing.targetZ);
@@ -419,8 +450,12 @@ export class Stage {
 
   /** The camera on its orbit about the target: level in front of it, turned by the eased parallax. */
   private placeCamera(): void {
-    const yaw = this.parallax.x * MathUtils.degToRad(PARALLAX_YAW_DEG);
-    const pitch = this.parallax.y * MathUtils.degToRad(PARALLAX_PITCH_DEG);
+    // The drift: a slow Lissajous of a few degrees, period about 10 s in yaw and 14 s in pitch.
+    const t = this.driftClock;
+    const driftYaw = this.drift ? DRIFT_YAW_DEG * Math.sin((t * 2 * Math.PI) / 10) : 0;
+    const driftPitch = this.drift ? DRIFT_PITCH_DEG * Math.sin((t * 2 * Math.PI) / 14) : 0;
+    const yaw = MathUtils.degToRad(this.parallax.x * this.orbitYawDeg + driftYaw);
+    const pitch = MathUtils.degToRad(this.parallax.y * this.orbitPitchDeg + driftPitch);
     const d = this.framing.distance;
     this.camera.position.set(
       this.cameraTarget.x + d * Math.sin(yaw) * Math.cos(pitch),
@@ -431,6 +466,13 @@ export class Stage {
   }
 
   private easeParallax(dt: number): void {
+    if (this.drift) {
+      this.driftClock += dt;
+      if (!this.parallaxOn) {
+        this.placeCamera();
+        return;
+      }
+    }
     if (!this.parallaxOn) return;
     const k = 1 - Math.exp(-dt / PARALLAX_EASE_S);
     this.parallax.x += (this.parallaxGoal.x - this.parallax.x) * k;

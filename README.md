@@ -28,6 +28,8 @@ npm run check               # astro check, tsc for worker and tools, biome ci
 npm test                    # node --test: worker, packages/being, tools (the _headers simulator)
 npm run build               # astro build, then _headers, csp-check, preflight, bundle-budget
 npm run headers             # regenerate apps/web/dist/_headers alone (SITE_PHASE=2 for the Talk block)
+# Phase 2 (Talk to Emily): SITE_PHASE=2 REPORT_ONLY=1 npm run build for the 48 h observation window, then
+# SITE_PHASE=2 npm run build to enforce. PUBLIC_TURNSTILE_SITEKEY sets the sheet's site key at build time.
 node scripts/og.mjs         # render apps/web/public/og.png with the installed Edge (manual)
 npx lhci autorun            # Lighthouse CI against dist (mobile, slow 4G, budgets)
 ```

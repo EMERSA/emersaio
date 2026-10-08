@@ -92,7 +92,13 @@ export const sameSiteOnly =
     return fail(403, 'Requests from other sites are not accepted.');
   };
 
-export type LimiterName = 'CONTACT_LIMITER' | 'CSP_LIMITER';
+export type LimiterName =
+  | 'CONTACT_LIMITER'
+  | 'CSP_LIMITER'
+  | 'TALK_LIMITER'
+  | 'BRAIN_LIMITER'
+  | 'MEMORY_LIMITER'
+  | 'UPLOAD_LIMITER';
 
 /**
  * The Cloudflare rate limiter named in wrangler.jsonc, when bound. It is advisory (per location, eventually

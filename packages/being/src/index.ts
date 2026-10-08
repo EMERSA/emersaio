@@ -16,15 +16,19 @@ import { BeingDepthSource } from './data/depth/BeingDepthSource.ts';
 import type { DepthSource } from './data/depth/DepthSource.ts';
 import { EYE_LINE_SHARE, scatterFor } from './data/depth/depthMath.ts';
 import { FAN_LINES, FAN_PLANE_M } from './data/fanMath.ts';
-import { type KeepZone, KinectCloud } from './data/KinectCloud.ts';
+import { type KeepZone, KINECT_DEFAULTS, KinectCloud } from './data/KinectCloud.ts';
 import { TokenMeter } from './data/TokenMeter.ts';
 import { FaceDriver } from './face/FaceDriver.ts';
-import { IdleSource, TextVisemesSource, VisemeTimelineSource } from './face/index.ts';
 import type { FaceSource } from './face/source.ts';
+import type { ArkitStreamSource } from './face/sources/ArkitStream.ts';
+import { IdleSource } from './face/sources/Idle.ts';
+import { TextVisemesSource } from './face/sources/TextVisemes.ts';
+import { VisemeTimelineSource } from './face/sources/VisemeTimeline.ts';
 import { getAudioOutput, unlock } from './speech/audioUnlock.ts';
 import { RIM_HEIGHT_M, RIM_RADIUS_SHARE, RIM_RIGHT_SHARE } from './stage/Backdrop.ts';
+import { bustBounds, type HeadBounds } from './stage/framing.ts';
 import { CLOUD_GRIDS, type QualityCaps, QualityMonitor, qualityProfile, startingQuality } from './stage/Quality.ts';
-import { Stage } from './stage/Stage.ts';
+import { ORBIT_PITCH_DEG, ORBIT_YAW_DEG, PARALLAX_PITCH_DEG, PARALLAX_YAW_DEG, Stage } from './stage/Stage.ts';
 import { ThemeUniforms } from './stage/ThemeUniforms.ts';
 import type {
   BeingHandle,
@@ -517,6 +521,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
   let effective: Look = 'wire';
   /** The head as measured once in the bind pose: the face framing, the sensor, the keep zones and the fan's starts. */
   let head: HeadMeasure | null = null;
+  /** The head-and-shoulders crop under it (the kinect-demo look). */
+  let headBust: HeadBounds | null = null;
   let headBone: Object3D | null = null;
   const headBind = new Matrix4();
   /** The head bone's movement since the bind pose, and the keep zones carried along with it each frame. */
@@ -529,6 +535,9 @@ export function createBeing(options: BeingOptions): BeingHandle {
   let shatterManual = 0;
   let shatterManualAt = Number.NEGATIVE_INFINITY;
   let introAt: number | null = null;
+  /** The kinect-demo look's wire head (off unless asked for), and whether the page picked the cloud's mode itself. */
+  let demoHeadWire = options.headWire === true;
+  let modeChosen = false;
 
   /** A keep zone from the head's bind-pose bounds, moved with the head bone. */
   const placeZone = (zone: KeepZone, shape: { up: number; forward: number; radius: number }): void => {
@@ -552,28 +561,45 @@ export function createBeing(options: BeingOptions): BeingHandle {
   const applyScene = (): void => {
     effective = small || profile.cloud === null ? 'wire' : look;
     const isFace = effective === 'face';
+    // The kinect-demo look: head and shoulders as tiny shards from a fixed sensor, no wire unless asked for.
+    const isDemo = effective === 'kinect-demo';
+    const headLook = isFace || isDemo;
     const casters: Mesh[] = [];
     if (avatar) {
-      const headWire = effective !== 'kinect';
+      const headWire = isDemo ? demoHeadWire : effective !== 'kinect';
       const bodyWire = effective === 'wire';
       showWire(avatar.head, headWire);
-      if (!headWire || isFace) casters.push(avatar.head);
+      if (!headWire || isFace || isDemo) casters.push(avatar.head);
       if (avatar.body) {
         showWire(avatar.body, bodyWire);
         if (!bodyWire && !isFace) casters.push(avatar.body);
       }
     }
+    if (!modeChosen) cloud.setMode(isDemo ? 'shards' : KINECT_DEFAULTS.mode);
+    stage.setOrbit(
+      isDemo ? ORBIT_YAW_DEG : PARALLAX_YAW_DEG,
+      isDemo ? ORBIT_PITCH_DEG : PARALLAX_PITCH_DEG,
+      isDemo && !reducedMotion,
+    );
     // With a sensor or a video the cloud is theirs, and the being's own depth pass has nothing to add.
     beingSource.setMeshes(external ? [] : casters);
     cloud.setSource(external ?? beingSource);
-    const grid = (isFace ? profile.headCloud : profile.cloud) ?? CLOUD_GRIDS.reduced;
+    const demoGrid = touch && profile.bustCloud ? CLOUD_GRIDS.bustLite : profile.bustCloud;
+    const grid = (isDemo ? demoGrid : isFace ? profile.headCloud : profile.cloud) ?? CLOUD_GRIDS.reduced;
     cloud.setGrid(grid.cols, grid.rows);
     beingSource.setSize(grid.cols, grid.rows);
     cloud.setEnabled(effective !== 'wire');
-    const bounds = isFace && head ? head.bounds : null;
+    const headBounds = headLook && head ? head.bounds : null;
+    // One object per head: the stage compares bounds by identity, and its layout calls back into this function.
+    const bust = isDemo && headBounds ? headBust : null;
+    const bounds = bust ?? headBounds;
+    cloud.setCrop(bust ? bust.minY : null);
     // The sensor stands in front of the head in the face look and on its tripod before the figure otherwise; the
     // cloud's ramp is centred on what it looks at until the probe has measured the figure.
-    if (bounds) {
+    if (bust) {
+      beingSource.placeForBust(bust);
+      cloud.setSubject(0, (bust.minY + bust.maxY) / 2, bust.centreZ);
+    } else if (bounds) {
       beingSource.placeForHead(bounds);
       cloud.setSubject(0, bounds.minY + (bounds.maxY - bounds.minY) * EYE_LINE_SHARE, bounds.centreZ);
     } else {
@@ -602,25 +628,25 @@ export function createBeing(options: BeingOptions): BeingHandle {
       floor.setFloor(profile.rim && !small);
       floor.setPlane(plinth, bounds ? PLINTH_RADIUS_M : FLOOR_RADIUS);
     }
-    stage.setFaceBounds(bounds);
+    stage.setFaceBounds(bounds, bust !== null);
     // The one rim light: behind the head, 8 percent of the frame to its right, its radius 0.75 of the head's
     // height (the brief); behind the chest for the figure looks.
     stage.backdrop?.setEnabled(profile.rim);
-    if (bounds) {
-      const headHeight = bounds.maxY - bounds.minY;
+    if (headBounds) {
+      const headHeight = headBounds.maxY - headBounds.minY;
       stage.backdrop?.setFocus(
         RIM_RIGHT_SHARE * stage.frameSize().width,
-        (bounds.minY + bounds.maxY) / 2,
-        bounds.centreZ,
+        (headBounds.minY + headBounds.maxY) / 2,
+        headBounds.centreZ,
         2 * RIM_RADIUS_SHARE * headHeight,
       );
     } else {
       stage.backdrop?.setFocus(0, RIM_HEIGHT_M, FIGURE_RIM_Z, FIGURE_RIM_DIAMETER_M);
     }
-    stage.setBloom(profile.bloom, isFace ? FACE_BLOOM_RADIUS : profile.bloomRadius);
-    stage.setBloomScale(isFace ? FACE_BLOOM_SCALE : 1);
+    stage.setBloom(profile.bloom, headLook ? FACE_BLOOM_RADIUS : profile.bloomRadius);
+    stage.setBloomScale(headLook ? FACE_BLOOM_SCALE : 1);
     // The fan belongs to the face look on fine-pointer desktops: never on touch devices, never in the lite tier.
-    fan.setAllowed(isFace && profile.fan && !small && !touch);
+    fan.setAllowed(headLook && profile.fan && !small && !touch);
   };
 
   const applyQuality = (quality: Quality): void => {
@@ -645,7 +671,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
   applyQuality(monitor.current());
   // The rim light sits a share of the frame's width to the right of the head, so a resize places it again.
   stage.onLayout(() => {
-    if (head && effective === 'face') applyScene();
+    if (head && (effective === 'face' || effective === 'kinect-demo')) applyScene();
   });
 
   stage.onFrame((dt, elapsed) => {
@@ -681,15 +707,20 @@ export function createBeing(options: BeingOptions): BeingHandle {
     // The ring circles the hips, which a head-and-shoulders framing leaves out; drawing it there would only put a
     // bright band across the face. The face look leaves the hips out too.
     if (ring) {
-      ring.points.visible = !small && effective !== 'face';
+      ring.points.visible = !small && effective !== 'face' && effective !== 'kinect-demo';
       ring.update(bands.bands, dt);
     }
     // The cloud scatters with the token meter, like the sparkle: data leaving the body while the being thinks; and
     // with the pieces, so the head's cloud comes apart and together with its wire.
     scatter += (scatterFor(tokenRate, tokenPulse) - scatter) * (1 - Math.exp(-dt / SCATTER_EASE_S));
-    cloud.setScatter(Math.max(scatter, shatter));
+    // The kinect-demo face is all cloud, millimetre shards with no wire to hold it: it scatters for the intro (and
+    // a page's explicit setShatter) only, never with the token meter, so a speaking face stays a face.
+    const demo = effective === 'kinect-demo';
+    const inIntro = introAt !== null && elapsed - introAt < INTRO_S;
+    const manual = shatterGoal(shatterManual, now - shatterManualAt, 0, 0);
+    cloud.setScatter(demo ? (inIntro ? shatter : manual) : Math.max(scatter, shatter));
     // The eyes and the mouth travel with the head bone; the dropout leaves them alone.
-    if (effective === 'face' && head) {
+    if ((effective === 'face' || effective === 'kinect-demo') && head) {
       if (headBone) headDelta.multiplyMatrices(headBone.matrixWorld, headBind);
       placeZone(eyesZone, EYES_ZONE);
       placeZone(mouthZone, MOUTH_ZONE);
@@ -739,6 +770,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
     // The head in the bind pose, before the rig moves anything: the face framing, the sensor and the fan read it.
     result.root.updateMatrixWorld(true);
     head = measureHead(result.head, FAN_LINES);
+    headBust = bustBounds(head.bounds);
     headBone = result.bones.head ?? null;
     if (headBone) headBind.copy(headBone.matrixWorld).invert();
     fan.setPoints(head.points, headBone ? headBone.matrixWorld : new Matrix4());
@@ -832,6 +864,40 @@ export function createBeing(options: BeingOptions): BeingHandle {
     });
   };
 
+  // The ARKit stream joins the face only when a talk session pushes its first frame; the module is fetched then,
+  // so the home page's runtime chunk never carries it. Frames that arrive while it loads keep only the newest.
+  let arkit: ArkitStreamSource | null = null;
+  let arkitLoading = false;
+  let arkitAttached = false;
+  let arkitPending: Float32Array | null = null;
+  const pushArkit = (frame: ArrayLike<number>): void => {
+    if (disposed) return;
+    if (arkit) {
+      arkit.push(frame);
+      if (!arkitAttached && face) {
+        face.add(arkit);
+        arkitAttached = true;
+      }
+      return;
+    }
+    arkitPending = Float32Array.from(frame);
+    if (arkitLoading) return;
+    arkitLoading = true;
+    void import('./face/sources/ArkitStream.ts').then(
+      ({ ArkitStreamSource: Source }) => {
+        if (disposed) return;
+        arkit = new Source();
+        const pending = arkitPending;
+        arkitPending = null;
+        if (pending) pushArkit(pending);
+      },
+      (error: unknown) => {
+        arkitLoading = false;
+        options.onError?.(error);
+      },
+    );
+  };
+
   const handle: BeingHandle = {
     ready,
     speak,
@@ -862,8 +928,9 @@ export function createBeing(options: BeingOptions): BeingHandle {
       pendingLook.y = y;
       pendingLook.set = true;
       rig?.lookAt(x, y);
-      // The view eases after the pointer too, by a few degrees at most; the sensor camera stays put.
-      if (!reducedMotion) stage.setParallax(clampUnit(x), clampUnit(y));
+      // The view eases after the pointer too (a few degrees, or the kinect-demo orbit); the sensor camera stays put.
+      // On touch the demo's view only drifts: a finger dragging the orbit about would fight the page's scroll.
+      if (!reducedMotion && !(touch && effective === 'kinect-demo')) stage.setParallax(clampUnit(x), clampUnit(y));
     },
     setListening(on: boolean): void {
       ring?.setListening(on);
@@ -894,13 +961,21 @@ export function createBeing(options: BeingOptions): BeingHandle {
       setClipping: (nearM, farM) => cloud.setClipping(nearM, farM),
       setPointSize: (px) => cloud.setPointSize(px),
       setZOffset: (m) => cloud.setZOffset(m),
-      setMode: (mode) => cloud.setMode(mode),
+      setMode: (mode) => {
+        modeChosen = true;
+        cloud.setMode(mode);
+      },
+      setHeadWire: (on) => {
+        demoHeadWire = on;
+        applyScene();
+      },
       setDisplacement: (value) => cloud.setDisplacement(value),
       setBrightness: (value) => cloud.setBrightness(value),
       setContrast: (value) => cloud.setContrast(value),
       setOpacity: (value) => cloud.setOpacity(value),
       setLineWidth: (px) => cloud.setLineWidth(px),
     },
+    face: { pushArkit },
     stats: () => ({
       fps: stage.fps(),
       drawCalls: stage.drawCalls(),

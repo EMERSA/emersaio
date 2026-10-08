@@ -101,3 +101,36 @@ export function faceFramingFor(aspect: number, head: HeadBounds): Framing {
   );
   return { t, fov: FACE_FOV, distance: distanceFor(FACE_FOV, visible), targetY, targetZ: head.centreZ };
 }
+
+/** The kinect-demo look's head and shoulders: their share of the canvas height, centred, on any aspect. */
+export const BUST_SHARE = 0.75;
+/** The bust's lower edge as a share of the figure's height (its crown): 1.25 m of a 1.75 m figure. */
+export const BUST_FLOOR_SHARE = 1.25 / 1.75;
+
+/** The head-and-shoulders crop under a measured head: from BUST_FLOOR_SHARE of the crown's height up to the crown. */
+export function bustBounds(head: HeadBounds): HeadBounds {
+  return { minY: head.maxY * BUST_FLOOR_SHARE, maxY: head.maxY, centreZ: head.centreZ };
+}
+
+/**
+ * On a landscape canvas the bust rides this share of the visible height above centre, so the shoulders have faded
+ * into the page before the copy block (label, headline) that sits over the lower half of the hero.
+ */
+export const BUST_LIFT = 0.08;
+
+/**
+ * The kinect-demo look: the bust fills BUST_SHARE of the height through the face look's lens, centred on a portrait
+ * canvas and lifted by BUST_LIFT of the height on a landscape one.
+ */
+export function bustFramingFor(aspect: number, bust: HeadBounds): Framing {
+  const height = Math.max(0.05, bust.maxY - bust.minY);
+  const visible = height / BUST_SHARE;
+  const t = faceLayoutT(aspect);
+  return {
+    t,
+    fov: FACE_FOV,
+    distance: distanceFor(FACE_FOV, visible),
+    targetY: (bust.minY + bust.maxY) / 2 - BUST_LIFT * t * visible,
+    targetZ: bust.centreZ,
+  };
+}

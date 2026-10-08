@@ -1,5 +1,6 @@
 import {
   DepthTexture,
+  DoubleSide,
   type Material,
   Mesh,
   MeshBasicMaterial,
@@ -20,6 +21,7 @@ import {
   decodeDepthProbe,
   EYE_LINE_SHARE,
   PROBE_RANGE_M,
+  SENSOR_BUST,
   SENSOR_FACE,
   SENSOR_FIGURE,
   sensorFrame,
@@ -112,7 +114,12 @@ export class BeingDepthSource implements DepthSource {
   private readonly renderer: WebGLRenderer;
   private readonly scene: Scene;
   private readonly reducedMotion: boolean;
-  private readonly depthMaterial = new MeshBasicMaterial({ colorWrite: false });
+  /**
+   * Both sides: the head mesh is open at the eyes and the mouth, and with back faces culled the sensor saw nothing
+   * through them (black slots in the face). Drawn double-sided it records the inner shell behind each opening, so
+   * those cells draw as recessed, dimmer shards and the mouth still opens and closes with the lip sync.
+   */
+  private readonly depthMaterial = new MeshBasicMaterial({ colorWrite: false, side: DoubleSide });
   private meshes: Mesh[] = [];
   private readonly saved: Array<Material | Material[]> = [];
   private readonly probe = new WebGLRenderTarget(PROBE_CELLS.cols, PROBE_CELLS.rows, {
@@ -204,6 +211,17 @@ export class BeingDepthSource implements DepthSource {
       ),
       new Vector3(0, eyeY, head.centreZ),
       SENSOR_FACE.fovDeg,
+    );
+  }
+
+  /** Stand the sensor in front of the head and shoulders (the kinect-demo look), looking at their centre. */
+  placeForBust(bust: HeadBounds): void {
+    const y = (bust.minY + bust.maxY) / 2;
+    const down = (SENSOR_BUST.belowDeg * Math.PI) / 180;
+    this.place(
+      new Vector3(0, y - SENSOR_BUST.distanceM * Math.sin(down), bust.centreZ + SENSOR_BUST.distanceM * Math.cos(down)),
+      new Vector3(0, y, bust.centreZ),
+      SENSOR_BUST.fovDeg,
     );
   }
 

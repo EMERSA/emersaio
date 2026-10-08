@@ -37,6 +37,8 @@ const FORBIDDEN = [
   '.hero-scroll',
   '.chrome-text',
 ];
+/** What may only load after the visitor taps Talk: the lazy talk chunks, the SDK, its transports and Turnstile. */
+const TALK_BYTES = /convai|livekit|challenges\.cloudflare\.com|\/_astro\/talk[.-]|\/api\/(talk|memory|brain)/i;
 const RADII = ['0px', '8px', '16px', '999px', '50%'];
 /** Slack between the page's own clock stamp of the mount and the request event reaching Node. */
 const MOUNT_SLACK_MS = 250;
@@ -83,6 +85,8 @@ try {
         await ctx.addInitScript(instrument);
         const errors = [];
         const apiRequests = [];
+        /** Phase 2: nothing of Talk (the talk chunk, Convai, LiveKit, Turnstile, /api/talk) before a tap. */
+        const talkRequests = [];
         page.on('console', (m) => {
           if (m.type() !== 'error') return;
           const url = m.location()?.url ?? '';
@@ -94,6 +98,7 @@ try {
         page.on('request', (r) => {
           const url = new URL(r.url());
           if (url.pathname.startsWith('/api/')) apiRequests.push({ path: url.pathname, at: Date.now() });
+          if (TALK_BYTES.test(url.href)) talkRequests.push(url.href);
         });
         const issues = [];
         try {
@@ -199,6 +204,7 @@ try {
           if (m.overflow > 0) issues.push(`horizontal overflow ${m.overflow}px`);
           if (m.theme !== theme) issues.push(`data-theme is ${m.theme}, expected ${theme}`);
           if (!m.js) issues.push('html.js not set (theme-boot.js did not run)');
+          for (const href of talkRequests) issues.push(`talk bytes before any tap: ${href}`);
           for (const r of apiRequests) {
             if (m.hasStage) {
               if (!m.mountedAt) issues.push(`${r.path} requested but the being never mounted`);

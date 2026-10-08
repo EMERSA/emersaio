@@ -38,7 +38,7 @@
     // https://integrate.api.nvidia.com/v1 with NVIDIA_API_KEY set as a secret.
     "NIM_BASE_URL": "",
     "NIM_MODEL": "nvidia/nemotron-nano-3-30b-a3b",
-    "CONVAI_CHARACTER_ID": "",
+    "CONVAI_CHARACTER_ID": "1d0a37ce-c9a4-11ef-a59e-42010a7be016",
     "TURNSTILE_SITEKEY": "",
     "PUBLIC_BRAIN": "convai"
   },
@@ -48,7 +48,12 @@
   // authoritative caps. namespace_id only has to be unique within the account; bindings sharing an id share counters.
   "ratelimits": [
     { "name": "CONTACT_LIMITER", "namespace_id": "2001", "simple": { "limit": 5, "period": 60 } },
-    { "name": "CSP_LIMITER", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } }
+    { "name": "CSP_LIMITER", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } },
+    // Phase 2 (plan 4.5): Talk sessions, the NIM text brain, memory reads and writes, file attachments.
+    { "name": "TALK_LIMITER", "namespace_id": "2003", "simple": { "limit": 10, "period": 60 } },
+    { "name": "BRAIN_LIMITER", "namespace_id": "2004", "simple": { "limit": 30, "period": 60 } },
+    { "name": "MEMORY_LIMITER", "namespace_id": "2005", "simple": { "limit": 60, "period": 60 } },
+    { "name": "UPLOAD_LIMITER", "namespace_id": "2006", "simple": { "limit": 5, "period": 60 } }
   ],
 
   // Where 429s, 503-for-missing-binding and CSP reports are counted (free tier: 100k points/day). There is no
@@ -58,14 +63,22 @@
   // Visitor memory and the daily cap of the contact form. Deliberately not bound until the database exists:
   //   1. npx wrangler d1 create emersa-memory --location weur     (EU; the region is fixed at creation)
   //   2. paste the printed database_id below and uncomment the block
-  //   3. npm run db:migrate                                        (applies worker/migrations)
+  //   3. npm run db:migrate                                        (applies worker/migrations: 0001_counters, then
+  //      0002_memory for Talk; an existing database only takes 0002, which wrangler tracks in d1_migrations)
   //   4. the same for beta, which inherits no binding: npx wrangler d1 create emersa-memory-beta --location weur,
   //      then paste its id into the block under env.beta, uncomment it, and run npm run db:migrate:beta
-  // Until then the contact form answers 503 (not connected) even once POSTMARK_TOKEN is set, and the cron logs that
-  // it skipped: bind and migrate the database before the token (worker/routes/contact.ts counts every send here).
-  // "d1_databases": [
-  //   { "binding": "MEMORY", "database_name": "emersa-memory", "database_id": "<from step 1>", "migrations_dir": "worker/migrations" }
-  // ],
+  // Until then the contact form answers 503 (not connected) even once POSTMARK_TOKEN is set, every Phase 2 route
+  // (talk, brain, memory) answers 503, and the cron logs that it skipped: bind and migrate the database before the
+  // tokens (worker/routes/contact.ts counts every send here; worker/lib/memory.ts keeps visitor memory here).
+  // Phase 2 secrets, after the database: VISITOR_HMAC_KEY, TURNSTILE_SECRET, CONVAI_API_KEY (and NVIDIA_API_KEY on beta).
+  "d1_databases": [
+    {
+      "binding": "MEMORY",
+      "database_name": "emersa-memory",
+      "database_id": "eb0b6af7-6f4b-4f23-b192-7d0cf4139ddf",
+      "migrations_dir": "worker/migrations"
+    }
+  ],
 
   // Daily housekeeping (worker/scheduled.ts): retention purge and counter cleanup. Without a database it logs that it skipped.
   "triggers": { "crons": ["0 3 * * *"] },
@@ -86,13 +99,17 @@
         "ENV": "beta",
         "NIM_BASE_URL": "https://integrate.api.nvidia.com/v1",
         "NIM_MODEL": "nvidia/nemotron-nano-3-30b-a3b",
-        "CONVAI_CHARACTER_ID": "",
+        "CONVAI_CHARACTER_ID": "1d0a37ce-c9a4-11ef-a59e-42010a7be016",
         "TURNSTILE_SITEKEY": "",
         "PUBLIC_BRAIN": "convai"
       },
       "ratelimits": [
         { "name": "CONTACT_LIMITER", "namespace_id": "2101", "simple": { "limit": 5, "period": 60 } },
-        { "name": "CSP_LIMITER", "namespace_id": "2102", "simple": { "limit": 30, "period": 60 } }
+        { "name": "CSP_LIMITER", "namespace_id": "2102", "simple": { "limit": 30, "period": 60 } },
+        { "name": "TALK_LIMITER", "namespace_id": "2103", "simple": { "limit": 10, "period": 60 } },
+        { "name": "BRAIN_LIMITER", "namespace_id": "2104", "simple": { "limit": 30, "period": 60 } },
+        { "name": "MEMORY_LIMITER", "namespace_id": "2105", "simple": { "limit": 60, "period": 60 } },
+        { "name": "UPLOAD_LIMITER", "namespace_id": "2106", "simple": { "limit": 5, "period": 60 } }
       ],
       "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "emersa_metrics_beta" }]
       // Beta's own database (step 4 of the D1 recipe above); d1_databases is not inherited from the top level.

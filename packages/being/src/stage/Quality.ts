@@ -16,13 +16,19 @@ export interface QualityCaps {
  * The kinect cloud's grids: desktop full, the one touch devices and the lower tiers draw, and the grids of the face
  * look, where the cloud is the head alone and the lite tier still draws it.
  */
-export const CLOUD_GRIDS: Readonly<Record<'full' | 'reduced' | 'head' | 'headReduced' | 'headLite', CloudGrid>> = {
+export const CLOUD_GRIDS: Readonly<
+  Record<'full' | 'reduced' | 'head' | 'headReduced' | 'headLite' | 'bust' | 'bustReduced' | 'bustLite', CloudGrid>
+> = {
   full: { cols: 320, rows: 240 },
   reduced: { cols: 160, rows: 120 },
   // The head alone fills the sensor's frame, so the full grid goes on it: about 2 px between points at 1440 x 900.
   head: { cols: 320, rows: 240 },
   headReduced: { cols: 200, rows: 150 },
   headLite: { cols: 120, rows: 90 },
+  // The kinect-demo look's head and shoulders as tiny shards: two per cell, so 320 x 240 is about 152k triangles.
+  bust: { cols: 320, rows: 240 },
+  bustReduced: { cols: 200, rows: 150 },
+  bustLite: { cols: 128, rows: 96 },
 };
 
 export interface QualityProfile {
@@ -32,6 +38,8 @@ export interface QualityProfile {
   cloud: CloudGrid | null;
   /** The head cloud's grid in the face look. */
   headCloud: CloudGrid | null;
+  /** The head-and-shoulders lattice of the kinect-demo look (touch devices take bustLite whatever the tier). */
+  bustCloud: CloudGrid | null;
   /** The data fan of the face look. */
   fan: boolean;
   ribbon: boolean;
@@ -53,6 +61,7 @@ export function qualityProfile(quality: Quality, caps: QualityCaps): QualityProf
         render: true,
         cloud: CLOUD_GRIDS.full,
         headCloud: CLOUD_GRIDS.head,
+        bustCloud: CLOUD_GRIDS.bust,
         fan: true,
         ribbon: caps.ribbon,
         reflection: caps.reflection,
@@ -67,6 +76,7 @@ export function qualityProfile(quality: Quality, caps: QualityCaps): QualityProf
         render: true,
         cloud: CLOUD_GRIDS.reduced,
         headCloud: CLOUD_GRIDS.headReduced,
+        bustCloud: CLOUD_GRIDS.bustReduced,
         fan: true,
         ribbon: caps.ribbon,
         reflection: false,
@@ -81,6 +91,7 @@ export function qualityProfile(quality: Quality, caps: QualityCaps): QualityProf
         render: true,
         cloud: CLOUD_GRIDS.reduced,
         headCloud: CLOUD_GRIDS.headLite,
+        bustCloud: CLOUD_GRIDS.bustLite,
         fan: false,
         ribbon: false,
         reflection: false,
@@ -95,6 +106,7 @@ export function qualityProfile(quality: Quality, caps: QualityCaps): QualityProf
         render: false,
         cloud: null,
         headCloud: null,
+        bustCloud: null,
         fan: false,
         ribbon: false,
         reflection: false,

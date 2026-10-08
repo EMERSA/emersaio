@@ -8,11 +8,10 @@
    ========================================================================== */
 
 .being-dock {
-  /* The poster's box: the head's crown-to-neck span as the runtime frames it (stage/framing.ts, the face look).
-     Landscape: crown 6% below the top, chin 47% above the bottom. Portrait: 70% of the height, centred. The face
-     look blends between aspect 1.0 and 1.6 (framing.ts faceLayoutT), so a 390 x 388 phone stage is portrait. */
-  --poster-top: 15%;
-  --poster-h: 70%;
+  /* The poster's box: the head and shoulders as the runtime frames them (stage/framing.ts, the kinect-demo look):
+     75% of the stage's height, centred, on any aspect. */
+  --poster-top: 12.5%;
+  --poster-h: 75%;
   --stage-h: 46svh;
   position: relative;
   z-index: 1;
@@ -191,9 +190,12 @@
   border-radius: var(--radius);
 }
 
-/* The Phase 2 talk sheet: hidden until it is wired. */
+/* The Phase 2 talk sheet: hidden in Phase 1; the consent and the conversation in Phase 2. */
 .talk-sheet {
+  width: min(32rem, calc(100vw - 2 * var(--gutter)));
   max-width: min(32rem, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100svh - 2rem);
+  overflow-y: auto;
   padding: 1.5rem;
   border: 1px solid var(--line-2);
   border-radius: var(--radius);
@@ -268,10 +270,10 @@ html.is-touring body {
 /* ---------- The stage fills the hero ---------- */
 @media (min-width: 720px) {
   /* At rest the dock is the whole hero (inset 0); the copy sits over its foot. Nothing here reserves layout. The
-     stage is landscape here, so the head takes the landscape framing. */
+     stage is landscape here; the head and shoulders fill 75% of it, centred, as the kinect-demo look frames them. */
   .being-dock {
-    --poster-top: 6%;
-    --poster-h: 47%;
+    --poster-top: 12.5%;
+    --poster-h: 75%;
     position: absolute;
     inset: 0;
     display: block;

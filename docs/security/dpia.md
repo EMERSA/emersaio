@@ -26,7 +26,7 @@ though the scale is small and no decision with legal effect is made.
 Phase 1 sets no cookies. No visitor IP is ever written anywhere. The privacy policy names Cloudflare and
 Postmark as processors and has a cookies section.
 
-### Phase 2 (planned)
+### Phase 2 (Talk; built, switched on by `SITE_PHASE=2`)
 
 | Processing | Data | Purpose | Lawful basis | Processor | Retention |
 | --- | --- | --- | --- | --- | --- |
@@ -35,6 +35,13 @@ Postmark as processors and has a cookies section.
 | Visitor cookie `em_vid` | 128-bit random id, HMAC-signed | Linking a browser to its memory | Consent (set only after "Start talking") | Cloudflare | 13 months |
 | Turnstile | Cloudflare's challenge signals | Protecting the paid session quota | Legitimate interests | Cloudflare | Per Cloudflare's Turnstile terms |
 | Daily quotas | Per-visitor turn, session and ASR-second counts | Abuse and cost control | Legitimate interests | Cloudflare D1 | 1 day |
+| File upload | The plain text of one PDF, .txt or .md file (at most 2 MB in, 20,000 characters kept), its name and size | Context the visitor asked Emily to read | Consent | Cloudflare (extraction in the Worker, D1 `document` row); the text reaches Convai as conversation context | Same as memory: 12 idle months or "Forget me". The file itself is never stored or forwarded |
+
+Phase 2 additions, as built: consent version 1 is recorded on the `visitor` row (`consent_version`, `last_seen`)
+by `POST /api/talk/session`; the cookie is `em_vid=<id>.<mac>; HttpOnly; Secure; SameSite=Lax; Path=/api`,
+about 13 months; quotas are 20 sessions, 200 turns and 10 files per visitor per day, 20 minutes per session;
+the Convai Knowledge Bank is not used. Turnstile runs only inside the Talk sheet, loaded when it opens. The
+Phase 2 CSP and `microphone=(self)` apply to `/` only, observed as Report-Only for 48 hours before enforcement.
 
 ## 3. Necessity and proportionality
 

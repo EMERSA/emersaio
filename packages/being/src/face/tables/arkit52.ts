@@ -1,6 +1,8 @@
 /**
- * The 52 ARKit face blendshapes in the order live providers stream them (Convai, Audio2Face and most ARKit
- * capture tools agree on this order). The GLB's faceunits01 morphs carry the same names.
+ * The 52 ARKit face blendshapes in the order Convai streams them: `@convai/web-sdk/lipsync-helpers` ARKIT_ORDER_61
+ * (1.8.0) with the first letter lowered. It is not Apple's alphabetical order, and it swaps the Left/Right pairs of
+ * jaw (15, 16) and mouth (21, 22) against the usual capture order. The GLB's faceunits01 morphs carry the same
+ * names, so the face maps by name and never by slot.
  */
 export const arkit52 = [
   'eyeBlinkLeft',
@@ -18,14 +20,14 @@ export const arkit52 = [
   'eyeSquintRight',
   'eyeWideRight',
   'jawForward',
-  'jawLeft',
   'jawRight',
+  'jawLeft',
   'jawOpen',
   'mouthClose',
   'mouthFunnel',
   'mouthPucker',
-  'mouthLeft',
   'mouthRight',
+  'mouthLeft',
   'mouthSmileLeft',
   'mouthSmileRight',
   'mouthFrownLeft',
@@ -62,8 +64,9 @@ export type ArkitName = (typeof arkit52)[number];
 /**
  * The nine rotation slots a 61-value frame carries after the 52 blendshapes: head, then left eye, then right
  * eye, each as yaw, pitch, roll in radians. Positive yaw turns right, positive pitch looks up, positive roll
- * tilts the right ear down. Phase 2 verifies this order against `@convai/web-sdk/lipsync-helpers`
- * ARKIT_ORDER_61 and passes the SDK's own array to ArkitStreamSource if it differs: the source maps by name.
+ * tilts the right ear down. Verified against `@convai/web-sdk/lipsync-helpers` ARKIT_ORDER_61 (1.8.0): slots
+ * 52-60 are HeadYaw, HeadPitch, HeadRoll, LeftEyeYaw, LeftEyePitch, LeftEyeRoll, RightEyeYaw, RightEyePitch,
+ * RightEyeRoll.
  */
 export const ARKIT_ROTATIONS = [
   'headYaw',

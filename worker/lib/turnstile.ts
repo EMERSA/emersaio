@@ -1,14 +1,15 @@
 /**
- * Cloudflare Turnstile, checked server side. No Phase 1 route uses it; Phase 2's POST /api/talk/session calls
- * verify() before minting a Convai token, and fails closed there (no pass, no session).
- *
- * TODO Phase 2: call this from routes/talk.ts with TURNSTILE_SECRET; the test keys from the Turnstile docs let the
- * browser flow run end to end without a real challenge.
+ * Cloudflare Turnstile, checked server side. POST /api/talk/session (routes/talk.ts) calls verify() with
+ * TURNSTILE_SECRET before minting a Convai token, and fails closed there (no pass, no session). The documented test
+ * secrets (1x0000000000000000000000000000000AA always passes) let the browser flow run end to end in development.
  */
-const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+export const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
 /** Turnstile tokens are well under this; anything longer is not one. */
 const MAX_TOKEN = 2048;
+
+/** A Turnstile that does not answer in this long is a failure. */
+const TIMEOUT_MS = 5000;
 
 /**
  * True when Turnstile confirms the token was issued for this site to this visitor. The address is passed on for
@@ -19,7 +20,7 @@ export async function verify(secret: string, token: string, ip: string | null): 
   const body = new URLSearchParams({ secret, response: token });
   if (ip) body.set('remoteip', ip);
   try {
-    const response = await fetch(SITEVERIFY, { method: 'POST', body });
+    const response = await fetch(SITEVERIFY, { method: 'POST', body, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!response.ok) return false;
     const payload: unknown = await response.json();
     return typeof payload === 'object' && payload !== null && (payload as { success?: unknown }).success === true;
