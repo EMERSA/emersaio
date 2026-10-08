@@ -1,0 +1,66 @@
+---
+/**
+ * The theme switch. A pressed state means the dark theme is on; main.ts keeps aria-pressed, localStorage and the
+ * address-bar colour in step and announces the change as an `em:theme` event. The icons are inline SVG elements so
+ * they take the text colour. Without JavaScript the button could do nothing, so it only appears on `html.js`.
+ * A 44px hit area with no border; a hairline ring shows on hover and focus only.
+ */
+import { site } from '../data/site.ts';
+---
+
+<button class="theme-toggle" type="button" data-theme-toggle aria-pressed="true" aria-label={site.a11y.darkMode}>
+  <svg class="icon icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+    <path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1Z"></path>
+  </svg>
+  <svg class="icon icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path
+      d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"
+    ></path>
+  </svg>
+</button>
+
+<style>
+  .theme-toggle {
+    display: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-2);
+    transition:
+      color var(--dur-fast),
+      border-color var(--dur-fast);
+  }
+
+  :global(html.js) .theme-toggle {
+    display: grid;
+  }
+
+  .theme-toggle:hover,
+  .theme-toggle:focus-visible {
+    color: var(--ink);
+    border-color: var(--line);
+  }
+
+  .icon {
+    grid-area: 1 / 1;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* The icon shows the state: a moon while dark, a sun while light. */
+  .icon-sun,
+  :global([data-theme='light']) .icon-moon {
+    display: none;
+  }
+
+  :global([data-theme='light']) .icon-sun {
+    display: block;
+  }
+</style>

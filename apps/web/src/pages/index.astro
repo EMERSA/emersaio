@@ -1,0 +1,52 @@
+---
+/**
+ * The home page: the being's hero, then the sections the scripted tour walks through, in the order the tour
+ * speaks them. Whitespace divides the page: no dividers and no bands.
+ */
+import Contact from '../components/Contact.astro';
+import DocsTeaser from '../components/DocsTeaser.astro';
+import GamesTeaser from '../components/GamesTeaser.astro';
+import Hero from '../components/Hero.astro';
+import Partners from '../components/Partners.astro';
+import Products from '../components/Products.astro';
+import Story from '../components/Story.astro';
+import Technology from '../components/Technology.astro';
+import TourTranscript from '../components/TourTranscript.astro';
+import Base from '../layouts/Base.astro';
+import { graph, organization } from '../lib/schema.ts';
+
+const schema = graph(organization());
+---
+
+<Base being="tour" schema={schema}>
+  <Hero />
+  <Partners />
+  <Story />
+  <Products />
+  <Technology />
+  <div class="teasers" data-reveal>
+    <div class="container teasers-grid">
+      <DocsTeaser />
+      <GamesTeaser />
+    </div>
+  </div>
+  <TourTranscript />
+  <Contact />
+</Base>
+
+<style>
+  .teasers {
+    padding-block: var(--section-y);
+  }
+
+  .teasers-grid {
+    display: grid;
+    gap: 2rem 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .teasers-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

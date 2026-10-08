@@ -1,0 +1,10 @@
+{
+  "name": "Emersa Labs",
+  "short_name": "Emersa",
+  "description": "We make synthetic beings.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#040918",
+  "theme_color": "#040918",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

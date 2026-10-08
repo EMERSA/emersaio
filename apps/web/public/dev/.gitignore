@@ -1,0 +1,4 @@
+# The Kinectron browser client is copied in by hand for the harness and is never committed (see README.md).
+kinectron-client.js
+# Depth recordings for VideoDepthSource (docs/runbooks/kinectron.md) are local files too.
+*.webm

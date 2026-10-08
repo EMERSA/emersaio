@@ -1,0 +1,339 @@
+---
+/**
+ * Development harness for the kinect cloud. It never ships: scripts/postbuild.mjs removes dist/dev (and the
+ * script only it used) after every build and the sitemap filter in astro.config.mjs skips /dev. The page mounts a
+ * being of its own and lets a developer feed its cloud from a live Kinect through Kinectron, or from a depth
+ * video, switch the look and the cloud's mode, and turn every knob of the cloud and the shatter
+ * (scripts/kinect-harness.ts). The Kinectron browser client is not vendored: the page loads /dev/kinectron-client.js
+ * from apps/web/public/dev when a developer has put it there (see the README in that folder). The labels live here
+ * rather than in site.ts because this is a tool for developers, not a page of the site.
+ */
+import Hud from '../../components/Hud.astro';
+import Base from '../../layouts/Base.astro';
+
+const beingAssets = import.meta.glob('../../assets/being/guide*.glb', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+const assetUrl = beingAssets['../../assets/being/guide.glb'];
+const assetLiteUrl = beingAssets['../../assets/being/guide-lite.glb'];
+
+const t = {
+  eyebrow: 'Development',
+  title: 'Kinect harness',
+  lead: 'Feed the cloud from a Kinect over Kinectron or from a depth video, then tune it. This page is never built.',
+  source: 'Depth source',
+  host: 'Kinectron host',
+  port: 'Port',
+  portHint: 'client default',
+  type: 'Sensor',
+  azure: 'Azure Kinect',
+  windows: 'Kinect for Windows v2',
+  feed: 'Feed',
+  depth: 'Depth image (8-bit)',
+  rawDepth: 'Raw depth (16-bit)',
+  connect: 'Connect',
+  being: 'Back to the being',
+  video: 'Depth video (white near, black far)',
+  figure: 'The figure',
+  look: 'Look',
+  looks: [
+    ['face', 'Face: the head alone, wire over its depth cloud'],
+    ['hybrid', 'Hybrid: wire head, cloud body'],
+    ['kinect', 'Kinect: all cloud'],
+    ['wire', 'Wire: no cloud'],
+  ],
+  shatter: 'Shatter (0 assembled, 1 scattered)',
+  cloud: 'The cloud',
+  mode: 'Mode',
+  modes: [
+    ['points', 'Points'],
+    ['wire', 'Wire triangles'],
+    ['mesh', 'Mesh: solid metallic surface'],
+  ],
+  near: 'Near clip (m)',
+  far: 'Far clip (m)',
+  size: 'Point size (px)',
+  zOffset: 'Z offset (m)',
+  displacement: 'Displacement',
+  brightness: 'Brightness',
+  contrast: 'Contrast',
+  opacity: 'Opacity',
+  lineWidth: 'Line width (px)',
+  idle: 'Loading the being.',
+} as const;
+---
+
+<Base title={t.title} description={t.lead} being="none" noindex>
+  <section
+    class="container section harness"
+    data-kinect-harness
+    data-asset-url={assetUrl}
+    data-asset-lite-url={assetLiteUrl}
+  >
+    <header class="page-head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1>{t.title}</h1>
+      <p class="lead">{t.lead}</p>
+    </header>
+
+    <div class="layout">
+      <div class="stage">
+        <canvas class="canvas" data-harness-canvas aria-hidden="true"></canvas>
+        <div class="hud-plate">
+          <Hud />
+        </div>
+      </div>
+
+      <form class="controls" data-harness-form>
+        <fieldset class="group">
+          <legend class="legend">{t.source}</legend>
+          <label class="field">
+            <span>{t.host}</span>
+            <input name="host" type="text" value="127.0.0.1" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>{t.port}</span>
+            <input name="port" type="number" min="1" max="65535" placeholder={t.portHint} />
+          </label>
+          <label class="field">
+            <span>{t.type}</span>
+            <select name="kinectType">
+              <option value="azure">{t.azure}</option>
+              <option value="windows">{t.windows}</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>{t.feed}</span>
+            <select name="feed">
+              <option value="depth">{t.depth}</option>
+              <option value="rawDepth">{t.rawDepth}</option>
+            </select>
+          </label>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" type="button" data-harness-connect>{t.connect}</button>
+            <button class="btn btn-ghost btn-sm" type="button" data-harness-being>{t.being}</button>
+          </div>
+          <label class="field">
+            <span>{t.video}</span>
+            <input name="video" type="file" accept="video/*" data-harness-video />
+          </label>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend class="legend">{t.figure}</legend>
+          <label class="field">
+            <span>{t.look}</span>
+            <select name="look" data-harness-look>
+              {t.looks.map(([value, label]) => <option value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label class="field range">
+            <span>{t.shatter}</span>
+            <input name="shatter" type="range" min="0" max="1" step="0.01" value="0" data-harness-shatter />
+            <output class="num" data-harness-shatter-out>0.00</output>
+          </label>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend class="legend">{t.cloud}</legend>
+          <label class="field">
+            <span>{t.mode}</span>
+            <select name="mode" data-harness-mode>
+              {t.modes.map(([value, label]) => <option value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label class="field range">
+            <span>{t.near}</span>
+            <input name="near" type="range" min="0.3" max="3" step="0.05" value="0.85" data-harness-near />
+            <output class="num" data-harness-near-out>0.85</output>
+          </label>
+          <label class="field range">
+            <span>{t.far}</span>
+            <input name="far" type="range" min="1" max="8" step="0.05" value="4" data-harness-far />
+            <output class="num" data-harness-far-out>4.00</output>
+          </label>
+          <label class="field range">
+            <span>{t.size}</span>
+            <input name="size" type="range" min="1" max="8" step="0.5" value="3" data-harness-size />
+            <output class="num" data-harness-size-out>3.0</output>
+          </label>
+          <label class="field range">
+            <span>{t.zOffset}</span>
+            <input name="zOffset" type="range" min="-2" max="4" step="0.05" value="0" data-harness-z />
+            <output class="num" data-harness-z-out>0.00</output>
+          </label>
+          <label class="field range">
+            <span>{t.displacement}</span>
+            <input name="displacement" type="range" min="0" max="3" step="0.05" value="1" data-harness-displacement />
+            <output class="num" data-harness-displacement-out>1.00</output>
+          </label>
+          <label class="field range">
+            <span>{t.brightness}</span>
+            <input name="brightness" type="range" min="-1" max="1" step="0.02" value="0" data-harness-brightness />
+            <output class="num" data-harness-brightness-out>0.00</output>
+          </label>
+          <label class="field range">
+            <span>{t.contrast}</span>
+            <input name="contrast" type="range" min="0" max="3" step="0.05" value="1" data-harness-contrast />
+            <output class="num" data-harness-contrast-out>1.00</output>
+          </label>
+          <label class="field range">
+            <span>{t.opacity}</span>
+            <input name="opacity" type="range" min="0" max="1" step="0.02" value="1" data-harness-opacity />
+            <output class="num" data-harness-opacity-out>1.00</output>
+          </label>
+          <label class="field range">
+            <span>{t.lineWidth}</span>
+            <input name="lineWidth" type="range" min="0.5" max="4" step="0.1" value="1.2" data-harness-line-width />
+            <output class="num" data-harness-line-width-out>1.2</output>
+          </label>
+        </fieldset>
+
+        <p class="status" data-harness-status aria-live="polite">{t.idle}</p>
+        <p class="stats" data-harness-stats></p>
+      </form>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import '../../scripts/kinect-harness.ts';
+</script>
+
+<style>
+  .layout {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  /* The scene of the home page in miniature: the flat navy and the canvas over it, with the readouts at its foot. */
+  .stage {
+    position: relative;
+    height: min(70svh, 720px);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-3d);
+  }
+
+  .hud-plate {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-2);
+  }
+
+  .canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .controls {
+    display: grid;
+    gap: 1.25rem;
+    align-self: start;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .group {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--accent-text);
+  }
+
+  .field {
+    display: grid;
+    gap: 0.35rem;
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+  }
+
+  .field input,
+  .field select {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius-sm);
+    background: var(--field-bg);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  .field input[type='range'] {
+    padding: 0;
+    border: 0;
+    background: none;
+    accent-color: var(--accent);
+  }
+
+  .field input[type='file'] {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .field input:focus-visible,
+  .field select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .range {
+    grid-template-columns: minmax(0, 1fr) 4.5ch;
+    align-items: center;
+  }
+
+  .range span {
+    grid-column: 1 / -1;
+  }
+
+  .range output {
+    text-align: right;
+    font-size: var(--text-xs);
+    color: var(--ink-muted);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .status,
+  .stats {
+    margin: 0;
+    font-size: var(--text-xs);
+    line-height: var(--leading-body);
+    color: var(--ink-muted);
+  }
+
+  .status {
+    color: var(--ink-2);
+  }
+
+  @media (min-width: 900px) {
+    .layout {
+      grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+    }
+  }
+</style>

@@ -1,0 +1,204 @@
+---
+/**
+ * The hero like the bottle's label: the face is the emblem, the H1 the wordmark, the label line the small print,
+ * everything centred on a flat page. Two canvases share the stage: the raw WebGL hero cloud that paints the head
+ * once the page is idle, and the three.js being (the face look: the head alone, large, with one azure rim light)
+ * that replaces it when the device can carry it. On phones the stage is a 46svh block above the copy; from 720px
+ * it fills the hero and the copy sits 48px above the hero's foot. Copy comes from site.ts; the scripts find
+ * everything through data attributes, never ids.
+ */
+import { site } from '../data/site.ts';
+import '../styles/hud.css';
+import BeingStage from './BeingStage.astro';
+import Captions from './Captions.astro';
+import TalkSheet from './TalkSheet.astro';
+
+// The avatar pipeline produces these files and a fresh checkout may lack them. Whatever exists reaches the scripts
+// through data attributes; a missing attribute means the procedural cloud and the poster stand in.
+const beingAssets = import.meta.glob('../assets/being/guide*.glb', { eager: true, query: '?url', import: 'default' });
+const cloudAssets = import.meta.glob('../assets/being/cloud-*.bin', { eager: true, query: '?url', import: 'default' });
+const assetUrl = beingAssets['../assets/being/guide.glb'];
+const assetLiteUrl = beingAssets['../assets/being/guide-lite.glb'];
+const cloudDesktop = cloudAssets['../assets/being/cloud-12k.bin'];
+const cloudTouch = cloudAssets['../assets/being/cloud-6k.bin'];
+
+const { hero, tour, a11y } = site;
+---
+
+<section id="hero" class="hero" data-hero>
+  <canvas
+    class="hero-cloud"
+    data-hero-canvas
+    aria-hidden="true"
+    data-cloud-touch={cloudTouch}
+    data-cloud-desktop={cloudDesktop}></canvas>
+  <div class="being-dock" data-being-dock>
+    <BeingStage assetUrl={assetUrl} assetLiteUrl={assetLiteUrl} />
+    <p class="voice-label label" data-voice-label hidden>{hero.voiceLabel}</p>
+    <Captions />
+    <div class="tour-bar" data-tour hidden tabindex="-1" role="group" aria-label={a11y.tourControls}>
+      <button type="button" class="tour-btn" data-tour-back>{tour.back}</button>
+      <button type="button" class="tour-btn" data-tour-next>{tour.next}</button>
+      <button type="button" class="tour-btn" data-tour-replay>{tour.replay}</button>
+      <button type="button" class="tour-btn" data-tour-mute aria-pressed="false">{tour.mute}</button>
+      <button type="button" class="tour-btn" data-tour-end>{tour.end}</button>
+      <span class="tour-progress num" data-tour-progress></span>
+    </div>
+    <p
+      class="tour-notice"
+      data-tour-notice
+      hidden
+      data-label-connection={tour.captionsOnly}
+      data-label-still={tour.captionsOnlyStill}>{tour.captionsOnly}</p>
+  </div>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <p class="hero-label label">{hero.eyebrow}</p>
+      <h1 class="hero-title">{hero.title}</h1>
+      <p class="lead hero-lead">{hero.lead}</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href={hero.primary.href} data-tour-start>{hero.primary.label}</a>
+        <a class="btn btn-ghost" href={hero.secondary.href}>{hero.secondary.label}</a>
+        <a class="btn btn-ghost" href={hero.talk.href} data-talk-open hidden>{hero.talk.label}</a>
+      </div>
+    </div>
+  </div>
+  <TalkSheet />
+</section>
+
+<script>
+  import '../scripts/hero.ts';
+  import '../scripts/being-mount.ts';
+</script>
+
+<style>
+  /* The sticky header sits in the flow above, so the first screen is 100svh less its height. Flat --bg: the only
+     tone change on it is the rim light the runtime draws behind the head. */
+  .hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100svh - var(--header-h));
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* The cloud paints behind everything and only once it has points; the heading is on screen first. */
+  .hero-cloud {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-slow) var(--ease-out);
+  }
+
+  .hero.is-ready .hero-cloud {
+    opacity: 1;
+  }
+
+  /* The copy: centred, under the stage on phones, over the foot of the stage from 720px. */
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    padding: 1.5rem var(--gutter) 2rem;
+    pointer-events: none;
+  }
+
+  .hero-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 760px;
+    margin-inline: auto;
+    text-align: center;
+    pointer-events: auto;
+  }
+
+  .hero-label {
+    line-height: 1rem;
+  }
+
+  /* The bottle-wordmark moment: Marcellus, uppercase, tracked, two lines on desktop and three on phones. */
+  .hero-title {
+    max-width: 13em;
+    margin: 1rem 0 0;
+    font-family: var(--font-display);
+    font-size: var(--text-h1);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-h1);
+    text-transform: uppercase;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+
+  /* The full lead runs to two lines at this measure; the block below the chin stays within its 48px margin. */
+  .hero-lead {
+    max-width: 60ch;
+    margin-top: 1rem;
+    margin-inline: auto;
+  }
+
+  .hero-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    margin-top: 1.5rem;
+  }
+
+  .hero-ctas .btn {
+    width: 100%;
+  }
+
+  @media (min-width: 560px) {
+    .hero-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: auto;
+    }
+
+    .hero-ctas .btn {
+      width: auto;
+    }
+  }
+
+  @media (min-width: 720px) {
+    /* The head takes 47% of the hero and the copy block about 310px; under 780px the two would meet, so a short
+       viewport scrolls a little rather than putting the label on the chin. */
+    .hero {
+      justify-content: flex-end;
+      min-height: max(calc(100svh - var(--header-h)), 780px);
+    }
+
+    /* The dock is the whole hero (hud.css); the copy is anchored 48px above the hero's foot. */
+    .hero-inner {
+      padding: 0 var(--gutter) 3rem;
+    }
+
+    .hero-ctas {
+      margin-top: 1.5rem;
+    }
+  }
+
+  /* While the tour pins the dock to the viewport, the stacked hero keeps its copy where it was. */
+  @media (max-width: 719.98px) {
+    :global(html.is-touring) .hero {
+      justify-content: flex-start;
+    }
+
+    :global(html.is-touring) .hero-inner {
+      padding-top: 3rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-cloud {
+      transition: none;
+    }
+  }
+</style>

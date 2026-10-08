@@ -1,0 +1,30 @@
+# Emersa Labs
+
+> We make synthetic beings. Emersa Labs makes synthetic beings: intelligent characters that see, remember and act. Emily Wilson for the enterprise, Krupiq for security. London, since 2023.
+
+Emersa Labs is a trading name of Emersa Ltd, registered in England and Wales (company no. 15179283). Emersa started in 2023 as a games studio in London. Unhappy with scripted, forgetful characters, the studio gave them memory, perception and intent. Those characters outgrew the games and became synthetic beings: Emily Wilson guides enterprises and Krupiq guards their networks. The website itself is guided by one of them.
+
+## Products
+
+- [Emily Wilson](https://emersa.io/#products): Enterprise hologram assistant. An ambient, agentic assistant that sees your dashboards, remembers your procedures and walks your people through them, step by step. Deploys on-premises, in a sovereign cloud or fully air-gapped, with humans in the loop for sensitive actions.
+- [Krupiq](https://krupiq.com): A network that exists only for intruders. Krupiq lays a living decoy over your network. An intruder sees a network that looks like yours and changes shape before they can map it. Your data stays where it is.
+
+## Technology
+
+- [Triangles are data](https://emersa.io/#technology): A being is a mesh driven by what it hears, reads and thinks. Small, fast language models run close to your data on NVIDIA hardware. What a being remembers is yours to see and yours to erase. Least privilege, encrypted by default, policy as code, with true air-gap deployment.
+
+## Docs
+
+- [Docs](https://emersa.io/docs): Plain documentation: what a synthetic being is, how Emily deploys, and what this site remembers about you.
+
+## Company
+
+- [Story](https://emersa.io/#story): From non-player characters to synthetic beings, 2023 to now.
+- [Partners](https://emersa.io/#partners): Emersa was accepted into the NVIDIA Inception Program in February 2026. Emersa Ltd is an approved SUSE partner at Innovate Sapphire tier, 2026.
+- [Contact](https://emersa.io/contact): Book a 20-minute demo of Emily Wilson, ask about Krupiq, or tell us what you would build. Email sales@emersa.io.
+- [Security](https://emersa.io/security): How to report a vulnerability. Email 4d@emersa.io.
+- [Privacy](https://emersa.io/privacy): No cookies, no analytics; the contact form is the only personal data the site handles.
+
+## Optional
+
+- [Games](https://emersa.io/games): Where it started. Our first beings lived in games. New titles will be listed here as we announce them.

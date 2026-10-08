@@ -1,0 +1,8 @@
+id: technology
+order: 8
+anchor: "#technology"
+text: "Watch my face while I talk. Every triangle moves with the sound. When I think, the mesh sparkles at the rate of my thoughts. Triangles are data."
+highlight: "#technology"
+dwellMs: 700
+actions:
+  - { type: emote, name: think }

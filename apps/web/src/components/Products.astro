@@ -1,0 +1,131 @@
+---
+/**
+ * The two beings. Emily's card is the page's single gloss (global.css .gloss, the bottle-glass recipe) with the
+ * points list, the video panel and the orange call to action; Krupiq's card is flat with an outline one. The tour
+ * highlights each card through data-product.
+ */
+import { site } from '../data/site.ts';
+import VideoSlot from './VideoSlot.astro';
+
+const { emily, krupiq } = site.products;
+const external = (href: string): boolean => /^https?:\/\//.test(href);
+---
+
+<section id="products" class="products section" aria-labelledby="products-title" data-reveal>
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">{site.products.eyebrow}</p>
+      <h2 id="products-title">{site.products.title}</h2>
+    </div>
+
+    <div class="grid">
+      <article class="product gloss" data-product="emily">
+        <p class="eyebrow">{emily.kicker}</p>
+        <h3 class="name">{emily.name}</h3>
+        <p class="text">{emily.lead}</p>
+        <ul class="points">
+          {emily.points.map((point) => <li>{point}</li>)}
+        </ul>
+        <VideoSlot />
+        <p class="cta">
+          <a class="btn btn-primary" href={emily.cta.href}>{emily.cta.label}</a>
+        </p>
+      </article>
+
+      <article class="product card" data-product="krupiq">
+        <p class="eyebrow">{krupiq.kicker}</p>
+        <h3 class="name">{krupiq.name}</h3>
+        <p class="text">{krupiq.lead}</p>
+        <p class="cta">
+          <a class="btn btn-ghost" href={krupiq.cta.href} rel={external(krupiq.cta.href) ? 'noopener' : undefined}>
+            {krupiq.cta.label}
+          </a>
+        </p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  /* A column flex lets the call to action sit at the bottom; card padding 40px (24px on phones). */
+  .product {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+
+  .product.card {
+    padding: 1.5rem;
+  }
+
+  .product > * + * {
+    margin-top: 0;
+  }
+
+  /* Product names in Marcellus. */
+  .name {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: var(--tracking-display);
+    line-height: 1.12;
+  }
+
+  .text {
+    color: var(--ink-2);
+  }
+
+  .points {
+    display: grid;
+    gap: 0.625rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .points li {
+    position: relative;
+    padding-left: 1.4rem;
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
+  /* An 8px outline triangle for a bullet: the one surviving use of the triangle motif. */
+  .points li::before {
+    content: '';
+    position: absolute;
+    top: 0.45em;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    background: var(--accent-text);
+    clip-path: polygon(evenodd, 0 0, 100% 50%, 0 100%, 1px 2.2px, 1px 5.8px, 6px 4px);
+  }
+
+  /* Pushes the call to action to the bottom so the cards end on the same line. */
+  .cta {
+    margin-top: auto;
+    padding-top: 0.5rem;
+  }
+
+  /* Side by side: Emily in columns 1 to 7, Krupiq in 8 to 12, equal heights. */
+  @media (min-width: 768px) {
+    .product,
+    .product.card {
+      padding: 2.5rem;
+    }
+  }
+
+  @media (min-width: 960px) {
+    .grid {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      align-items: stretch;
+    }
+  }
+</style>

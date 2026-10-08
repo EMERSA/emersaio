@@ -1,0 +1,102 @@
+---
+/**
+ * The document every page renders through. Order in <head> matters: the two theme-color metas come first so that
+ * /theme-boot.js, loaded next and before any stylesheet, can set the theme, html.js and the address-bar colour
+ * before the first paint. Astro leaves a <script> alone once it carries any attribute besides src, so the
+ * fetchpriority on the bootstrap (a tiny, critical file) also keeps it out of the bundler. There is no inline script
+ * or style anywhere: the Content-Security-Policy allows none. JSON-LD is data, not code, and is escaped so it stays
+ * inert in HTML. The two preloaded fonts are Marcellus 400 and the site's Inter subset (styles/fonts.css,
+ * assets/fonts/README.md): the only font files any page loads.
+ */
+import '../styles/fonts.css';
+import '../styles/global.css';
+import interWoff2 from '../assets/fonts/inter-latin-wght-400-600.woff2?url';
+import marcellusWoff2 from '../assets/fonts/marcellus-latin-400.woff2?url';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { legal } from '../data/legal';
+import { site } from '../data/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Which being, if any, being-mount.ts should mount on this document. */
+  being?: 'tour' | 'talk' | 'none';
+  /** Keep the page out of search results (the 404, drafts). */
+  noindex?: boolean;
+  /** schema.org JSON-LD for this page. */
+  schema?: Record<string, unknown>;
+  ogType?: 'website' | 'article';
+  /** A broader content measure for pages built around a stage. */
+  wide?: boolean;
+}
+
+const {
+  title,
+  description = site.description,
+  being = 'none',
+  noindex = false,
+  schema,
+  ogType = 'website',
+  wide = false,
+} = Astro.props;
+
+const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.tagline}`;
+const base = Astro.site ?? new URL(site.url);
+// The build writes docs.html, the Worker serves /docs, and that is what the sitemap points at: the canonical agrees.
+const cleanPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '/') || '/';
+const canonical = new URL(cleanPath, base).href;
+const ogImage = new URL('/og.png', base).href;
+const jsonLd = schema ? JSON.stringify(schema).replace(/</g, '\\u003c') : null;
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#040918" data-theme-color="dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf6ee" data-theme-color="light" />
+    <script src="/theme-boot.js" fetchpriority="high"></script>
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href={marcellusWoff2} />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href={interWoff2} />
+    <meta name="color-scheme" content="dark light" />
+    <meta
+      name="robots"
+      content={noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1'}
+    />
+    <meta name="author" content={legal.company} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:locale" content={site.locale} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`${site.name}: ${site.tagline.toLowerCase()}`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    {jsonLd && <script type="application/ld+json" set:html={jsonLd} />}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{site.a11y.skip}</a>
+    <Header />
+    <main id="main" data-being={being === 'none' ? undefined : being} class:list={{ 'is-wide': wide }}>
+      <slot />
+    </main>
+    <Footer />
+    <script>
+      import '../scripts/main.ts';
+    </script>
+  </body>
+</html>

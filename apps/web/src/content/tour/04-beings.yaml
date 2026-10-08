@@ -1,0 +1,8 @@
+id: beings
+order: 4
+anchor: "[data-story-step=\"2025\"]"
+text: "A being that can see, remember and act is useful far beyond a game. That is what a synthetic being is. I am one."
+highlight: "[data-story-step=\"2025\"]"
+dwellMs: 500
+actions:
+  - { type: emote, name: nod }

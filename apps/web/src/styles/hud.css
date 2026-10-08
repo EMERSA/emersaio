@@ -1,0 +1,366 @@
+/* ==========================================================================
+   The being's dock: the stage with its canvas and poster, the captions, the "AI-generated voice" line, the tour
+   bar and the notice. Imported by Hero.astro. Colours come from tokens.css only; every panel is flat --bg-2 with a
+   1px hairline and radius 16, with no blur. At rest the stage is no box: on phones it is a 46svh full-bleed block
+   above the copy, from 720px it fills the whole hero (inset 0) under the copy, so the head is never cut and the
+   rim light drawn in 3D is the only tone on the flat page. While the tour runs the dock pins to the viewport
+   (bottom-right from 900px, a bottom sheet below) with a small face beside the captions.
+   ========================================================================== */
+
+.being-dock {
+  /* The poster's box: the head's crown-to-neck span as the runtime frames it (stage/framing.ts, the face look).
+     Landscape: crown 6% below the top, chin 47% above the bottom. Portrait: 70% of the height, centred. The face
+     look blends between aspect 1.0 and 1.6 (framing.ts faceLayoutT), so a 390 x 388 phone stage is portrait. */
+  --poster-top: 15%;
+  --poster-h: 70%;
+  --stage-h: 46svh;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "stage"
+    "voice"
+    "captions"
+    "tour"
+    "notice";
+  gap: 0.75rem;
+  width: 100%;
+}
+
+/* ---------- The stage ---------- */
+/* The slot is the scene; on phones it bleeds the full width. There is no decor: the page is flat. */
+.being-slot {
+  grid-area: stage;
+  position: relative;
+  height: var(--stage-h);
+  overflow: hidden;
+}
+
+.being-stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* The canvas starts invisible so the heading stays the LCP element. */
+.being-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+/* The poster is the head wire inlined as <svg> (strokes in currentColor), so it follows --wire in both themes and
+   is never a largest-contentful-paint candidate: an <img>, or a box with a masked or background image, out-sizes
+   the <h1> and takes the LCP; vector shapes do not count. Its box spans the crown-to-neck band the runtime frames,
+   and the artwork is centred in it, so the head renders in its place. */
+.being-poster {
+  position: absolute;
+  top: var(--poster-top);
+  left: 0;
+  display: block;
+  width: 100%;
+  height: var(--poster-h);
+  color: var(--wire);
+  opacity: 0.92;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.being-stage.is-ready .being-canvas {
+  opacity: 1;
+}
+
+.being-stage.is-ready .being-poster {
+  opacity: 0;
+}
+
+.being-stage.is-loading .being-poster {
+  animation: being-breathe 1.4s var(--ease-out) infinite alternate;
+}
+
+@keyframes being-breathe {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0.95;
+  }
+}
+
+/* ---------- Captions ---------- */
+/* A flat panel that keeps two lines of space so text never shifts the layout. */
+.captions {
+  grid-area: captions;
+  box-sizing: border-box;
+  min-height: calc(2em * 1.5 + 1.5rem);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--ink-2);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.captions:not(:empty) {
+  opacity: 1;
+}
+
+/* The disclosure: shown while voice plays (being-mount.ts toggles hidden from the being's isSpeaking). */
+.voice-label {
+  grid-area: voice;
+  margin: 0;
+}
+
+/* ---------- Tour bar ---------- */
+/* Real buttons with text labels; the bar itself takes focus when the tour starts. */
+.tour-bar {
+  grid-area: tour;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+
+.tour-bar:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tour-btn {
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  font: 500 var(--text-sm) / 1 var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast),
+    color var(--dur-fast);
+}
+
+.tour-btn:hover {
+  border-color: var(--ink-muted);
+}
+
+.tour-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tour-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tour-btn[aria-pressed="true"] {
+  color: var(--accent-text);
+  border-color: var(--accent-text);
+}
+
+/* "2 / 9" in tabular figures. */
+.tour-progress {
+  margin-inline-start: auto;
+  padding-inline: 0.5rem;
+  color: var(--ink-muted);
+}
+
+.tour-notice {
+  grid-area: notice;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+/* The element the tour is talking about: a 1px ring at 8px. */
+.is-highlighted {
+  outline: 1px solid var(--accent-text);
+  outline-offset: 8px;
+  border-radius: var(--radius);
+}
+
+/* The Phase 2 talk sheet: hidden until it is wired. */
+.talk-sheet {
+  max-width: min(32rem, calc(100vw - 2 * var(--gutter)));
+  padding: 1.5rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+.talk-sheet::backdrop {
+  background: var(--selection);
+}
+
+/* ---------- Touring ---------- */
+/* The dock pins to the bottom of the viewport as one flat panel with a small figure beside the captions. */
+.is-touring .being-dock {
+  --poster-top: 0;
+  --poster-h: 100%;
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "voice voice"
+    "stage captions"
+    "tour tour"
+    "notice notice";
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem var(--gutter) calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+.is-touring .being-slot {
+  position: relative;
+  width: 6rem;
+  height: auto;
+  aspect-ratio: 2 / 3;
+  margin: 0;
+  overflow: visible;
+}
+
+/* The docked panel is a fixed box the height of the small figure beside it; a long line scrolls inside it (the
+   caption adapter keeps the newest words in view) instead of growing the dock line by line as the words arrive. */
+.is-touring .captions {
+  min-height: 0;
+  max-height: 9rem;
+  align-self: stretch;
+  overflow-y: auto;
+}
+
+/* Inside the dock the captions and the bar sit on the panel itself: no second border or fill. */
+.is-touring .captions,
+.is-touring .tour-bar {
+  padding-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* The page keeps room for the pinned dock (being-mount.ts measures it into --dock-h), so the foot of the page and
+   anything focus brings to the bottom edge can still scroll out from under it. */
+html.is-touring {
+  scroll-padding-bottom: var(--dock-h, 0px);
+}
+
+html.is-touring body {
+  padding-bottom: var(--dock-h, 0px);
+}
+
+/* ---------- The stage fills the hero ---------- */
+@media (min-width: 720px) {
+  /* At rest the dock is the whole hero (inset 0); the copy sits over its foot. Nothing here reserves layout. The
+     stage is landscape here, so the head takes the landscape framing. */
+  .being-dock {
+    --poster-top: 6%;
+    --poster-h: 47%;
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: auto;
+  }
+
+  .being-slot {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+
+  .being-dock .captions,
+  .being-dock .voice-label,
+  .being-dock .tour-bar,
+  .being-dock .tour-notice {
+    position: absolute;
+    left: var(--gutter);
+    right: var(--gutter);
+  }
+
+  .being-dock .captions {
+    bottom: 1.5rem;
+    width: max-content;
+    max-width: min(24rem, 100% - 2 * var(--gutter));
+  }
+
+  .being-dock .voice-label {
+    top: 1.5rem;
+  }
+
+  .being-dock .tour-bar {
+    bottom: 1.5rem;
+  }
+
+  .being-dock .tour-notice {
+    bottom: 0.25rem;
+  }
+
+  .is-touring .being-dock {
+    --poster-top: 0;
+    --poster-h: 100%;
+    display: grid;
+  }
+
+  .is-touring .being-slot {
+    position: relative;
+    inset: auto;
+  }
+
+  .is-touring .being-dock .captions,
+  .is-touring .being-dock .voice-label,
+  .is-touring .being-dock .tour-bar,
+  .is-touring .being-dock .tour-notice {
+    position: static;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .is-touring .being-dock {
+    inset: auto 1.5rem 1.5rem auto;
+    width: min(28rem, calc(100vw - 2 * var(--gutter)));
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "voice voice"
+      "captions stage"
+      "tour tour"
+      "notice notice";
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .is-touring .being-slot {
+    width: 9rem;
+  }
+
+  .is-touring .being-dock .captions {
+    max-height: 13.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .being-canvas,
+  .being-poster,
+  .captions {
+    transition: none;
+    animation: none;
+  }
+}

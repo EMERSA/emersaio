@@ -1,0 +1,161 @@
+---
+/**
+ * Privacy policy for Phase 1: no cookies, no analytics, a contact form handled by Cloudflare and delivered by
+ * Postmark, and a plain statement that the voice features are not yet enabled. Every particular comes from
+ * data/legal.ts. When the voice features ship, this page changes before they are switched on.
+ */
+import { legal } from '../data/legal';
+import { site } from '../data/site.ts';
+import Base from '../layouts/Base.astro';
+
+const updated = '7 October 2026';
+const browserKeys = [
+  { key: 'em-theme', where: 'local storage', what: 'whether you chose the dark or the light theme.' },
+  {
+    key: 'em-tour',
+    where: 'local storage',
+    what: 'how far you got on the guided tour, so you can pick it up where you left off.',
+  },
+  {
+    key: 'em-colo',
+    where: 'session storage',
+    what: 'the three-letter code of the Cloudflare data centre that served you, kept for the readouts on the development pages. It is forgotten when you close the tab.',
+  },
+];
+---
+
+<Base
+  title="Privacy"
+  description="How emersa.io handles your data: no cookies, no analytics, and a contact form that reaches a human inbox."
+>
+  <article class="container container-narrow section">
+    <header class="page-head">
+      <p class="eyebrow">Legal</p>
+      <h1>Privacy policy</h1>
+      <p class="lead">
+        This site sets no cookies and runs no analytics. The only personal data we receive is what you choose to send
+        us through the contact form.
+      </p>
+      <p class="page-meta">Last updated {updated}</p>
+    </header>
+
+    <div class="prose">
+      <h2 id="who">Who we are</h2>
+      <p>
+        {legal.company}, trading as {legal.tradingName}, is the controller of any personal data this site handles.
+        Company No. {legal.companyNo}, registered in {legal.registeredIn}. {legal.registeredOffice}.
+      </p>
+      <p>
+        Questions about this policy go to <a href={`mailto:${legal.privacyEmail}`}>{legal.privacyEmail}</a>.
+      </p>
+
+      <h2 id="summary">The short version</h2>
+      <ul>
+        <li>No cookies are set, by us or by anyone else.</li>
+        <li>No analytics, no advertising, no tracking pixels and no third-party scripts run on this site.</li>
+        <li>The contact form sends your message to us by email. That is the only time this site handles personal data.</li>
+        <li>We never store your IP address.</li>
+      </ul>
+
+      <h2 id="browser">What stays in your browser</h2>
+      <p>
+        The site keeps a few small things in your browser's own storage. They never leave your device and we cannot
+        read them:
+      </p>
+      <ul>
+        {
+          browserKeys.map((item) => (
+            <li>
+              <code>{item.key}</code> ({item.where}): {item.what}
+            </li>
+          ))
+        }
+      </ul>
+      <p>Clearing your browser's site data for emersa.io removes them.</p>
+
+      <h2 id="contact-form">The contact form</h2>
+      <p>
+        When you write to us through the contact form we receive your name, your email address, the company you name
+        if any, the topic you pick and your message. We use them to answer you and for nothing else. Our lawful basis
+        is our legitimate interest in replying to people who contact us and, where you ask about a product, the steps
+        needed before a contract.
+      </p>
+      <p>
+        The form is handled by a small program on Cloudflare's network and delivered to our inbox by Postmark. Both act
+        as our processors:
+      </p>
+      <ul>
+        <li>
+          <strong>Cloudflare, Inc.</strong> hosts the site and runs the form handler. The handler keeps a daily count
+          of messages and a short-lived rate limit so the form cannot be abused; neither records who you are.
+        </li>
+        <li>
+          <strong>Postmark</strong> (ActiveCampaign, LLC) delivers the email. Postmark is based in the United States;
+          the transfer is covered by the safeguards UK law requires for transfers outside the UK, which Postmark sets
+          out in its data processing agreement.
+        </li>
+      </ul>
+      <p>
+        We keep your message for as long as we need it to deal with your enquiry, and delete it when the conversation
+        is over or when you ask us to.
+      </p>
+
+      <h2 id="hosting">Hosting and logs</h2>
+      <p>
+        Cloudflare serves every page from its network. To do that it processes your IP address for the duration of the
+        request, as any host must, under its own security measures. We keep no visitor logs ourselves: our own metrics
+        count requests by route and outcome only, never by person.
+      </p>
+
+      <h2 id="voice">Voice features: not yet enabled</h2>
+      <p>
+        This site is designed to be guided by a synthetic being, Emily. Today she follows a script: nothing you do
+        while she talks is recorded or sent anywhere. A later version of the site will let you talk with her. When that
+        arrives it will work like this, and this policy will be updated first:
+      </p>
+      <ul>
+        <li>
+          <strong>Microphone.</strong> Used only after you tap Start talking, only while a conversation is open, and
+          switched off the moment you end it.
+        </li>
+        <li>
+          <strong>Memory.</strong> What you say and what Emily replies, kept so she can pick the conversation up next
+          time. Nothing is stored before you give consent.
+        </li>
+        <li>
+          <strong>Consent.</strong> A single clear step before the microphone or memory is used, with a text-only
+          alternative that stores nothing.
+        </li>
+        <li>
+          <strong>What you remember about me, and Forget me.</strong> A panel that shows everything held about you and
+          a button that erases all of it in one go.
+        </li>
+      </ul>
+      <p>None of this is switched on today.</p>
+
+      <h2 id="rights">Your rights</h2>
+      <p>
+        Under the UK General Data Protection Regulation you can ask us for a copy of the personal data we hold about
+        you, ask us to correct or delete it, restrict or object to how we use it, and ask for it in a portable form.
+        Write to <a href={`mailto:${legal.privacyEmail}`}>{legal.privacyEmail}</a> and we will reply within one month.
+      </p>
+      <p>
+        If you are not happy with how we handle your data you can complain to the Information Commissioner's Office at{' '}
+        <a href="https://ico.org.uk/">ico.org.uk</a>.
+      </p>
+
+      <h2 id="children">Children</h2>
+      <p>This site is not aimed at children and we do not knowingly collect personal data from them.</p>
+
+      <h2 id="changes">Changes</h2>
+      <p>
+        We update this page when the site changes what it collects, and the date at the top moves with it. The voice
+        features described above will not be switched on before this policy says so.
+      </p>
+    </div>
+
+    <p class="page-tour">
+      <a href="/?tour=technology">{site.tour.resumeHere}</a>
+    </p>
+  </article>
+</Base>

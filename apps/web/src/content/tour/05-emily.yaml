@@ -1,0 +1,8 @@
+id: emily
+order: 5
+anchor: "#products"
+text: "In the enterprise I am Emily Wilson, a hologram assistant. I see your dashboards, remember your procedures and guide your people through them, on your own hardware."
+highlight: "[data-product=\"emily\"]"
+dwellMs: 600
+actions:
+  - { type: point, side: right }

@@ -1,0 +1,114 @@
+---
+/**
+ * The company story as a vertical timeline: a hairline rail with a 7px azure dot level with each title, the year
+ * to the left in tabular figures. Each step is an article the tour can point at through data-story-step
+ * ("2023" | "2024" | "2025" | "now").
+ */
+import { site } from '../data/site.ts';
+
+const steps = site.story.steps.map((step) => ({ ...step, key: step.year.toLowerCase() }));
+---
+
+<section id="story" class="story section" aria-labelledby="story-title" data-reveal>
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">{site.story.eyebrow}</p>
+      <h2 id="story-title">{site.story.title}</h2>
+    </div>
+
+    <ol class="timeline">
+      {
+        steps.map((step) => (
+          <li class="item">
+            <article class="step" data-story-step={step.key}>
+              <span class="marker" aria-hidden="true"></span>
+              <p class="year num">{step.year}</p>
+              <div class="body">
+                <h3 class="step-title">{step.title}</h3>
+                <p class="step-text">{step.text}</p>
+              </div>
+            </article>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  /* The rail: a 1px hairline, with a solid dot at every step. On phones it sits at 8px; wider, past the year column. */
+  .timeline {
+    --rail: 8px;
+    position: relative;
+    max-width: 760px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    left: var(--rail);
+    width: 1px;
+    background: var(--line-2);
+  }
+
+  .item + .item {
+    margin-top: 2.5rem;
+  }
+
+  .step {
+    position: relative;
+    display: grid;
+    gap: 0.5rem;
+    padding-left: calc(var(--rail) + 1.5rem);
+  }
+
+  .marker {
+    position: absolute;
+    top: 0.55rem;
+    left: calc(var(--rail) - 3px);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-text);
+  }
+
+  .year {
+    color: var(--accent-text);
+    line-height: 1.6;
+  }
+
+  .step-title {
+    margin-bottom: 0.5rem;
+  }
+
+  .step-text {
+    max-width: 58ch;
+    color: var(--ink-2);
+  }
+
+  /* Wider screens: the year sits to the left of the rail (88px, right-aligned), the text to its right from 136px. */
+  @media (min-width: 768px) {
+    .timeline {
+      --rail: 112px;
+    }
+
+    .step {
+      grid-template-columns: 88px minmax(0, 1fr);
+      column-gap: 0;
+      padding-left: 0;
+    }
+
+    .year {
+      padding-top: 0.15rem;
+      text-align: right;
+    }
+
+    .body {
+      padding-left: 48px;
+    }
+  }
+</style>

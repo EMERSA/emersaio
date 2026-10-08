@@ -1,0 +1,130 @@
+---
+/** /games: every title in the games collection, oldest first, as rows with their status. Content pages carry no being. */
+import { getCollection, render } from 'astro:content';
+import { site } from '../data/site.ts';
+import Base from '../layouts/Base.astro';
+import { graph, webPage } from '../lib/schema.ts';
+
+const entries = await getCollection('games');
+const games = await Promise.all(
+  [...entries]
+    .sort((a, b) => a.data.year - b.data.year || a.data.title.localeCompare(b.data.title))
+    .map(async (entry) => ({ entry, Content: (await render(entry)).Content })),
+);
+const schema = graph(webPage('/games', site.games.title, site.games.lead, 'CollectionPage'));
+---
+
+<Base title={site.games.eyebrow} description={site.games.lead} being="none" schema={schema}>
+  <div class="container section games">
+    <header class="page-head">
+      <p class="eyebrow">{site.games.eyebrow}</p>
+      <h1>{site.games.title}</h1>
+      <p class="lead">{site.games.lead}</p>
+    </header>
+
+    <ul class="games-list">
+      {
+        games.map(({ entry, Content }) => (
+          <li class="game">
+            {entry.data.cover && <img class="game-cover" src={entry.data.cover} alt="" loading="lazy" decoding="async" />}
+            <div class="game-body">
+              <h2 class="game-title">{entry.data.title}</h2>
+              <p class="page-meta game-meta">
+                <span class="num">{entry.data.year}</span>
+                <span>{entry.data.platform}</span>
+                <span class="game-status">{site.games.statuses[entry.data.status]}</span>
+              </p>
+              <div class="prose">
+                <Content />
+              </div>
+              {entry.data.links && entry.data.links.length > 0 && (
+                <ul class="game-links">
+                  {entry.data.links.map((link) => (
+                    <li>
+                      <a class="btn btn-ghost btn-sm" href={link.href}>
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="page-tour">
+      <a href="/?tour=games">{site.tour.resumeHere}</a>
+    </p>
+  </div>
+</Base>
+
+<style>
+  .games-list {
+    max-width: 760px;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  /* A row between hairlines. */
+  .game {
+    display: grid;
+    gap: 1.25rem;
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .game-cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--bg-2);
+  }
+
+  .game-body > * + * {
+    margin-top: 0.9rem;
+  }
+
+  .game-title {
+    font-size: var(--text-title);
+  }
+
+  .game-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0;
+  }
+
+  .game-meta span + span::before {
+    content: '\00B7';
+    margin: 0 0.6em;
+    color: var(--ink-muted);
+  }
+
+  .game-status {
+    color: var(--accent-text);
+  }
+
+  .game-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .games a:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (min-width: 720px) {
+    .game:has(.game-cover) {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      align-items: start;
+    }
+  }
+</style>

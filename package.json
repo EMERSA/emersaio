@@ -1,0 +1,46 @@
+{
+  "name": "emersaio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Emersa Labs website (emersa.io): an Astro shell, the @emersa/being avatar runtime and one Cloudflare Worker.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "dev:worker": "wrangler dev --port 8850",
+    "build": "npm run build -w apps/web && node tools/headers.ts --emit apps/web/dist/_headers && node scripts/csp-check.mjs && node scripts/preflight.mjs && node scripts/bundle-budget.mjs",
+    "check": "npm run check --workspaces --if-present && npm run check:worker && npm run check:tools && npm run lint",
+    "check:worker": "wrangler types worker/worker-configuration.d.ts && tsc -p worker",
+    "check:tools": "tsc -p tools",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "test": "node --test \"worker/**/*.test.ts\" \"packages/being/test/**/*.test.ts\" \"tools/**/*.test.ts\"",
+    "headers": "node tools/headers.ts --emit apps/web/dist/_headers",
+    "preflight": "node scripts/preflight.mjs",
+    "budget": "node scripts/bundle-budget.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply emersa-memory --remote",
+    "db:migrate:beta": "wrangler d1 migrations apply emersa-memory-beta --remote --env beta",
+    "lhci": "lhci autorun"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@biomejs/biome": "2.5.15",
+    "@gltf-transform/cli": "4.5.1",
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/extensions": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
+    "@lhci/cli": "0.15.1",
+    "@types/node": "24.19.1",
+    "playwright-core": "1.63.0",
+    "typescript": "~5.9.3",
+    "wrangler": "4.148.0",
+    "yaml": "2.9.1"
+  }
+}

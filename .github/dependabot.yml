@@ -1,0 +1,18 @@
+# Dependency updates (plan 4.5): exact pins everywhere, so every update arrives as a pull request that CI gates.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+  # The offline clip-baking tools keep their own lockfile outside the workspaces (tools/avatar/README.md).
+  - package-ecosystem: npm
+    directory: /tools/avatar
+    schedule:
+      interval: monthly
+    versioning-strategy: increase
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

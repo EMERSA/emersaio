@@ -1,0 +1,30 @@
+---
+/**
+ * The stage: the being's canvas and the poster that stands in before it loads, under reduced motion, without
+ * WebGL2 and after a lost context. No decor: the page is flat and the rim light is drawn in 3D. The avatar URLs
+ * ride on data attributes for being-mount.ts, which picks the lite file on touch and low-end devices.
+ */
+import Poster from '../assets/being/guide-poster.svg';
+import { site } from '../data/site.ts';
+
+interface Props {
+  assetUrl?: string;
+  assetLiteUrl?: string;
+}
+
+const { assetUrl, assetLiteUrl } = Astro.props;
+---
+
+<div class="being-slot">
+  <div
+    class="being-stage"
+    data-being-stage
+    data-asset-url={assetUrl}
+    data-asset-lite-url={assetLiteUrl}
+    role="img"
+    aria-label={site.hero.guideLabel}>
+    <canvas class="being-canvas" data-being-canvas aria-hidden="true"></canvas>
+    {/* Inline vector art, never an <img> or a masked box: those count as image paints and out-size the <h1> for LCP. */}
+    <Poster class="being-poster" data-being-poster aria-hidden="true" focusable="false" />
+  </div>
+</div>

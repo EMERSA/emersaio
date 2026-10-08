@@ -1,0 +1,67 @@
+---
+/** /docs: every doc, grouped by section, as list rows with a one-line description. Content pages carry no being. */
+import { getCollection } from 'astro:content';
+import { groupDocs } from '../../content.config.ts';
+import { site } from '../../data/site.ts';
+import Base from '../../layouts/Base.astro';
+import { graph, webPage } from '../../lib/schema.ts';
+
+const groups = groupDocs(await getCollection('docs'));
+const schema = graph(webPage('/docs', site.docs.title, site.docs.lead, 'CollectionPage'));
+---
+
+<Base title={site.docs.eyebrow} description={site.docs.lead} being="none" schema={schema}>
+  <div class="container section docs-index">
+    <header class="page-head">
+      <p class="eyebrow">{site.docs.eyebrow}</p>
+      <h1>{site.docs.title}</h1>
+      <p class="lead">{site.docs.lead}</p>
+    </header>
+
+    {
+      groups.map((group) => (
+        <section class="docs-group" aria-labelledby={`docs-group-${group.id}`}>
+          <h2 class="label docs-group-title" id={`docs-group-${group.id}`}>
+            {site.docs.sections[group.id]}
+          </h2>
+          <ul class="rows">
+            {group.docs.map((doc) => (
+              <li>
+                <a class="row-link" href={`/docs/${doc.id}`}>
+                  <span class="row-title">{doc.data.title}</span>
+                  <span class="row-text">{doc.data.description}</span>
+                  <svg class="row-arrow" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                    <path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+
+    <p class="page-tour">
+      <a href="/?tour=technology">{site.tour.resumeHere}</a>
+    </p>
+  </div>
+</Base>
+
+<style>
+  .docs-group {
+    max-width: 760px;
+  }
+
+  .docs-group + .docs-group {
+    margin-top: 3rem;
+  }
+
+  .docs-group-title {
+    margin-bottom: 1rem;
+  }
+
+  .docs-index a:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+</style>

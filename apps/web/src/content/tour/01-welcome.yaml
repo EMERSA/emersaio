@@ -1,0 +1,7 @@
+id: welcome
+order: 1
+anchor: "#hero"
+text: "Hello. I am Emily, a synthetic being made by Emersa. What you see is my structure, not my skin. Let me show you around."
+dwellMs: 600
+actions:
+  - { type: emote, name: smile }

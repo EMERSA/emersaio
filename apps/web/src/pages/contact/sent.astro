@@ -1,0 +1,57 @@
+---
+/**
+ * Where a scripts-off submission lands when the Worker accepted it. The form page is static and cannot read a
+ * query string, so the Worker redirects here instead of back with a flag.
+ */
+import { site } from '../../data/site.ts';
+import Base from '../../layouts/Base.astro';
+
+const { title, text } = site.contact.sent;
+---
+
+<Base title={title} description={text} noindex>
+  <section class="result">
+    <div class="container">
+      <div class="panel card">
+        <h1 class="result-title">{title}</h1>
+        <p class="result-text">{text}</p>
+        <p class="cta">
+          <a class="btn btn-ghost" href={site.docs.cta.href}>{site.docs.cta.label}</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .result {
+    min-height: 70vh;
+    padding-top: clamp(3rem, 8vw, 6rem);
+    padding-bottom: var(--section-y);
+  }
+
+  .panel {
+    display: grid;
+    gap: 1rem;
+    justify-items: start;
+    max-width: 560px;
+  }
+
+  .panel > * + * {
+    margin-top: 0;
+  }
+
+  .result-title {
+    font-size: var(--text-title);
+  }
+
+  .result-text {
+    margin: 0;
+    line-height: var(--leading-body);
+    color: var(--ink-2);
+  }
+
+  .cta {
+    margin: 0.5rem 0 0;
+  }
+</style>

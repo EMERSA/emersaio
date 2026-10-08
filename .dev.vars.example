@@ -1,0 +1,21 @@
+# Local secrets for "npm run dev:worker" (wrangler dev). Copy this file to .dev.vars, which is gitignored, and fill
+# in only what you need; an empty value is the same as an unset one. Production and beta secrets never live in a
+# file: set them with "npx wrangler secret put <NAME>" (and "--env beta"). The names match worker/lib/env.ts.
+
+# Postmark server token. Without it POST /api/contact answers 503 and tells people to email sales@emersa.io. With it
+# the form still needs its daily cap: the D1 binding in wrangler.jsonc (local under wrangler dev) with the migration
+# applied, "npx wrangler d1 migrations apply emersa-memory --local". Until then it answers 503 as well.
+POSTMARK_TOKEN=
+
+# Verified Postmark sender. Empty means "Emersa Labs <noreply@emersa.io>".
+POSTMARK_FROM=
+
+# Where contact form messages are delivered. Empty means 4d@emersa.io.
+CONTACT_TO=
+
+# Phase 2: keys the signed visitor id cookie (worker/lib/consent.ts). 32 random bytes as hex: openssl rand -hex 32
+VISITOR_HMAC_KEY=
+
+# Phase 2: Turnstile secret for POST /api/talk/session (worker/lib/turnstile.ts). The Turnstile docs publish test
+# keys that always pass or always fail, for the browser flow in development.
+TURNSTILE_SECRET=

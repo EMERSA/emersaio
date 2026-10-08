@@ -1,0 +1,6 @@
+id: npcs
+order: 3
+anchor: "[data-story-step=\"2024\"]"
+text: "So they gave characters memory, perception and intent. We remembered players, read the room and acted on our own. Nobody called us NPCs any more."
+highlight: "[data-story-step=\"2024\"]"
+dwellMs: 500

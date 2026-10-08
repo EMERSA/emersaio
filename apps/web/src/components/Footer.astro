@@ -1,0 +1,201 @@
+---
+/**
+ * Site footer: brand and tagline, the link columns from site.footer, then under a hairline the legal row that UK
+ * trading-disclosure rules require. Flat --bg with a hairline on top; no giant wordmark. Every particular comes
+ * from data/legal.ts; the year is the build year, which is right for a static site that is rebuilt on every deploy.
+ */
+import { legal, legalLine } from '../data/legal';
+import { site } from '../data/site';
+import LogoSlot from './LogoSlot.astro';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer" data-footer>
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="/" aria-label={`${site.name} home`}>
+          <LogoSlot size={24} />
+          <span class="brand-name">{site.shortName}</span>
+        </a>
+        <p class="footer-tagline">{site.footer.tagline}</p>
+      </div>
+
+      <nav class="footer-cols" aria-label={site.a11y.footerNav}>
+        {
+          site.footer.columns.map((column, index) => (
+            <div class="footer-col">
+              <p class="label" id={`footer-col-${index}`}>
+                {column.title}
+              </p>
+              <ul aria-labelledby={`footer-col-${index}`}>
+                {column.links.map((link) => (
+                  <li>
+                    <a href={link.href}>{link.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </nav>
+    </div>
+
+    <div class="footer-bottom">
+      <p class="footer-legal">{legalLine(year)}</p>
+      <ul class="footer-links">
+        {
+          site.footer.legalLinks.map((link) => (
+            <li>
+              <a href={link.href}>{link.label}</a>
+            </li>
+          ))
+        }
+        <li>
+          <a href={legal.linkedin} rel="noopener">{site.footer.linkedin}</a>
+        </li>
+      </ul>
+      <p class="footer-security">
+        {site.footer.vulnerability}{' '}
+        <a href={`mailto:${legal.securityEmail}`}>{legal.securityEmail}</a>
+      </p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    padding: 4rem 0 calc(2rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  .footer-top {
+    display: grid;
+    gap: 2.5rem;
+    margin-bottom: 3rem;
+  }
+
+  .footer-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--ink);
+  }
+
+  .brand-name {
+    margin-right: calc(-1 * var(--tracking-wordmark));
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 400;
+    letter-spacing: var(--tracking-wordmark);
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .footer-tagline {
+    max-width: 34ch;
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    color: var(--ink-muted);
+  }
+
+  .footer-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem 1.5rem;
+  }
+
+  .footer-col .label {
+    margin-bottom: 1rem;
+  }
+
+  .footer-col ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .footer-col a {
+    color: var(--ink-2);
+    transition: color var(--dur-fast);
+  }
+
+  .footer-col a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .footer-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-size: var(--text-legal);
+    line-height: 1.6;
+    color: var(--ink-muted);
+  }
+
+  .footer-legal {
+    max-width: 72ch;
+  }
+
+  .footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.2rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer-links a,
+  .footer-security a {
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-decoration-color: var(--line-2);
+    text-underline-offset: 3px;
+    transition:
+      color var(--dur-fast),
+      text-decoration-color var(--dur-fast);
+  }
+
+  .footer-links a:hover,
+  .footer-security a:hover {
+    color: var(--ink);
+    text-decoration-color: var(--accent);
+  }
+
+  @media (min-width: 1024px) {
+    .footer-top {
+      grid-template-columns: 5fr 1fr 6fr;
+    }
+
+    .footer-cols {
+      grid-column: 3;
+    }
+
+    .footer-bottom {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.6rem 2rem;
+      align-items: start;
+    }
+
+    .footer-security {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

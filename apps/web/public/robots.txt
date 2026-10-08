@@ -1,0 +1,51 @@
+# emersa.io
+# Search engines and AI assistants are welcome to read the whole site. The API and the development harness are not content.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+# Generative AI crawlers, listed so the intent is unambiguous. A crawler follows only the most specific group that
+# names it (RFC 9309), so each group repeats the two paths that are not content.
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
+Sitemap: https://emersa.io/sitemap-index.xml

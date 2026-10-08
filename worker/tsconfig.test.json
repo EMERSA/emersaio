@@ -1,0 +1,10 @@
+{
+  // Type-checks the tests and their helpers too: "npx tsc -p worker/tsconfig.test.json". The main tsconfig leaves
+  // them out because they need the Node types (node:test, node:sqlite), which the Worker itself must not see.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["index.ts", "scheduled.ts", "lib/**/*.ts", "routes/**/*.ts", "test/**/*.ts", "worker-configuration.d.ts"],
+  "exclude": []
+}

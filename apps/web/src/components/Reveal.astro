@@ -1,0 +1,18 @@
+---
+/**
+ * Wraps content that fades into view (opacity only, 400 ms, once); main.ts watches [data-reveal] with an
+ * IntersectionObserver and the transition lives in global.css. Without JavaScript, or with reduced motion, the
+ * content is simply there. There is no stagger.
+ */
+type Tag = 'div' | 'section' | 'article' | 'aside' | 'figure' | 'li' | 'p' | 'span';
+
+interface Props extends astroHTML.JSX.HTMLAttributes {
+  as?: Tag;
+}
+
+const { as: Tag = 'div', class: className, ...rest } = Astro.props;
+---
+
+<Tag class:list={['reveal', className]} data-reveal {...rest}>
+  <slot />
+</Tag>

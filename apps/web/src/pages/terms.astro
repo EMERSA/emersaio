@@ -1,0 +1,90 @@
+---
+/**
+ * Terms of use: plain English, the law of England and Wales, particulars from data/legal.ts only.
+ */
+import { legal } from '../data/legal';
+import { site } from '../data/site.ts';
+import Base from '../layouts/Base.astro';
+
+const updated = '7 October 2026';
+---
+
+<Base title="Terms" description="The plain rules for using emersa.io.">
+  <article class="container container-narrow section">
+    <header class="page-head">
+      <p class="eyebrow">Legal</p>
+      <h1>Terms of use</h1>
+      <p class="lead">The plain rules for using emersa.io.</p>
+      <p class="page-meta">Last updated {updated}</p>
+    </header>
+
+    <div class="prose">
+      <h2 id="who">Who you are dealing with</h2>
+      <p>
+        This website is run by {legal.company}, trading as {legal.tradingName}. Company No. {legal.companyNo},
+        registered in {legal.registeredIn}. {legal.registeredOffice}. {legal.vat}. You can reach us at{' '}
+        <a href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>.
+      </p>
+
+      <h2 id="use">Using the site</h2>
+      <p>By using emersa.io you agree to these terms. If you do not agree, please do not use the site.</p>
+      <p>
+        You may read, link to and quote the site for your own information and for your work. You may not disrupt it,
+        probe it for weaknesses outside the rules on our <a href="/security">security page</a>, or use it to send
+        unsolicited messages. Crawlers are welcome where our robots.txt allows.
+      </p>
+
+      <h2 id="content">What the site says</h2>
+      <p>
+        The site describes our company and our products in good faith, but it is information, not an offer or a
+        warranty. Products, features and dates can change. Any contract for Emily Wilson or Krupiq is made separately and
+        in writing.
+      </p>
+
+      <h2 id="guide">The guide</h2>
+      <p>
+        Parts of this site are presented by Emily, a synthetic being. Her voice is AI-generated and she follows a
+        script we wrote. She is not a person, and what she says is subject to these terms like the rest of the site.
+      </p>
+
+      <h2 id="ip">Intellectual property</h2>
+      <p>
+        The content of this site, including its text, design, code, images, the 3D being and the names Emersa, Emily
+        Wilson and Krupiq, belongs to {legal.company} or to the people who licensed it to us. Partner names and logos
+        belong to their owners.
+      </p>
+
+      <h2 id="links">Links to other sites</h2>
+      <p>
+        We link to other websites, including krupiq.com and our partners. We are not responsible for them, and a link
+        is not an endorsement.
+      </p>
+
+      <h2 id="liability">Liability</h2>
+      <p>
+        Nothing in these terms limits any liability that cannot be limited under the law of England and Wales,
+        including liability for death or personal injury caused by negligence, or for fraud.
+      </p>
+      <p>
+        Beyond that, the site is provided as it is. We do not promise that it will always be available or free of
+        errors, and we are not liable for any loss that comes from relying on it or from being unable to use it.
+      </p>
+
+      <h2 id="privacy">Privacy</h2>
+      <p>How we handle personal data is set out in our <a href="/privacy">privacy policy</a>.</p>
+
+      <h2 id="law">Law</h2>
+      <p>
+        These terms are governed by the law of England and Wales, and the courts of England and Wales have exclusive
+        jurisdiction over any dispute about them.
+      </p>
+
+      <h2 id="changes">Changes</h2>
+      <p>We may update these terms. The date at the top shows the current version.</p>
+    </div>
+
+    <p class="page-tour">
+      <a href="/?tour=technology">{site.tour.resumeHere}</a>
+    </p>
+  </article>
+</Base>

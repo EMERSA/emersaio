@@ -1,0 +1,229 @@
+---
+/**
+ * Sticky, solid top bar: the orange mark and the EMERSA wordmark, the primary navigation from site.nav inline from
+ * 960 px, the theme toggle and, below 960 px, a CSS-only <details> menu sheet that works without JavaScript
+ * (main.ts only adds closing on link tap and Escape). Flat --bg with a hairline: nothing to blur.
+ */
+import { site } from '../data/site';
+import LogoSlot from './LogoSlot.astro';
+import ThemeToggle from './ThemeToggle.astro';
+
+const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+
+/** A link is current on its own path and below it. Hash links to home sections and external links never are. */
+const isCurrent = (href: string): boolean => {
+  if (href.includes('#') || /^https?:/.test(href)) return false;
+  const target = href.replace(/\/$/, '') || '/';
+  return target === '/' ? path === '/' : path === target || path.startsWith(`${target}/`);
+};
+---
+
+<header class="site-header" data-header>
+  <div class="container header-inner">
+    <a class="brand" href="/" aria-label={`${site.name} home`}>
+      <LogoSlot size={24} />
+      <span class="brand-name">{site.shortName}</span>
+    </a>
+
+    <nav class="nav" aria-label={site.a11y.primaryNav}>
+      {
+        site.nav.map((item) => (
+          <a class="nav-link" href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="header-actions">
+      <ThemeToggle />
+      <details class="menu" data-menu>
+        <summary class="menu-button" aria-label={site.a11y.menu}>
+          <span class="menu-icon" aria-hidden="true"></span>
+        </summary>
+        <nav class="menu-sheet" aria-label={site.a11y.menu}>
+          {
+            site.nav.map((item) => (
+              <a class="menu-link" href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    height: var(--header-h);
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--ink);
+  }
+
+  /* "EMERSA" like "AQUA VERA": Marcellus, uppercase, tracked wide. The tracking's trailing space is trimmed. */
+  .brand-name {
+    margin-right: calc(-1 * var(--tracking-wordmark));
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 400;
+    letter-spacing: var(--tracking-wordmark);
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .nav {
+    display: none;
+    align-items: center;
+    gap: 1.75rem;
+  }
+
+  .nav-link {
+    position: relative;
+    padding: 0.75rem 0;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: var(--tracking-nav);
+    text-transform: uppercase;
+    color: var(--ink-2);
+    transition: color var(--dur-fast);
+  }
+
+  .nav-link:hover,
+  .nav-link[aria-current='page'] {
+    color: var(--ink);
+  }
+
+  .nav-link[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.4rem;
+    height: 1px;
+    background: currentColor;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* The menu button is the <summary>; the sheet is the rest of the <details>. No border; a ring on hover and focus. */
+  .menu-button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    transition: border-color var(--dur-fast);
+  }
+
+  .menu-button:hover {
+    border-color: var(--line);
+  }
+
+  .menu-icon {
+    position: relative;
+    width: 18px;
+    height: 12px;
+  }
+
+  .menu-icon::before,
+  .menu-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: currentColor;
+  }
+
+  .menu-icon::before {
+    top: 0;
+  }
+
+  .menu-icon::after {
+    bottom: 0;
+  }
+
+  /* Forced colours (Windows high contrast) flatten backgrounds to the canvas colour; the bars take the text colour. */
+  @media (forced-colors: active) {
+    .menu-icon::before,
+    .menu-icon::after {
+      background: CanvasText;
+    }
+  }
+
+  .menu[open] .menu-icon::before {
+    top: 5.5px;
+    transform: rotate(45deg);
+  }
+
+  .menu[open] .menu-icon::after {
+    bottom: 5.5px;
+    transform: rotate(-45deg);
+  }
+
+  .menu-sheet {
+    position: fixed;
+    inset: var(--header-h) 0 0;
+    z-index: 55;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem var(--gutter) calc(1.5rem + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+  }
+
+  /* Marcellus links separated by hairlines. */
+  .menu-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 400;
+    letter-spacing: var(--tracking-display);
+    line-height: 1.1;
+    color: var(--ink);
+  }
+
+  .menu-link[aria-current='page'] {
+    color: var(--accent-text);
+  }
+
+  @media (min-width: 960px) {
+    .nav {
+      display: flex;
+    }
+
+    .menu {
+      display: none;
+    }
+  }
+</style>

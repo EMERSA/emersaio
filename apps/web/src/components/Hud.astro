@@ -1,0 +1,50 @@
+---
+/**
+ * Engineering readouts for the development harness (/dev/kinect) only: frame rate, tokens per second, the head
+ * cloud's depth ramp and point count, its mode (points, wire or mesh) and the edge colo. The home page carries no
+ * instrument plate. Hidden from assistive technology; kinect-harness.ts fills the values with textContent, and a
+ * blank readout stays out of sight.
+ */
+---
+
+<div class="hud" data-hud aria-hidden="true">
+  <span class="hud-item"><span class="hud-k">fps</span><span class="hud-v" data-hud-fps></span></span>
+  <span class="hud-item"><span class="hud-k">tok/s</span><span class="hud-v" data-hud-tokens></span></span>
+  <span class="hud-item"><span class="hud-k">depth</span><span class="hud-v" data-hud-depth></span></span>
+  <span class="hud-item"><span class="hud-k">pts</span><span class="hud-v" data-hud-points></span></span>
+  <span class="hud-item"><span class="hud-k">mode</span><span class="hud-v" data-hud-mode></span></span>
+  <span class="hud-item"><span class="hud-k">colo</span><span class="hud-v" data-hud-colo></span></span>
+</div>
+
+<style>
+  .hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+  }
+
+  .hud-item {
+    display: inline-flex;
+    gap: 0.6ch;
+    white-space: nowrap;
+  }
+
+  .hud-k {
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .hud-v {
+    min-width: 2ch;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+  }
+
+  .hud-item:has(> .hud-v:empty) {
+    display: none;
+  }
+</style>

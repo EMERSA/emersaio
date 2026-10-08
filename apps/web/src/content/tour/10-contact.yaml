@@ -1,0 +1,8 @@
+id: contact
+order: 10
+anchor: "#contact"
+text: "That is the tour. If you want a twenty-minute demo, or you have a world to build, write to us here. Thank you for walking with me."
+highlight: "#contact"
+dwellMs: 800
+actions:
+  - { type: emote, name: smile }

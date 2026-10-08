@@ -1,0 +1,15 @@
+{
+  "name": "emersaio-avatar-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline tooling for the guide figure and the baked tour voice. Not a workspace: installed on the authoring machine only (npm ci --prefix tools/avatar), so the site's build and deploy never fetch the ONNX runtime.",
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@breezystack/lamejs": "1.2.7",
+    "@huggingface/transformers": "3.8.1",
+    "kokoro-js": "1.2.1"
+  }
+}

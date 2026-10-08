@@ -1,0 +1,69 @@
+---
+/**
+ * How to report a vulnerability and what the site does to keep visitors safe. Every claim here describes what the
+ * Phase 1 build actually ships; keep it that way when the security posture changes.
+ */
+import { legal } from '../data/legal';
+import { site } from '../data/site.ts';
+import Base from '../layouts/Base.astro';
+
+const updated = '7 October 2026';
+const rules = [
+  'Do not read, change or delete data that is not yours, and stop as soon as you can show the issue.',
+  'Do not degrade the service for other people: no flooding, no denial of service.',
+  'Do not use social engineering, phishing or physical attacks against our people or our partners.',
+  'Give us a reasonable time to fix the issue before you publish anything about it.',
+];
+const measures = [
+  'A strict Content Security Policy: no inline scripts, no inline styles, no scripts from any other origin, no frames.',
+  'No third-party scripts. Fonts, styles and code are all served from emersa.io.',
+  'No keys in the browser. Every secret stays on the server; the page never carries an API key.',
+  'HTTPS everywhere with HSTS, and headers that stop the site being framed or its content type being guessed.',
+  'The contact form goes through a same-site check, a size cap and rate limits, and we never store your IP address.',
+  'No cookies and no analytics today. The voice features planned for later will ask for your consent first; see the privacy policy.',
+  'Dependencies are pinned to exact versions and reviewed before they change.',
+];
+---
+
+<Base title="Security" description="How to report a vulnerability on emersa.io, and what the site does to keep you safe.">
+  <article class="container container-narrow section">
+    <header class="page-head">
+      <p class="eyebrow">Legal</p>
+      <h1>Security</h1>
+      <p class="lead">
+        Found something? Tell us. Here is how to report a vulnerability and what this site does to keep you safe.
+      </p>
+      <p class="page-meta">Last updated {updated}</p>
+    </header>
+
+    <div class="prose">
+      <h2 id="report">Report a vulnerability</h2>
+      <p>
+        Email <a href={`mailto:${legal.securityEmail}`}>{legal.securityEmail}</a>. A human reads it. Tell us what you
+        found, where, how to reproduce it and what you think it could do. We will reply, keep you posted while we fix
+        it, and credit you if you would like that.
+      </p>
+      <p>
+        Our machine-readable contact is published at{' '}
+        <a href="/.well-known/security.txt">/.well-known/security.txt</a>, following RFC 9116.
+      </p>
+      <p>While you test, please:</p>
+      <ul>{rules.map((rule) => <li>{rule}</li>)}</ul>
+      <p>Research done in good faith within these rules is welcome, and we will not pursue it.</p>
+
+      <h2 id="measures">What this site does</h2>
+      <ul>{measures.map((measure) => <li>{measure}</li>)}</ul>
+
+      <h2 id="scope">Scope</h2>
+      <p>
+        This page covers emersa.io and its API. Krupiq has its own site; Cloudflare, Postmark and LinkedIn run their
+        own programmes. If you are not sure where a finding belongs, write to us anyway and we will point you to the
+        right place.
+      </p>
+    </div>
+
+    <p class="page-tour">
+      <a href="/?tour=technology">{site.tour.resumeHere}</a>
+    </p>
+  </article>
+</Base>

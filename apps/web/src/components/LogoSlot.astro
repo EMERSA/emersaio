@@ -1,0 +1,39 @@
+---
+/**
+ * The Emersa mark, inlined so it takes the colour of its context. src/assets/logo/emersa-mark.svg is the official
+ * geometry (the chevron, its stem and the eye, from the vector master; see the README beside it); replacing that
+ * file with another export of the same three properties (square viewBox, currentColor fills, no width or height
+ * attributes) changes every header, footer and 404 at once.
+ */
+import Mark from '../assets/logo/emersa-mark.svg';
+
+interface Props {
+  /** Rendered size in CSS pixels; the mark is square. */
+  size?: number;
+  /** An accessible name when the mark stands on its own. Without one it is decorative. */
+  label?: string;
+  class?: string;
+}
+
+const { size = 28, label, class: className } = Astro.props;
+---
+
+<span class:list={['logo-slot', className]}>
+  <Mark
+    width={size}
+    height={size}
+    role={label ? 'img' : undefined}
+    aria-label={label}
+    aria-hidden={label ? undefined : 'true'}
+    focusable="false"
+  />
+</span>
+
+<style>
+  .logo-slot {
+    display: inline-flex;
+    flex: none;
+    line-height: 0;
+    color: var(--orange);
+  }
+</style>

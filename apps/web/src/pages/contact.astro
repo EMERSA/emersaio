@@ -1,0 +1,38 @@
+---
+/**
+ * The contact page: a hero and the same form as the home page section. Product links arrive here with
+ * ?topic=<value>, which scripts/contact.ts turns into the preselected topic.
+ */
+import Contact from '../components/Contact.astro';
+import { site } from '../data/site.ts';
+import Base from '../layouts/Base.astro';
+import { graph, organization, webPage } from '../lib/schema.ts';
+
+const { contact } = site;
+const title = site.nav.find((item) => item.href === '/contact')?.label ?? contact.eyebrow;
+const schema = graph(organization(), webPage('/contact', title, contact.lead, 'ContactPage'));
+---
+
+<Base title={title} description={contact.lead} schema={schema}>
+  <div class="container contact-head">
+    <header class="page-head">
+      <p class="eyebrow">{contact.eyebrow}</p>
+      <h1>{contact.title}</h1>
+      <p class="lead">{contact.lead}</p>
+    </header>
+  </div>
+
+  <Contact intro={false} gloss />
+</Base>
+
+<style>
+  /* The same page head as the docs, games and legal pages; the form section below keeps only a little air. */
+  .contact-head {
+    padding-top: clamp(2.5rem, 7vw, 5rem);
+  }
+
+  .page-head {
+    max-width: 720px;
+    margin-bottom: 0;
+  }
+</style>

@@ -1,0 +1,87 @@
+---
+/**
+ * Where a scripts-off submission lands when the Worker could not accept it. The form page is static and cannot
+ * read a query string, so the Worker redirects here instead of back with a flag.
+ */
+import { legal } from '../../data/legal.ts';
+import { site } from '../../data/site.ts';
+import Base from '../../layouts/Base.astro';
+
+const { title, text } = site.contact.error;
+const contactLabel = site.nav.find((item) => item.href === '/contact')?.label ?? site.contact.eyebrow;
+
+// The sentence names the sales address; that address becomes a mailto link.
+const hasEmail = text.includes(legal.contactEmail);
+const [before = text, after = ''] = text.split(legal.contactEmail);
+---
+
+<Base title={title} description={text} noindex>
+  <section class="result">
+    <div class="container">
+      <div class="panel card">
+        <h1 class="result-title">{title}</h1>
+        <p class="result-text">
+          {
+            hasEmail ? (
+              <>
+                {before}
+                <a href={'mailto:' + legal.contactEmail}>{legal.contactEmail}</a>
+                {after}
+              </>
+            ) : (
+              text
+            )
+          }
+        </p>
+        <p class="cta">
+          <a class="btn btn-primary" href="/contact">{contactLabel}</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .result {
+    min-height: 70vh;
+    padding-top: clamp(3rem, 8vw, 6rem);
+    padding-bottom: var(--section-y);
+  }
+
+  .panel {
+    display: grid;
+    gap: 1rem;
+    justify-items: start;
+    max-width: 560px;
+  }
+
+  .panel > * + * {
+    margin-top: 0;
+  }
+
+  .result-title {
+    font-size: var(--text-title);
+  }
+
+  .result-text {
+    margin: 0;
+    line-height: var(--leading-body);
+    color: var(--ink-2);
+  }
+
+  .result-text a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--line-2);
+    text-underline-offset: 3px;
+  }
+
+  .result-text a:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .cta {
+    margin: 0.5rem 0 0;
+  }
+</style>

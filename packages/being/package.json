@@ -1,0 +1,29 @@
+{
+  "name": "@emersa/being",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Emersa being: a framework-agnostic avatar runtime on three.js (wire head, point-cloud body, lip-sync, tour, brain, speech, memory).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hero-cloud": "./src/hero-cloud/HeroCloud.ts",
+    "./tour": "./src/tour/index.ts",
+    "./brain": "./src/brain/index.ts",
+    "./speech": "./src/speech/index.ts",
+    "./audio": "./src/speech/audioUnlock.ts",
+    "./face": "./src/face/index.ts",
+    "./depth": "./src/data/depth/index.ts",
+    "./framing": "./src/stage/framing.ts"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "three": "0.186.1",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,6 @@
+id: krupiq
+order: 6
+anchor: "[data-product=\"krupiq\"]"
+text: "Krupiq is my sibling in security. It lays a living decoy over a network, so intruders spend their night somewhere that does not exist."
+highlight: "[data-product=\"krupiq\"]"
+dwellMs: 500

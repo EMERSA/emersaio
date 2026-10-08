@@ -1,0 +1,67 @@
+---
+/**
+ * Three plain columns on how a being is built, each under a hairline: a 24px wire icon drawn inline (stroke 1.25,
+ * no glow), an H3 and the text. The section costs no image requests; the paths are geometry only.
+ */
+import { site } from '../data/site.ts';
+
+// 24 x 24 icons, one per column: a wire pyramid (the structure), a triangle that subdivides (the brain),
+// a triangle inside its guard (the posture).
+const icons: ReadonlyArray<readonly string[]> = [
+  ['M12 3.5 20.5 19.5h-17z', 'M12 3.5v9.3', 'M12 12.8 3.5 19.5', 'M12 12.8l8.5 6.7'],
+  ['M12 3.5 20.5 19.5h-17z', 'M7.75 11.5h8.5L12 19.5z'],
+  ['M12 3.5 20.5 19.5h-17z', 'M12 9.5 15.8 16.5H8.2z'],
+];
+
+const cards = site.technology.cards.map((card, index) => ({ ...card, paths: icons[index] ?? icons[0] ?? [] }));
+---
+
+<section id="technology" class="technology section" aria-labelledby="technology-title" data-reveal>
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">{site.technology.eyebrow}</p>
+      <h2 id="technology-title">{site.technology.title}</h2>
+      <p class="lead">{site.technology.lead}</p>
+    </div>
+
+    <div class="grid">
+      {
+        cards.map((card) => (
+          <article class="column">
+            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+              <g fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round">
+                {card.paths.map((d) => (
+                  <path d={d} />
+                ))}
+              </g>
+            </svg>
+            <h3>{card.title}</h3>
+            <p class="text">{card.text}</p>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    gap: 2rem 1.5rem;
+  }
+
+  .icon {
+    display: block;
+    color: var(--accent-text);
+  }
+
+  .column h3 {
+    margin-top: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

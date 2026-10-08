@@ -1,0 +1,35 @@
+/* ==========================================================================
+   Web fonts: two files, both preloaded by Base.astro, about 34 KB together (the budget is 75 KB).
+   Inter is the site's own variable subset (weights 400 to 600, basic Latin plus the marks the pages use; recipe in
+   src/assets/fonts/README.md). Marcellus is the fontsource latin 400 file as published. "Marcellus Fallback" is
+   Georgia with its metrics adjusted to Marcellus, so the swap moves nothing (sizes computed from the Marcellus
+   hhea table and the width of "WE MAKE SYNTHETIC BEINGS." in both faces). Code uses the system mono stack.
+   ========================================================================== */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 600;
+  src: url("../assets/fonts/inter-latin-wght-400-600.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00A9, U+00B7, U+2018-2019, U+201C-201D;
+}
+
+@font-face {
+  font-family: "Marcellus";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("../assets/fonts/marcellus-latin-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Marcellus Fallback";
+  src: local("Georgia");
+  size-adjust: 92.4%;
+  ascent-override: 105.4%;
+  descent-override: 30.3%;
+  line-gap-override: 0%;
+}

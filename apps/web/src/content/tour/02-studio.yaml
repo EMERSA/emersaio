@@ -1,0 +1,8 @@
+id: studio
+order: 2
+anchor: "#story"
+text: "Emersa began in 2023 as a games studio in London. The characters in games were scripted and forgetful, and the team wanted better."
+highlight: "[data-story-step=\"2023\"]"
+dwellMs: 500
+actions:
+  - { type: point, side: left }

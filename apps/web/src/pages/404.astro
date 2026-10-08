@@ -1,0 +1,61 @@
+---
+/**
+ * Served by Cloudflare for any path that does not exist (not_found_handling: 404-page). The guide gets the line;
+ * every word, her name included, comes from site.notFound. A small poster face sits above the words.
+ */
+import Poster from '../assets/being/guide-poster.svg';
+import { site } from '../data/site.ts';
+import Base from '../layouts/Base.astro';
+
+const { notFound } = site;
+---
+
+<Base title={notFound.title} description={notFound.description} noindex>
+  <section class="container container-narrow section not-found">
+    <Poster class="poster" aria-hidden="true" focusable="false" />
+    <header class="page-head">
+      <p class="eyebrow">{notFound.eyebrow}</p>
+      <h1>{notFound.heading}</h1>
+      <p class="lead">
+        <span class="speaker">{notFound.speaker}:</span>{' '}
+        {notFound.lead}
+      </p>
+    </header>
+    <nav class="actions" aria-label={notFound.actionsLabel}>
+      {
+        notFound.actions.map((action, index) => (
+          <a class:list={['btn', index === 0 ? 'btn-primary' : 'btn-ghost']} href={action.href}>
+            {action.label}
+          </a>
+        ))
+      }
+    </nav>
+  </section>
+</Base>
+
+<style>
+  .not-found {
+    min-height: calc(100svh - var(--header-h));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .poster {
+    width: 160px;
+    height: auto;
+    margin-bottom: 2rem;
+    color: var(--wire);
+  }
+
+  .speaker {
+    font-weight: 600;
+    color: var(--accent-text);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+</style>

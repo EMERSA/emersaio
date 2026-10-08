@@ -1,0 +1,129 @@
+---
+/**
+ * The tour as text: the no-JavaScript target of "Start the tour" (#tour), a transcript for search engines and
+ * screen readers, and the place a visitor can read what Emily says without playing anything. One disclosure row
+ * between hairlines with a chevron. The stops come from the same collection that feeds /tour/script.json, so the
+ * words can never drift apart. being-mount.ts opens it through [data-tour-transcript] when no tour could be built.
+ */
+import { getCollection } from 'astro:content';
+import { site } from '../data/site.ts';
+
+const stops = (await getCollection('tour')).sort((a, b) => a.data.order - b.data.order);
+const { tour } = site;
+---
+
+<section id="tour" class="tour-transcript" aria-labelledby="tour-transcript-title" data-reveal>
+  <div class="container">
+    <details class="tour-details" data-tour-transcript>
+      <summary class="tour-summary">
+        <span class="tour-summary-text">
+          <span class="eyebrow">{tour.transcriptEyebrow}</span>
+          <h2 id="tour-transcript-title" class="tour-transcript-title">{tour.transcriptTitle}</h2>
+          <span class="tour-summary-hint">{tour.transcriptHint}</span>
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+          <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </summary>
+      <ol class="tour-list">
+        {
+          stops.map((stop) => (
+            <li class="tour-stop" id={`tour-${stop.data.id}`}>
+              <span class="tour-stop-n num" aria-hidden="true">{String(stop.data.order).padStart(2, '0')}</span>
+              <p class="tour-stop-text">{stop.data.text}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </details>
+  </div>
+</section>
+
+<style>
+  .tour-transcript {
+    padding-block: 0 var(--section-y);
+  }
+
+  .tour-details {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tour-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.5rem 0;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .tour-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .tour-summary:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm);
+  }
+
+  .tour-summary-text {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .tour-transcript-title {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: var(--text-h3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+
+  .tour-summary-hint {
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .tour-details[open] .tour-summary-hint {
+    display: none;
+  }
+
+  .chevron {
+    flex: none;
+    color: var(--ink-muted);
+  }
+
+  .tour-details[open] .chevron {
+    transform: rotate(180deg);
+  }
+
+  .tour-list {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0 0 1.5rem;
+    list-style: none;
+  }
+
+  .tour-stop {
+    display: grid;
+    grid-template-columns: 3ch minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+  }
+
+  .tour-stop-n {
+    color: var(--accent-text);
+  }
+
+  .tour-stop-text {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-2);
+  }
+</style>

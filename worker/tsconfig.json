@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": [],
+    // npm test runs these files under Node's type stripping, which erases types and nothing else.
+    "erasableSyntaxOnly": true
+  },
+  "include": ["index.ts", "scheduled.ts", "lib/**/*.ts", "routes/**/*.ts", "worker-configuration.d.ts"],
+  "exclude": ["**/*.test.ts"]
+}

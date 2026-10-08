@@ -1,0 +1,16 @@
+---
+/**
+ * The Phase 2 talk sheet: consent, microphone and audio unlock, then the session. Phase 1 renders it hidden and
+ * unwired so the dialog, its hook and its styles are in place. The consent copy itself arrives in site.ts with
+ * Phase 2 and fills [data-talk-consent]; until then the paragraph stays empty.
+ */
+import { site } from '../data/site.ts';
+---
+
+<dialog class="talk-sheet" data-talk-sheet hidden aria-labelledby="talk-sheet-title">
+  <h2 id="talk-sheet-title" class="talk-sheet-title">{site.hero.talk.label}</h2>
+  <p class="talk-sheet-copy" data-talk-consent></p>
+  <form method="dialog">
+    <button type="submit" class="btn btn-ghost" data-talk-close>{site.hero.talk.close}</button>
+  </form>
+</dialog>

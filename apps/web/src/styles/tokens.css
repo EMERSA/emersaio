@@ -1,0 +1,185 @@
+/* ==========================================================================
+   emersa.io design tokens. Change the palette here and every component, and the 3D being, follow.
+   Rules: no hard-coded colours anywhere else (scripts/preflight.mjs greps for them); the being reads
+   --wire/--glow/--dot/--echo/--ribbon/--rim/--fan/--bg-3d/--bloom with getComputedStyle, so a theme switch
+   recolours the head and the data fan too.
+   The palette is the bottle: a near-black navy body, an azure rim light, ice highlights. The orange is the bottle
+   cap: it appears on the logo mark (LogoSlot.astro) and on the primary button (global.css .btn-primary), nowhere
+   else, and never in a 3D colour. Surfaces are flat; the one gloss recipe (--gloss-*) is used once per page.
+   Contrast ratios in docs/research/minimal-brief.md (Palette).
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #040918;
+  --bg-2: #03152f;
+  --bg-3: #04244b;
+  --surface: #03152f;
+  --fg-rgb: 207, 228, 242;
+
+  /* Text: ice for headings, pale sky for body, muted sky for labels. --steel is for non-text only. */
+  --ink: #f2f7fb;
+  --ink-2: #cfe4f2;
+  --ink-muted: #8bbddf;
+  --steel: #5a86ae;
+
+  /* Accents */
+  --accent: #2896dd;
+  --accent-text: #5baee6;
+  --accent-strong: #5baee6;
+  --focus: #5baee6;
+  --selection: rgba(40, 150, 221, 0.35);
+
+  /* Orange: the logo mark and .btn-primary only. */
+  --orange: #ff6a00;
+  --orange-hover: #ff7a1a;
+  --on-orange: #040918;
+  --btn-highlight: rgba(255, 255, 255, 0.35);
+
+  /* Lines */
+  --line: rgba(207, 228, 242, 0.1);
+  --line-2: rgba(207, 228, 242, 0.16);
+  --field-border: #5a86ae;
+  --field-bg: #040918;
+  --shadow-raised: none;
+
+  /* The gloss ("bottle glass"), used once per page: the Emily card on /, the form panel on /contact. */
+  --gloss-body: linear-gradient(180deg, #04244b 0%, #03152f 58%, #040918 100%);
+  --gloss-spec: rgba(223, 237, 246, 0.22);
+  --gloss-rim: rgba(40, 150, 221, 0.55);
+  --gloss-rim-soft: rgba(40, 150, 221, 0.45);
+  --gloss-border: rgba(207, 228, 242, 0.1);
+  --gloss-highlight: rgba(207, 228, 242, 0.16);
+  --gloss-shadow: none;
+
+  /* The 3D being (read by @emersa/being ThemeUniforms). Opaque colours; the runtime sets the rim's alpha. */
+  --wire: #cfe4f2;
+  --dot: #8bbddf;
+  --echo: #5baee6;
+  --glow: #2896dd;
+  --rim: #2896dd;
+  --fan: #5baee6;
+  --ribbon: #cfe4f2;
+  --bg-3d: #040918;
+  --bloom: 0;
+
+  /* Type: Marcellus for the H1, H2s and the wordmark; Inter for everything else; the system mono for code. */
+  --font-display: "Marcellus", "Marcellus Fallback", Georgia, "Times New Roman", serif;
+  --font-body: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-legal: 0.8125rem;
+  --text-lead: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
+  --text-h3: 1.25rem;
+  --text-h2: clamp(1.875rem, 1.25rem + 2vw, 2.75rem);
+  /* The home H1: 44px at 390 (the floor that keeps it the LCP element over the lead) and 64px at 1440. */
+  --text-h1: clamp(2.75rem, 2rem + 3vw, 4rem);
+  --text-h1-page: clamp(2.25rem, 1.6rem + 2vw, 3rem);
+  --text-title: 1.75rem;
+  --leading-tight: 1.04;
+  --leading-heading: 1.12;
+  --leading-body: 1.65;
+  --tracking-h1: 0.08em;
+  --tracking-display: -0.005em;
+  --tracking-label: 0.22em;
+  --tracking-nav: 0.16em;
+  --tracking-button: 0.12em;
+  --tracking-wordmark: 0.32em;
+  --tracking-number: 0.08em;
+
+  /* Space and shape: radii are 8 (fields, video), 16 (cards, panels, dock), 999 (buttons) and 50% (dots) only. */
+  --radius-sm: 8px;
+  --radius: 16px;
+  --container: 1120px;
+  --gutter: 20px;
+  --header-h: 64px;
+  --section-y: clamp(4.5rem, 2.5rem + 6vw, 9rem);
+  --head-gap: 2rem;
+
+  /* Motion: colour, opacity and border only. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur: 240ms;
+  --dur-slow: 720ms;
+}
+
+@media (max-width: 399.98px) {
+  :root {
+    --tracking-label: 0.16em;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 32px;
+    --header-h: 72px;
+    --head-gap: 3rem;
+    --text-h3: 1.25rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --text-h3: 1.125rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --gutter: 48px;
+  }
+}
+
+/* Light: creamy white with the same navy, cobalt and azure, so the bottle palette carries into light. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #faf6ee;
+  --bg-2: #f3eee4;
+  --bg-3: #ffffff;
+  --surface: #ffffff;
+  --fg-rgb: 4, 9, 24;
+
+  --ink: #040918;
+  --ink-2: #04244b;
+  --ink-muted: #3f5f80;
+  --steel: #6f7f96;
+
+  --accent: #0e5ba4;
+  --accent-text: #0e5ba4;
+  --accent-strong: #073a72;
+  --focus: #0e5ba4;
+  --selection: rgba(14, 91, 164, 0.2);
+
+  --orange: #f25c05;
+  --orange-hover: #ff6a00;
+  --on-orange: #040918;
+
+  --line: rgba(4, 9, 24, 0.1);
+  --line-2: rgba(4, 9, 24, 0.16);
+  --field-border: #6f7f96;
+  --field-bg: #ffffff;
+  --shadow-raised: 0 1px 2px rgba(4, 9, 24, 0.06);
+
+  --gloss-body: linear-gradient(180deg, #ffffff, #eef4f9);
+  --gloss-spec: rgba(255, 255, 255, 0.95);
+  --gloss-rim: rgba(14, 91, 164, 0.35);
+  --gloss-rim-soft: rgba(40, 150, 221, 0.25);
+  --gloss-border: rgba(4, 9, 24, 0.08);
+  --gloss-highlight: rgba(255, 255, 255, 0.9);
+  --gloss-shadow: 0 1px 2px rgba(4, 9, 24, 0.06), 0 16px 40px -24px rgba(4, 36, 75, 0.25);
+
+  --wire: #073a72;
+  --dot: #0e5ba4;
+  --echo: #2896dd;
+  --glow: #2896dd;
+  --rim: #5baee6;
+  --fan: #0e5ba4;
+  --ribbon: #073a72;
+  --bg-3d: #faf6ee;
+  --bloom: 0;
+}

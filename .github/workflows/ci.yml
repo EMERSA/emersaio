@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Check, test, build and gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      # Supply chain (plan 4.5): production dependencies only; dev tooling is audited through Dependabot.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run check
+      - run: npm test
+      # astro build, then _headers, csp-check, preflight and bundle-budget (the exact 16 KB gzip gate).
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: apps/web/dist
+          retention-days: 7
+      # Lighthouse (lighthouserc.json): mobile, slow 4G, the plan 4.6 gates against the static server, which
+      # compresses text the way Cloudflare does. Its script-size limit allows about 1.3 KB of response headers per
+      # request on top of the 16 KB body budget, because Lighthouse measures transfer size; bundle-budget.mjs holds
+      # the exact body figure. Google Chrome is preinstalled on ubuntu-latest.
+      - run: npx lhci autorun
+      # The browser checks drive the preinstalled Microsoft Edge (playwright-core, channel msedge, software WebGL).
+      - run: node tests/browser/metrics.mjs
+      - run: node tests/browser/a11y.mjs
+      - run: node tests/browser/tour-smoke.mjs
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-output
+          path: |
+            tests/browser/out
+            .lighthouseci
+          retention-days: 7
+          if-no-files-found: ignore

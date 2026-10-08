@@ -1,0 +1,32 @@
+---
+/** The games teaser: a column under a hairline. It shares one two-column band with DocsTeaser on the home page. */
+import { site } from '../data/site.ts';
+
+const { games } = site;
+---
+
+<section class="column teaser" aria-labelledby="games-title">
+  <p class="eyebrow">{games.eyebrow}</p>
+  <h2 class="title" id="games-title">{games.title}</h2>
+  <p class="text">{games.lead}</p>
+  <p class="cta">
+    <a class="btn btn-ghost btn-sm" href={games.cta.href}>{games.cta.label}</a>
+  </p>
+</section>
+
+<style>
+  .teaser {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .title {
+    font-size: var(--text-title);
+  }
+
+  .cta {
+    margin-top: auto;
+    padding-top: 1.25rem;
+  }
+</style>
