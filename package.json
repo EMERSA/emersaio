@@ -37,7 +37,7 @@
     "@gltf-transform/extensions": "4.5.1",
     "@gltf-transform/functions": "4.5.1",
     "@lhci/cli": "0.15.1",
-    "@types/node": "24.19.1",
+    "@types/node": "26.6.4",
     "playwright-core": "1.63.0",
     "typescript": "~5.9.3",
     "wrangler": "4.148.0",
