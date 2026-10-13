@@ -45,6 +45,18 @@ test('anything short of success is false: refusals, errors, bad answers and netw
   assert.equal(await verify('s', 't', null), false);
 });
 
+test('with an expected host, a pass solved on another site is refused; without one the host is not checked', async () => {
+  restore = mockFetch(async () => Response.json({ success: true, hostname: 'other.example' }));
+  assert.equal(await verify('s', 't', null, 'emersa.io'), false);
+  assert.equal(await verify('s', 't', null), true);
+  restore();
+  restore = mockFetch(async () => Response.json({ success: true, hostname: 'emersa.io' }));
+  assert.equal(await verify('s', 't', null, 'emersa.io'), true);
+  restore();
+  restore = mockFetch(async () => Response.json({ success: true }));
+  assert.equal(await verify('s', 't', null, 'emersa.io'), false, 'a pass that names no host is not a pass here');
+});
+
 test('an empty secret, an empty token or an oversized token never reach the network', async () => {
   restore = noFetch();
   assert.equal(await verify('', 't', null), false);

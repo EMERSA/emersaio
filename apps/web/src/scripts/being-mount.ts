@@ -306,10 +306,9 @@ function wireBeing(m: Mount, being: BeingHandle): void {
       stage.classList.add('is-ready');
     }
   });
-  // The fan is decoration: a runtime without it must never cost the being. Its anchors are fixed by the runtime
-  // (4 nodes at the right edge, desktop with a fine pointer only); the shell hands it no DOM targets.
+  // The bust stands alone like the moodboard's depth scans: no data lines.
   try {
-    being.fan.setEnabled(true);
+    being.fan.setEnabled(false);
   } catch {
     // The head renders without its data lines.
   }

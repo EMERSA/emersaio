@@ -4,7 +4,9 @@
  * 0.08em, at least 44px), exactly two font files before the LCP (Marcellus and Inter, 40 KB or less together), no
  * computed backdrop-filter or background-clip: text anywhere, none of the removed ornament classes in the DOM,
  * only the four border radii (8px, 16px, 999px, 50%), no /api/* request before the being mounts, no horizontal
- * overflow, the stored theme applied, and the menu opening at 390 px with JavaScript off.
+ * overflow, the stored theme applied, the being actually drawing on "/" (is-ready, not the poster fallback) once
+ * it mounts, the hero cloud drawing on a touch device with three.js still unrequested before any tap, and the
+ * menu opening at 390 px with JavaScript off.
  *
  *   node tests/browser/metrics.mjs                 (serves apps/web/dist itself)
  *   node tests/browser/metrics.mjs --base http://127.0.0.1:8850   (a running Worker)
@@ -17,6 +19,13 @@ const args = parseArgs();
 const PAGES = args.pages ? args.pages.split(',') : ['/', '/docs', '/contact'];
 const WIDTHS = args.widths ? args.widths.split(',').map(Number) : [390, 1024, 1440];
 const SETTLE_MS = 2500;
+/**
+ * How long the being may take to mount on "/": LCP, then idle, then the three.js chunk, the figure and the first
+ * frame, all on a software renderer in CI. The wait ends as soon as the stage reports is-ready or is-fallback.
+ */
+const MOUNT_TIMEOUT_MS = 25000;
+/** The hero cloud on a touch device: LCP, idle, the cloud chunk and its first frame. */
+const HERO_TIMEOUT_MS = 15000;
 /** Font bytes before the LCP: the brief's ceiling (the Lighthouse budget is 75 KB). */
 const FONT_BYTES_MAX = 40 * 1024;
 const FONT_FILES = [/marcellus-latin-400/, /inter-latin-wght-400-600/];
@@ -39,11 +48,13 @@ const FORBIDDEN = [
 ];
 /** What may only load after the visitor taps Talk: the lazy talk chunks, the SDK, its transports and Turnstile. */
 const TALK_BYTES = /convai|livekit|challenges\.cloudflare\.com|\/_astro\/talk[.-]|\/api\/(talk|memory|brain)/i;
+/** The renderer's chunk, which a touch device must not request before a tap (CONVENTIONS, Performance). */
+const THREE_CHUNK = /\/_astro\/three\./;
 const RADII = ['0px', '8px', '16px', '999px', '50%'];
 /** Slack between the page's own clock stamp of the mount and the request event reaching Node. */
 const MOUNT_SLACK_MS = 250;
 
-/** Runs before any page script: collects CSP violations, the LCP entry and the moment the being mounts. */
+/** Runs before any page script: collects CSP violations, the LCP entry, the being's mount and the hero's first frame. */
 const instrument = () => {
   window.__cspViolations = [];
   document.addEventListener('securitypolicyviolation', (e) => {
@@ -62,14 +73,27 @@ const instrument = () => {
   addEventListener('load', () => {
     window.__loadedAt = Date.now();
   });
-  window.__beingMountedAt = null;
+  // The being's mount, and whether it drew (is-ready) or gave up on the poster (is-fallback); the hero's first frame.
+  window.__beingMount = null;
+  window.__heroReadyAt = null;
   const check = () => {
-    if (window.__beingMountedAt) return;
-    if (document.querySelector('[data-being-stage].is-ready, [data-being-stage].is-fallback'))
-      window.__beingMountedAt = Date.now();
+    if (!window.__beingMount) {
+      if (document.querySelector('[data-being-stage].is-ready'))
+        window.__beingMount = { at: Date.now(), kind: 'ready' };
+      else if (document.querySelector('[data-being-stage].is-fallback'))
+        window.__beingMount = { at: Date.now(), kind: 'fallback' };
+    }
+    if (!window.__heroReadyAt && document.querySelector('[data-hero].is-ready')) window.__heroReadyAt = Date.now();
   };
   new MutationObserver(check).observe(document, { attributes: true, subtree: true, attributeFilter: ['class'] });
 };
+
+/** Resolves once the stage has reported, or at once on a page without one; false when the wait ran out. */
+const waitForMount = (page) =>
+  until(() => page.evaluate(() => Boolean(window.__beingMount) || !document.querySelector('[data-being-stage]')), {
+    timeout: MOUNT_TIMEOUT_MS,
+    interval: 250,
+  });
 
 const { base, close } = await withBase(args);
 const browser = await launch();
@@ -104,7 +128,10 @@ try {
         try {
           const response = await page.goto(base + path, { waitUntil: 'load', timeout: 60000 });
           if (response?.status() !== 200) issues.push(`status ${response?.status() ?? 'none'}`);
-          await page.waitForTimeout(SETTLE_MS);
+          // The being mounts after LCP and idle in its own time; the checks below read the page once it has, or
+          // once the wait ran out, then settle for the LCP entry and the fonts.
+          const mounted = await waitForMount(page);
+          await page.waitForTimeout(mounted ? 500 : SETTLE_MS);
           const m = await page.evaluate(
             ({ forbidden, radii }) => {
               const h1 = document.querySelector('h1');
@@ -144,12 +171,17 @@ try {
                   start: Math.round(e.startTime),
                   bytes: e.encodedBodySize,
                 }));
+              let webgl2 = false;
+              try {
+                webgl2 = Boolean(document.createElement('canvas').getContext('webgl2'));
+              } catch {}
               return {
                 csp: window.__cspViolations,
                 lcp: window.__lcp,
-                mountedAt: window.__beingMountedAt,
+                mount: window.__beingMount,
                 loadedAt: window.__loadedAt,
                 hasStage: Boolean(document.querySelector('[data-being-stage]')),
+                webgl2,
                 overflow: document.scrollingElement.scrollWidth - window.innerWidth,
                 theme: document.documentElement.getAttribute('data-theme'),
                 js: document.documentElement.classList.contains('js'),
@@ -204,12 +236,19 @@ try {
           if (m.overflow > 0) issues.push(`horizontal overflow ${m.overflow}px`);
           if (m.theme !== theme) issues.push(`data-theme is ${m.theme}, expected ${theme}`);
           if (!m.js) issues.push('html.js not set (theme-boot.js did not run)');
+          // The being must draw, not fall back to the poster: a shader that fails to compile, a runtime error in the
+          // first frames or a missing asset all end in is-fallback, which looked like a pass before this check.
+          if (m.hasStage && m.webgl2) {
+            if (!m.mount) issues.push(`the being did not mount within ${MOUNT_TIMEOUT_MS / 1000} s`);
+            else if (m.mount.kind !== 'ready')
+              issues.push('the being fell back to the poster (is-fallback) with WebGL2 available');
+          }
           for (const href of talkRequests) issues.push(`talk bytes before any tap: ${href}`);
           for (const r of apiRequests) {
             if (m.hasStage) {
-              if (!m.mountedAt) issues.push(`${r.path} requested but the being never mounted`);
-              else if (r.at < m.mountedAt - MOUNT_SLACK_MS)
-                issues.push(`${r.path} requested ${m.mountedAt - r.at}ms before the being mounted`);
+              if (!m.mount) issues.push(`${r.path} requested but the being never mounted`);
+              else if (r.at < m.mount.at - MOUNT_SLACK_MS)
+                issues.push(`${r.path} requested ${m.mount.at - r.at}ms before the being mounted`);
             } else if (!m.loadedAt || r.at < m.loadedAt)
               issues.push(`${r.path} requested before load on a page without a being`);
           }
@@ -217,7 +256,8 @@ try {
             path: join(shots, `metrics${path === '/' ? '-home' : path.replaceAll('/', '-')}-${theme}-${width}.png`),
           });
           const h1 = m.h1 ? ` h1=${Math.round(m.h1.size)}px/${m.h1.lines}l` : '';
-          const detail = `lcp=${m.lcp?.tag ?? '-'}${h1} fonts=${m.fonts.length}/${fontBytes}B api=${apiRequests.length} mount=${m.hasStage ? (m.mountedAt ? 'yes' : 'no') : 'n/a'}`;
+          const mount = m.hasStage ? (m.mount ? m.mount.kind : 'no') : 'n/a';
+          const detail = `lcp=${m.lcp?.tag ?? '-'}${h1} fonts=${m.fonts.length}/${fontBytes}B api=${apiRequests.length} mount=${mount}`;
           rows.push([label, issues.length ? 'FAIL' : 'PASS', issues.length ? issues.join('; ') : detail]);
         } catch (error) {
           rows.push([label, 'FAIL', `threw: ${String(error.message ?? error).slice(0, 160)}`]);
@@ -225,6 +265,63 @@ try {
           await ctx.close();
         }
       }
+    }
+  }
+
+  // A touch device at 390 px: the hero cloud draws its first frame, and the renderer's chunk, the being and every
+  // /api call wait for a tap (CONVENTIONS, Performance: three.js only on tap on touch).
+  if (PAGES.includes('/')) {
+    const ctx = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      hasTouch: true,
+      isMobile: true,
+    });
+    try {
+      await ctx.addInitScript((value) => {
+        try {
+          localStorage.setItem('em-theme', value);
+        } catch {}
+      }, 'dark');
+      await ctx.addInitScript(instrument);
+      const page = await ctx.newPage();
+      const errors = [];
+      const early = [];
+      page.on('console', (m) => {
+        if (m.type() === 'error') errors.push(m.text());
+      });
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('request', (r) => {
+        const url = new URL(r.url());
+        if (THREE_CHUNK.test(url.pathname) || url.pathname.startsWith('/api/') || TALK_BYTES.test(url.href))
+          early.push(url.pathname);
+      });
+      await page.goto(`${base}/`, { waitUntil: 'load', timeout: 60000 });
+      const hero = await until(() => page.evaluate(() => window.__heroReadyAt), {
+        timeout: HERO_TIMEOUT_MS,
+        interval: 250,
+      });
+      const state = await page.evaluate(() => ({
+        mount: window.__beingMount,
+        cloud: document.querySelector('[data-hero-canvas]')?.dataset.cloud ?? 'none',
+        webgl2: Boolean(document.createElement('canvas').getContext('webgl2')),
+      }));
+      const issues = [];
+      if (state.webgl2 && !hero)
+        issues.push(`the hero cloud never drew (canvas state "${state.cloud}"): a WebGL2 or shader failure`);
+      if (state.mount) issues.push(`the being mounted (${state.mount.kind}) without a tap`);
+      for (const path of early) issues.push(`${path} requested before any tap`);
+      if (errors.length) issues.push(`${errors.length} console error(s): ${errors[0].slice(0, 120)}`);
+      await page.screenshot({ path: join(shots, 'metrics-home-touch-390.png') });
+      rows.push([
+        'touch hero at 390',
+        issues.length ? 'FAIL' : 'PASS',
+        issues.length ? issues.join('; ') : `hero cloud ${hero ? 'drew' : 'skipped (no WebGL2)'}, nothing early`,
+      ]);
+    } catch (error) {
+      rows.push(['touch hero at 390', 'FAIL', `threw: ${String(error.message ?? error).slice(0, 160)}`]);
+    } finally {
+      await ctx.close();
     }
   }
 

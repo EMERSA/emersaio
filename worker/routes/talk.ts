@@ -14,7 +14,7 @@ import {
   visitorCookie,
 } from '../lib/consent.ts';
 import { apiBase, ConvaiError, connect, revoke } from '../lib/convai.ts';
-import { contentType, fail, json, noContent } from '../lib/http.ts';
+import { contentType, fail, json, noContent, SITE_HOST } from '../lib/http.ts';
 import {
   addDocument,
   bump,
@@ -32,14 +32,15 @@ import { pdfText } from '../lib/pdf.ts';
 import { secondsUntilTomorrow } from '../lib/quota.ts';
 import { multiLine, oneLine } from '../lib/text.ts';
 import { verify } from '../lib/turnstile.ts';
-import { consented, secureCookie, store } from '../lib/visitor.ts';
+import { consented, OLD_CONSENT, secureCookie, store } from '../lib/visitor.ts';
 
 export const MAX_SESSION_BYTES = 4096;
 export const VOICE_OFF = 'Voice is not connected yet.';
 export const VOICE_BUSY = 'Voice is not answering right now. Please try again in a minute, or type instead.';
 export const NOT_HUMAN = 'We could not confirm the check. Please try again.';
-export const OLD_CONSENT = 'Please read the updated notice and agree again.';
+export { OLD_CONSENT };
 export const DAY_FULL = 'That is all the talking for today. Please come back tomorrow.';
+export const UPLOADS_FULL = 'That is all the files for today. Please come back tomorrow.';
 
 const tomorrow = (): Record<string, string> => ({ 'Retry-After': String(secondsUntilTomorrow()) });
 
@@ -56,7 +57,9 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   if (!Number.isInteger(version)) return fail(422, 'Agree to the notice first.');
   if (version !== CONSENT_VERSION) return fail(422, OLD_CONSENT);
   const token = c.fields.turnstile ?? '';
-  if (!(await verify(env.TURNSTILE_SECRET, token, c.request.headers.get('cf-connecting-ip')))) {
+  // Production names its host so a pass solved on another site's page is refused; dev and beta pass nothing.
+  const host = env.ENV === 'production' ? SITE_HOST : undefined;
+  if (!(await verify(env.TURNSTILE_SECRET, token, c.request.headers.get('cf-connecting-ip'), host))) {
     writePoint(env, c.route, '403-turnstile');
     return fail(403, NOT_HUMAN);
   }
@@ -130,9 +133,11 @@ export async function talkUpload(c: ApiContext): Promise<Response> {
   if (s instanceof Response) return s;
   const id = await consented(c, s);
   if (id instanceof Response) return id;
-  if ((await bump(s.db, id, 'uploads')) > MAX_UPLOADS_PER_DAY) {
+  // The cheap read first, so a full day is refused before the body is parsed; the atomic bump below takes the
+  // slot only once the upload is a file this route reads, so a bad request costs the visitor nothing.
+  if ((await usage(s.db, id, 'uploads')) >= MAX_UPLOADS_PER_DAY) {
     writePoint(c.env, c.route, '429-cap');
-    return fail(429, 'That is all the files for today. Please come back tomorrow.', tomorrow());
+    return fail(429, UPLOADS_FULL, tomorrow());
   }
 
   let file: unknown;
@@ -145,6 +150,10 @@ export async function talkUpload(c: ApiContext): Promise<Response> {
   if (file.size > MAX_FILE_BYTES) return fail(413, 'That file is larger than 2 MB.');
   const kind = KINDS.exec(file.name)?.[1]?.toLowerCase();
   if (!kind) return fail(415, 'Attach a PDF, .txt or .md file.');
+  if ((await bump(s.db, id, 'uploads')) > MAX_UPLOADS_PER_DAY) {
+    writePoint(c.env, c.route, '429-cap');
+    return fail(429, UPLOADS_FULL, tomorrow());
+  }
   const name = oneLine(file.name, 120);
   const bytes = new Uint8Array(await file.arrayBuffer());
 

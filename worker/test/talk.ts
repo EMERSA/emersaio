@@ -42,7 +42,7 @@ export function upstreams(u: Upstreams = {}): () => void {
   seen.length = 0;
   return mockFetch(async (url, init) => {
     seen.push(url);
-    if (url.includes('turnstile')) return Response.json({ success: u.turnstile ?? true });
+    if (url.includes('turnstile')) return Response.json({ success: u.turnstile ?? true, hostname: 'emersa.io' });
     if (url.startsWith('https://api.convai.com/user/connect')) {
       return u.convai ? u.convai() : Response.json({ apiAuthToken: 'tok-1' });
     }

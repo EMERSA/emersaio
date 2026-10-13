@@ -25,8 +25,8 @@ export const CLOUD_GRIDS: Readonly<
   head: { cols: 320, rows: 240 },
   headReduced: { cols: 200, rows: 150 },
   headLite: { cols: 120, rows: 90 },
-  // The kinect-demo look's head and shoulders as tiny shards: two per cell, so 320 x 240 is about 152k triangles.
-  bust: { cols: 320, rows: 240 },
+  // The kinect-demo look's head and shoulders as tiny shards: two per cell, so 400 x 300 is about 240k triangles.
+  bust: { cols: 400, rows: 300 },
   bustReduced: { cols: 200, rows: 150 },
   bustLite: { cols: 128, rows: 96 },
 };

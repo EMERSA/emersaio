@@ -4,11 +4,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { CONSENT_VERSION, verifyVisitorId } from '../lib/consent.ts';
-import { bump, listDocuments, MAX_SESSIONS_PER_DAY, openSession } from '../lib/memory.ts';
+import { bump, listDocuments, MAX_SESSIONS_PER_DAY, openSession, usage } from '../lib/memory.ts';
 import { asD1 } from '../test/d1.ts';
 import { assertSecure, body, call, limiter, post, SAME_SITE } from '../test/harness.ts';
 import { HMAC, seen, talkEnv, upstreams, visitor } from '../test/talk.ts';
-import { UNREADABLE_PDF, VOICE_BUSY, VOICE_OFF } from './talk.ts';
+import { OLD_CONSENT, UNREADABLE_PDF, VOICE_BUSY, VOICE_OFF } from './talk.ts';
 
 const SESSION = 'https://emersa.io/api/talk/session';
 const UPLOAD = 'https://emersa.io/api/talk/upload';
@@ -231,9 +231,19 @@ test('upload refusals: 403 without consent, 411, 413, 415, 422 for an unreadable
     413,
   );
   assert.equal((await upload('a.exe', 'MZ', env, v.cookie)).status, 415);
+  // A request without a file this route reads costs no slot; parsing a file is the work, so it takes the slot
+  // whether or not the file turns out readable.
+  assert.equal(await usage(asD1(db), v.id, 'uploads'), 0);
   const bad = await upload('scan.pdf', '%PDF-1.4\nnothing readable', env, v.cookie);
   assert.equal(bad.status, 422);
   assert.equal((await body(bad)).error, UNREADABLE_PDF);
+  assert.equal(await usage(asD1(db), v.id, 'uploads'), 1);
+  // A visitor who agreed to an older notice is asked again before anything else is taken.
+  db.sqlite.prepare('UPDATE visitor SET consent_version = 0 WHERE id = ?').run(v.id);
+  const stale = await upload('a.txt', 'hello there', env, v.cookie);
+  assert.equal(stale.status, 403);
+  assert.equal((await body(stale)).error, OLD_CONSENT);
+  db.sqlite.prepare('UPDATE visitor SET consent_version = ? WHERE id = ?').run(CONSENT_VERSION, v.id);
   assert.equal((await upload('a.txt', 'hello', { ...env, UPLOAD_LIMITER: limiter(false) }, v.cookie)).status, 429);
   for (let i = 0; i < 10; i++) await bump(asD1(db), v.id, 'uploads');
   assert.equal((await upload('a.txt', 'hello', env, v.cookie)).status, 429);

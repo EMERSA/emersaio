@@ -6,18 +6,45 @@
  */
 const latin1 = new TextDecoder('latin1');
 
-async function inflate(bytes: Uint8Array): Promise<Uint8Array | null> {
+/**
+ * Caps on what FlateDecode may expand to. Deflate expands up to about 1000:1, so a 2 MB upload can ask for 2 GB
+ * while the Worker has 128 MB. Content streams of a text page are small: 4 MB per stream and 16 MB per file keep
+ * any real document readable and stop a decompression bomb early; the rest of the stream is cancelled unread.
+ */
+export const MAX_INFLATED_STREAM = 4 * 1024 * 1024;
+export const MAX_INFLATED_TOTAL = 16 * 1024 * 1024;
+
+/** The first `limit` inflated bytes of a deflate stream, the rest cancelled unread; null when it is not deflate. */
+async function inflate(bytes: Uint8Array, limit: number): Promise<Uint8Array | null> {
+  const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
   try {
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+    while (size < limit) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const keep = value.byteLength <= limit - size ? value : value.subarray(0, limit - size);
+      chunks.push(keep);
+      size += keep.byteLength;
+    }
   } catch {
     return null;
+  } finally {
+    reader.cancel().catch(() => undefined);
   }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out;
 }
 
 /** The streams of the file with their dictionaries, inflated where needed. */
 async function streams(pdf: string, bytes: Uint8Array): Promise<string[]> {
   const out: string[] = [];
+  let inflated = 0;
   const re = /<<((?:[^<>]|<<(?:[^<>]|<<[^<>]*>>)*>>|<[^<>]*>)*)>>\s*stream\r?\n/g;
   for (let m = re.exec(pdf); m; m = re.exec(pdf)) {
     const start = m.index + m[0].length;
@@ -31,8 +58,12 @@ async function streams(pdf: string, bytes: Uint8Array): Promise<string[]> {
     if (/\/Length1|\/FontFile/.test(dict)) continue;
     const raw = bytes.subarray(start, end);
     if (/\/FlateDecode/.test(dict)) {
-      const inflated = await inflate(raw);
-      if (inflated) out.push(latin1.decode(inflated));
+      const room = Math.min(MAX_INFLATED_STREAM, MAX_INFLATED_TOTAL - inflated);
+      if (room <= 0) break;
+      const text = await inflate(raw, room);
+      if (!text) continue;
+      inflated += text.byteLength;
+      out.push(latin1.decode(text));
     } else if (!/\/Filter/.test(dict)) {
       out.push(latin1.decode(raw));
     }

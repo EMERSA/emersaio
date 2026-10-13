@@ -133,9 +133,9 @@ test('the face look: full draws the 320 x 240 head cloud with the fan, balanced 
   assert.equal(poster.fan, false);
 });
 
-test('the kinect-demo lattice: 320 x 240 full, 200 x 150 balanced, 128 x 96 lite, none for the poster', () => {
+test('the kinect-demo lattice: 400 x 300 full, 200 x 150 balanced, 128 x 96 lite, none for the poster', () => {
   const caps = { bloom: false, ribbon: false, reflection: false, maxPixelRatio: 2 };
-  assert.deepEqual(qualityProfile('full', caps).bustCloud, { cols: 320, rows: 240 });
+  assert.deepEqual(qualityProfile('full', caps).bustCloud, { cols: 400, rows: 300 });
   assert.deepEqual(qualityProfile('balanced', caps).bustCloud, { cols: 200, rows: 150 });
   assert.deepEqual(qualityProfile('lite', caps).bustCloud, CLOUD_GRIDS.bustLite);
   assert.deepEqual(CLOUD_GRIDS.bustLite, { cols: 128, rows: 96 });
