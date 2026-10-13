@@ -1,8 +1,9 @@
 ---
 /**
- * The two beings. Emily's card is the page's single gloss (global.css .gloss, the bottle-glass recipe) with the
- * points list, the video panel and the orange call to action; Krupiq's card is flat with an outline one. The tour
- * highlights each card through data-product.
+ * The two beings, one above the other. Emily's card is the page's single gloss (global.css .gloss, the bottle-glass
+ * recipe) with the points list, the video panel and the orange call to action that opens the Talk monitor; Krupiq
+ * follows below her as a flat, compact row with an outline link, reached by scrolling. The tour highlights each
+ * through data-product.
  */
 import { site } from '../data/site.ts';
 import VideoSlot from './VideoSlot.astro';
@@ -18,25 +19,33 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
       <h2 id="products-title">{site.products.title}</h2>
     </div>
 
-    <div class="grid">
+    <div class="stack">
       <article class="product gloss" data-product="emily">
-        <p class="eyebrow">{emily.kicker}</p>
-        <h3 class="name">{emily.name}</h3>
-        <p class="text">{emily.lead}</p>
-        <ul class="points">
-          {emily.points.map((point) => <li>{point}</li>)}
-        </ul>
-        <VideoSlot />
-        <p class="cta">
-          <a class="btn btn-primary" href={emily.cta.href}>{emily.cta.label}</a>
-        </p>
+        <div class="emily-grid">
+          <div class="emily-copy">
+            <p class="eyebrow">{emily.kicker}</p>
+            <h3 class="name">{emily.name}</h3>
+            <p class="text">{emily.lead}</p>
+            <ul class="points">
+              {emily.points.map((point) => <li>{point}</li>)}
+            </ul>
+            <p class="cta">
+              <a class="btn btn-primary" href={emily.cta.href} data-talk-open>{emily.cta.label}</a>
+            </p>
+          </div>
+          <div class="emily-video">
+            <VideoSlot />
+          </div>
+        </div>
       </article>
 
-      <article class="product card" data-product="krupiq">
-        <p class="eyebrow">{krupiq.kicker}</p>
-        <h3 class="name">{krupiq.name}</h3>
-        <p class="text">{krupiq.lead}</p>
-        <p class="cta">
+      <article class="product card compact" data-product="krupiq">
+        <div class="compact-copy">
+          <p class="eyebrow">{krupiq.kicker}</p>
+          <h3 class="name name-compact">{krupiq.name}</h3>
+          <p class="text">{krupiq.lead}</p>
+        </div>
+        <p class="cta compact-cta">
           <a class="btn btn-ghost" href={krupiq.cta.href} rel={external(krupiq.cta.href) ? 'noopener' : undefined}>
             {krupiq.cta.label}
           </a>
@@ -47,12 +56,11 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
 </section>
 
 <style>
-  .grid {
+  .stack {
     display: grid;
     gap: 1.5rem;
   }
 
-  /* A column flex lets the call to action sit at the bottom; card padding 40px (24px on phones). */
   .product {
     display: flex;
     flex-direction: column;
@@ -60,11 +68,22 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
     padding: 1.5rem;
   }
 
-  .product.card {
-    padding: 1.5rem;
+  .product > * + * {
+    margin-top: 0;
   }
 
-  .product > * + * {
+  .emily-grid {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .emily-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .emily-copy > * + * {
     margin-top: 0;
   }
 
@@ -75,6 +94,10 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
     font-weight: 400;
     letter-spacing: var(--tracking-display);
     line-height: 1.12;
+  }
+
+  .name-compact {
+    font-size: 1.5rem;
   }
 
   .text {
@@ -108,24 +131,45 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
     clip-path: polygon(evenodd, 0 0, 100% 50%, 0 100%, 1px 2.2px, 1px 5.8px, 6px 4px);
   }
 
-  /* Pushes the call to action to the bottom so the cards end on the same line. */
   .cta {
     margin-top: auto;
     padding-top: 0.5rem;
   }
 
-  /* Side by side: Emily in columns 1 to 7, Krupiq in 8 to 12, equal heights. */
+  .compact-copy {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .compact-copy > * + * {
+    margin-top: 0;
+  }
+
+  .compact-cta {
+    margin-top: 0;
+    padding-top: 0;
+  }
+
   @media (min-width: 768px) {
-    .product,
-    .product.card {
+    .product {
       padding: 2.5rem;
+    }
+
+    /* Krupiq: one row, the words on the left and the link at the right edge. */
+    .product.compact {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1rem 2rem;
+      padding: 1.5rem 2rem;
     }
   }
 
   @media (min-width: 960px) {
-    .grid {
+    /* Emily: the words in the wider column, the video panel beside them, both the full width of the page. */
+    .emily-grid {
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      align-items: stretch;
+      align-items: start;
     }
   }
 </style>

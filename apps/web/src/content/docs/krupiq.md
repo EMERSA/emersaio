@@ -4,7 +4,7 @@ description: "A network that exists only for intruders. How Krupiq lays a living
 section: products
 order: 2
 tour: krupiq
-updated: 2026-10-07
+updated: 2026-10-14
 ---
 
 ## The idea
@@ -35,4 +35,4 @@ Krupiq is the security sibling of Emily Wilson. The same lineage of code that le
 
 ## Learn more
 
-Krupiq has its own site at [krupiq.com](https://krupiq.com), with the product detail, early access and the security contact. For a conversation about deploying it alongside Emily, [write to us](/contact?topic=krupiq).
+Krupiq has its own site at [krupiq.com](https://krupiq.com), with the product detail, early access and the security contact. For a conversation about deploying it alongside Emily, email 4d@emersa.io.

@@ -11,7 +11,7 @@ once, globally, as a compromise. A joined `Content-Security-Policy` is worse tha
 the intersection of both policies.
 
 This site needs real per-path differences: the social card must be embeddable from other origins, and from
-Phase 2 the home page alone allows the Convai, LiveKit and Turnstile origins and the microphone. Cloudflare
+the home page alone allows the Convai, LiveKit and Turnstile origins and the microphone (Talk to Emily). Cloudflare
 provides `! Header-Name` lines that detach an inherited header before a rule sets a new value, and limits the
 file to 100 rules and 2,000 characters per line. `_headers` never applies to responses the Worker generates.
 
@@ -22,9 +22,9 @@ file to 100 rules and 2,000 characters per line. `_headers` never applies to res
   checks for the generator's banner.
 - The same module exports `simulate(headersText, path)`, which reproduces the inherit-and-join semantics.
   `scripts/csp-check.mjs` runs it on representative paths after every build and fails on any joined CSP,
-  Permissions-Policy or CORP; `tools/headers.test.ts` proves the per-path expectations, including Phase 2.
-- `SITE_PHASE=2` adds the home-page block; `CSP_ROLLOUT=report-only` ships the Phase 2 policy as
-  `Content-Security-Policy-Report-Only` next to the enforced Phase 1 policy for the 48 hour observation window.
+  Permissions-Policy or CORP; `tools/headers.test.ts` proves the per-path expectations, including the home override.
+- The home-page block is always emitted; `CSP_ROLLOUT=report-only` ships the Talk policy as
+  `Content-Security-Policy-Report-Only` next to the enforced base policy for the observation window.
 - Worker responses carry their own `SECURE_HEADERS` (`worker/lib/http.ts`): `default-src 'none'`, HSTS, nosniff,
   DENY, CORP, `no-store`. That set is deliberately small and separate because the Worker cannot import a module
   that touches the file system; `tests/browser/probe.sh` checks both sets on a running Worker.

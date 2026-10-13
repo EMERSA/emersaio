@@ -9,7 +9,7 @@ due by Phase 1 week 2. Tick them off here and note where the input went.
       is the registered office at Companies House. Goes in `apps/web/src/data/legal.ts` (`registeredOffice`).
 - [ ] VAT number, or the wording "Not VAT registered". `legal.ts` (`vat`).
 - [ ] Who owns the Cloudflare account and the DNS for emersa.io, and that multi-factor authentication is on.
-- [ ] Who receives `privacy@emersa.io` and `4d@emersa.io` (privacy requests and vulnerability reports).
+- [ ] Who reads `4d@emersa.io` (demos, privacy requests and vulnerability reports all go there).
 
 ## Brand
 
@@ -24,7 +24,6 @@ due by Phase 1 week 2. Tick them off here and note where the input went.
       needs on site). The docs page `emily-wilson-overview` carries `[TBC]` until then.
 - [ ] The Emily Wilson video source (MP4, 1080p, with captions) or the YouTube ids `OFMqitAaKv0` /
       `yCaP1oKKDxE` as candidates. Self-hosted behind the poster facade; no YouTube embed under the CSP.
-- [ ] The 2023 games: title, year, platform, status, links, one image each. `apps/web/src/content/games/`.
 
 ## Partners
 

@@ -1,7 +1,7 @@
 # emersa.io
 
 The Emersa Labs website: an Astro static shell, the `@emersa/being` avatar runtime (Emily Wilson as a wire head
-of glowing triangles over a Kinect-style point-cloud body, who guides, speaks and, from Phase 2, listens and
+of tiny navy triangles over a Kinect-style depth scan, who guides, speaks, and in the Talk monitor listens and
 remembers), and one Cloudflare Worker as the edge middleware for `/api/*`. One npm-workspaces monorepo, all
 TypeScript, deployed by Cloudflare Workers Builds from GitHub.
 
@@ -13,7 +13,7 @@ Read `docs/CONVENTIONS.md` before writing code. The build enforces most of it.
   `kinect` and `wire`), with a glossy ribbon, a floor reflection and a rim light behind it; recoloured by the
   theme tokens, stepped down a quality ladder when frames drop, still under reduced motion.
 - The scripted tour: nine stops with baked voice clips, lip-sync and captions, resumable from `?tour=`.
-- Every page works without JavaScript; the contact form posts through the Worker (Postmark) with bot checks.
+- Every page works without JavaScript; without scripts, Talk to Emily becomes an email link to 4d@emersa.io.
 - Dark navy by default, creamy white in light mode, an orange accent; one token file drives the page and the
   3D scene alike.
 - A strict static CSP with zero inline scripts or styles, exact byte budgets and Lighthouse gates on every build.
@@ -27,9 +27,9 @@ npm run dev:worker          # wrangler dev on 8850: the site through the Worker,
 npm run check               # astro check, tsc for worker and tools, biome ci
 npm test                    # node --test: worker, packages/being, tools (the _headers simulator)
 npm run build               # astro build, then _headers, csp-check, preflight, bundle-budget
-npm run headers             # regenerate apps/web/dist/_headers alone (SITE_PHASE=2 for the Talk block)
-# Phase 2 (Talk to Emily): SITE_PHASE=2 REPORT_ONLY=1 npm run build for the 48 h observation window, then
-# SITE_PHASE=2 npm run build to enforce. PUBLIC_TURNSTILE_SITEKEY sets the sheet's site key at build time.
+npm run headers             # regenerate apps/web/dist/_headers alone
+# REPORT_ONLY=1 npm run build ships the Talk CSP on "/" as Report-Only for the observation window, then a plain
+# npm run build enforces it. PUBLIC_TURNSTILE_SITEKEY sets the person check's site key at build time (optional).
 node scripts/og.mjs         # render apps/web/public/og.png with the installed Edge (manual)
 npx lhci autorun            # Lighthouse CI against dist (mobile, slow 4G, budgets)
 ```
@@ -42,7 +42,6 @@ node tests/browser/a11y.mjs             # axe with color-contrast, both themes
 node tests/browser/tour-smoke.mjs       # the scripted tour starts, captions move, Next, Escape, ?tour= resume
 node tests/browser/gpu-look.mjs         # real GPU (D3D11 Edge): errors, renderer string, every page in both themes
 node tests/browser/pixels.mjs           # real GPU: the stage box within 2 levels of the page colour, both themes
-node tests/browser/form-test.mjs 8850   # the contact form against wrangler dev (JS on and off, bot checks, CSP reports)
 bash tests/browser/probe.sh 8850        # headers, traversal, 404s, methods, body caps against wrangler dev
 ```
 
@@ -67,11 +66,11 @@ wrangler.jsonc   the Worker: assets, bindings, env.beta;  lighthouserc.json + bu
 ## Phases
 
 1. **Site and scripted guide** (now): every page works without JavaScript; Emily gives a nine-stop tour with
-   baked voice clips and captions; contact form through the Worker and Postmark; strict static CSP with zero
+   baked voice clips and captions; strict static CSP with zero
    inline scripts or styles. Launchable at milestone M1 with a captions-only tour.
 2. **Play**: one tap, consent, microphone, Turnstile, a one-hour Convai token minted by the Worker, live
    conversation with lip-sync, memory in D1 (EU) with "What you remember about me" and "Forget me".
-   `SITE_PHASE=2` turns on the home-page header block; the new origins run 48 hours as Report-Only first.
+   Talk lives on the home page; `REPORT_ONLY=1` ships its origins as Report-Only first.
 3. **Beings elsewhere**: the runtime on `/demo/emily` and in any future demo. The metaverse is out of scope for
    this site.
 

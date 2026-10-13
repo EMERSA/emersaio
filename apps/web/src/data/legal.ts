@@ -14,8 +14,8 @@ export const legal = {
   since: 2023,
   city: 'London',
   securityEmail: '4d@emersa.io',
-  contactEmail: 'sales@emersa.io',
-  privacyEmail: 'privacy@emersa.io',
+  contactEmail: '4d@emersa.io',
+  privacyEmail: '4d@emersa.io',
   linkedin: 'https://www.linkedin.com/company/emersalabs',
 } as const;
 

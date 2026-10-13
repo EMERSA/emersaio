@@ -16,7 +16,7 @@ import { launch, newPage, outDir, parseArgs, report, THEMES, until, withBase } f
 
 const args = parseArgs();
 /** --pages /,/docs and --widths 390 narrow a local run; without them these three pages run at every width, as in CI. */
-const PAGES = args.pages ? args.pages.split(',') : ['/', '/docs', '/contact'];
+const PAGES = args.pages ? args.pages.split(',') : ['/', '/docs'];
 const WIDTHS = args.widths ? args.widths.split(',').map(Number) : [390, 1024, 1440];
 const SETTLE_MS = 2500;
 /**

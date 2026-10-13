@@ -1,14 +1,14 @@
 /**
- * Talk to Emily (Phase 2) against a running Worker: the consent sheet, Turnstile with Cloudflare's always-pass test
- * keys, the session mint against a mocked Convai, the visitor cookie, a typed turn posted to memory, the memory
+ * Talk to Emily against a running Worker: the monitor's consent view, Turnstile with Cloudflare's always-pass test
+ * keys when the build carries a site key (skipped otherwise), the session mint against a mocked Convai, the visitor cookie, a typed turn posted to memory, the memory
  * read, and Forget me clearing it all. The voice itself is not exercised: Convai and LiveKit requests from the
  * page are aborted, so the test proves the shell and the Worker contract, not the SDK.
  *
  * Setup (three terminals, or background jobs that are stopped afterwards):
- *   SITE_PHASE=2 PUBLIC_TURNSTILE_SITEKEY=1x00000000000000000000AA npm run build
+ *   PUBLIC_TURNSTILE_SITEKEY=1x00000000000000000000AA npm run build   (or plain npm run build: no person check)
  *   node tests/browser/talk-flow.mjs --mock 8851          (starts the mock Convai on 8851 and waits)
  *   npx wrangler dev --port 8850 --var CONVAI_API_BASE:http://127.0.0.1:8851 --var TURNSTILE_SITEKEY:1x00000000000000000000AA
- *     with .dev.vars holding TURNSTILE_SECRET=1x0000000000000000000000000000000AA, CONVAI_API_KEY=test,
+ *     with .dev.vars holding TURNSTILE_SECRET=1x0000000000000000000000000000000AA (optional), CONVAI_API_KEY=test,
  *     VISITOR_HMAC_KEY=<hex> and a migrated local D1 (npx wrangler d1 migrations apply emersa-memory --local)
  *   node tests/browser/talk-flow.mjs 8850 --mock-port 8851
  * Without --mock-port the mock is started in this process on a free port and its URL printed; wrangler dev must
@@ -74,26 +74,38 @@ if (args.mock) {
     check('Talk CTA visible on /', await cta.isVisible());
     check('header Talk link on /', (await page.locator('header [data-talk-open]').count()) === 1);
     await cta.click();
-    const sheet = page.locator('[data-talk-sheet]');
-    await sheet.waitFor({ state: 'visible', timeout: 5000 });
+    const panel = page.locator('[data-monitor]');
+    await panel.waitFor({ state: 'visible', timeout: 5000 });
+    check(
+      'monitor opens over the being',
+      await page.evaluate(() => document.documentElement.classList.contains('is-talking')),
+    );
+    check('Speak button present', (await page.locator('[data-talk-mic]').count()) === 1);
     const consent = (await page.locator('[data-talk-consent]').textContent()) ?? '';
     for (const phrase of [
       'Convai Technologies',
       'Cloudflare',
       'Microsoft',
       '12 months',
-      'type instead',
+      'Speak button',
       'Emily is an AI',
     ]) {
       check(`consent mentions ${phrase}`, consent.includes(phrase));
     }
-    await page
-      .waitForRequest(/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js/, { timeout: 10000 })
-      .catch(() => null);
-    check(
-      'Turnstile loaded after opening',
-      talkBytes.some((u) => u.includes('challenges.cloudflare.com')),
-    );
+    const sitekey = await page.locator('[data-talk-turnstile]').getAttribute('data-sitekey');
+    if (sitekey) {
+      await page
+        .waitForRequest((r) => r.url().startsWith('https://challenges.cloudflare.com/turnstile/v0/api.js'), {
+          timeout: 10000,
+        })
+        .catch(() => null);
+      check(
+        'Turnstile loaded after opening',
+        talkBytes.some((u) => u.includes('challenges.cloudflare.com')),
+      );
+    } else {
+      check('no Turnstile without a site key', !talkBytes.some((u) => u.includes('challenges.cloudflare.com')));
+    }
 
     const minted = page.waitForResponse((r) => r.url().endsWith('/api/talk/session'), { timeout: 30000 });
     await page.locator('[data-talk-start]').click();
@@ -108,11 +120,15 @@ if (args.mock) {
         mock.calls.some((c) => c.path === '/user/connect' && c.key),
       );
 
-    const cookies = await ctx.cookies(`${base}/api/`);
-    const vid = cookies.find((c) => c.name === 'em_vid');
+    // The attributes are read off the response: wrangler dev answers under the Worker's route host, so the cookie
+    // carries Secure and a browser on plain http drops it from its jar.
+    const setCookie = (session ? await session.headerValue('set-cookie') : null) ?? '';
     check(
       'em_vid set HttpOnly, SameSite=Lax, Path=/api',
-      Boolean(vid?.httpOnly && vid.sameSite === 'Lax' && vid.path === '/api'),
+      /^em_vid=[0-9a-f]{32}\.[A-Za-z0-9_-]{43}; HttpOnly;( Secure;)? SameSite=Lax; Path=\/api; Max-Age=34164000$/.test(
+        setCookie,
+      ),
+      setCookie.slice(0, 60),
     );
 
     const api = (path, init) =>

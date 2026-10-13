@@ -7,7 +7,6 @@
 import { site } from '../data/site';
 import LogoSlot from './LogoSlot.astro';
 import ThemeToggle from './ThemeToggle.astro';
-import { TALK_ENABLED } from '../lib/phase.ts';
 
 const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
 /** The file-format build names the home page /index; the Talk link lives there only. */
@@ -40,7 +39,7 @@ const isCurrent = (href: string): boolean => {
 
     <div class="header-actions">
       {
-        TALK_ENABLED && isHome && (
+        isHome && (
           <a class="nav-link talk-link" href={site.hero.talk.href} data-talk-open>
             {site.talk.headerLink}
           </a>
@@ -134,7 +133,15 @@ const isCurrent = (href: string): boolean => {
 
   .talk-link {
     margin-right: 0.75rem;
+    white-space: nowrap;
     color: var(--accent-text);
+  }
+
+  /* On the narrowest phones the link would crowd the mark; the hero button and the menu still open Talk. */
+  @media (max-width: 419.98px) {
+    .talk-link {
+      display: none;
+    }
   }
 
   .header-actions {

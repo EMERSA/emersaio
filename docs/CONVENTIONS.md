@@ -17,8 +17,8 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
 
 ## Copy and content
 
-- All copy is in `apps/web/src/data/site.ts`; legal particulars in `apps/web/src/data/legal.ts`; docs, games and
-  the tour in `apps/web/src/content/`. Components never contain prose of their own.
+- All copy is in `apps/web/src/data/site.ts`; legal particulars in `apps/web/src/data/legal.ts`; docs and the
+  tour in `apps/web/src/content/`. Components never contain prose of their own.
 - Plain English, no jargon, no em dashes, no unverified claims (no client logos, no ROI figures).
 
 ## HTML, CSS and security
@@ -32,7 +32,8 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
   theme leaves them out. Translucent panels use the `.glass` utility in `global.css` rather than a `--glass`
   background and a backdrop blur declared again in every component.
 - Animations use `transform` and `opacity` only; every animation respects `prefers-reduced-motion: reduce`.
-- Every page works without JavaScript (content, navigation, the contact form, captions-only tour fallback).
+- Every page works without JavaScript (content, navigation, captions-only tour fallback; Talk to Emily becomes a
+  mailto link).
   JavaScript enhances: `html.js` is set by `/theme-boot.js`; progressive hooks use `data-*` attributes, not ids.
 - The theme is `html[data-theme="dark"|"light"]`, stored under `localStorage['em-theme']`, announced with a
   `em:theme` CustomEvent (`detail: 'dark' | 'light'`). Other storage keys: `em-tour` (tour progress, local) and
@@ -41,14 +42,16 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
   `[data-hud]` with its readouts `[data-hud-depth]` and `[data-hud-points]` (blank until the cloud draws),
   `[data-tour]`, `[data-tour-start]`, `[data-tour-next]`, `[data-tour-back]`, `[data-tour-mute]`,
   `[data-tour-transcript]` (the no-script transcript, opened when no tour could be built), `[data-theme-toggle]`,
-  `[data-menu]`, `[data-contact-form]`, `[data-reveal]`, `[data-marquee]` and `[data-marquee-toggle]` (the partner
+  `[data-menu]`, `[data-monitor]` (the green HUD over the being: `[data-monitor-label]`, `[data-tour-view]`,
+  `[data-talk-open]`, `[data-talk-consent]`, `[data-talk-session]`, `[data-talk-mic]` the push-to-talk Speak button,
+  `[data-talk-close]`), `[data-story-step]` (the About timeline the tour points at), `[data-reveal]`, `[data-marquee]` and `[data-marquee-toggle]` (the partner
   marquee and its pause control). State classes: `is-ready`,
-  `is-fallback`, `is-speaking`, `is-listening`, `is-touring`, `is-open`, `is-paused` (the marquee), and for reveals
+  `is-fallback`, `is-speaking`, `is-listening`, `is-touring`, `is-talking` (the conversation is open), `is-open`, `is-paused` (the marquee), and for reveals
   `is-pending` (set by `main.ts` only on elements below the first screen) then `is-in`; nothing is hidden before
   `main.ts` runs. While touring, `being-mount.ts` publishes the dock's height as `--dock-h` on `<html>` (hud.css
   reads it for the page's bottom padding).
 - The being is mounted by `apps/web/src/scripts/being-mount.ts` on documents whose `<main data-being="tour|talk">`
-  says so. Content pages (docs, games, legal) load only `main.ts`. `apps/web/src/pages/dev/` is the development
+  says so. Content pages (docs, legal) load only `main.ts`. `apps/web/src/pages/dev/` is the development
   harness: served by `astro dev` only, removed from every build by `scripts/postbuild.mjs`.
 - Every control that can start a voice clip (Start, Next, Back, Replay, Mute and their keys) calls `primeAudio()`
   from `@emersa/being/audio` first, synchronously inside the gesture: it creates and resumes the page's one shared

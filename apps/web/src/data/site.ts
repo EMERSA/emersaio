@@ -1,8 +1,8 @@
 /**
- * Every word on the site lives here (or in src/content for docs, games and the tour). Components render it;
- * they never carry copy of their own. Plain language, no jargon, no claims we cannot back.
+ * Every word on the site lives here (or in src/content for docs and the tour). Components render it; they never
+ * carry copy of their own. Plain language, no jargon, no claims we cannot back.
  */
-import type { DocSection, GameStatus } from '../content.config.ts';
+import type { DocSection } from '../content.config.ts';
 
 export interface NavItem {
   label: string;
@@ -23,6 +23,9 @@ export interface Partner {
 
 const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'https://emersa.io').replace(/\/$/, '');
 
+/** The one address for everything: demos, privacy requests and vulnerability reports. */
+export const CONTACT_MAILTO = 'mailto:4d@emersa.io?subject=Emily%20Wilson';
+
 export const site = {
   name: 'Emersa Labs',
   shortName: 'Emersa',
@@ -33,12 +36,10 @@ export const site = {
   locale: 'en_GB',
 
   nav: [
-    { label: 'Story', href: '/#story' },
+    { label: 'About', href: '/#about' },
     { label: 'Products', href: '/#products' },
     { label: 'Technology', href: '/#technology' },
     { label: 'Docs', href: '/docs' },
-    { label: 'Games', href: '/games' },
-    { label: 'Contact', href: '/contact' },
   ] satisfies NavItem[],
 
   hero: {
@@ -46,54 +47,55 @@ export const site = {
     title: 'We make synthetic beings.',
     lead: 'Beings that see, remember and act. They were born in our games as intelligent characters. Now they guide people through work, learning and whole worlds.',
     primary: { label: 'Start the tour', href: '#tour' },
-    talk: { label: 'Talk to Emily', href: '#talk', close: 'Close' },
+    /** The href is the no-JavaScript fallback; with scripts the link opens the Talk monitor instead. */
+    talk: { label: 'Talk to Emily', href: CONTACT_MAILTO, close: 'Close' },
     secondary: { label: 'Meet Emily Wilson', href: '/#products' },
     guideLabel: 'Emily Wilson, rendered as the structure beneath the skin',
     voiceLabel: 'AI-generated voice',
   },
 
-  /** The Talk sheet (Phase 2): consent first, then the conversation. Every line a visitor reads before the mic. */
+  /** The Talk monitor: consent first, then the conversation. Every line a visitor reads before they start. */
   talk: {
     headerLink: 'Talk to Emily',
     title: 'Talk to Emily',
+    monitorLabel: 'Emily · live',
+    monitorSpeaking: 'Emily · speaking',
+    monitorConsentLabel: 'Before you start',
+    tourLabel: 'Tour',
     intro: 'Before you start, here is what happens when you talk to Emily.',
     consent: [
       {
-        term: 'Your microphone',
-        text: 'Your browser asks for the microphone when you tap Start talking. It is used only while the conversation is open and stops when you tap End.',
+        term: 'Who handles it',
+        text: 'Cloudflare runs this site. Convai Technologies in the United States reads what you type or say, writes Emily’s replies and gives her her voice. Microsoft handles speech only if we switch to its Azure speech service, and this list will say so first.',
       },
       {
-        term: 'Who handles it',
-        text: 'Cloudflare runs this site and checks that you are a person. Convai Technologies in the United States turns your voice into words and gives Emily her voice and her replies. Microsoft handles speech only if we switch to its Azure speech service, and this list will say so first.',
+        term: 'Your microphone',
+        text: 'Used only while you hold the Speak button, and never otherwise. Typing needs no microphone at all.',
       },
       {
         term: 'What Emily remembers',
-        text: 'What you say, what she replies, a few facts you mention (such as your name, your company or what you are interested in) and any file you add. She keeps this so she can pick up where you left off. At most 200 turns and 10 files a day.',
+        text: 'What you say, what she replies, a few facts you mention (such as your name, your company or what you are interested in) and any file you add. She keeps this so she can pick up where you left off.',
       },
       {
         term: 'How long',
         text: 'We delete everything 12 months after your last visit, or straight away when you tap Forget me.',
       },
-      {
-        term: 'Rather type?',
-        text: 'You can type instead of speaking. The microphone is never needed.',
-      },
     ],
+    freeMinutes: 'Five free minutes a day.',
     aiNotice: 'Emily is an AI and may make mistakes.',
     privacyLink: { label: 'Read the privacy policy', href: '/privacy#voice' },
     start: 'Start talking',
     starting: 'Connecting',
     close: 'Close',
     end: 'End',
-    micOn: 'Mute microphone',
-    micOff: 'Use microphone',
+    speak: 'Speak',
+    speakHold: 'Hold to speak',
     listening: 'Listening',
-    muted: 'Microphone off',
     upload: 'Add a file',
     uploadHint: 'PDF, .txt or .md, up to 2 MB.',
     uploaded: 'Emily has read',
     typeLabel: 'Type to Emily',
-    typePlaceholder: 'Type a message',
+    typePlaceholder: 'Type to Emily',
     send: 'Send',
     you: 'You',
     emily: 'Emily',
@@ -111,8 +113,10 @@ export const site = {
       checkPending: 'One moment: checking you are a person.',
       busy: 'Emily is talking with a lot of people right now. Please try again in a few minutes.',
       limit: 'That is all the talking for today. Please come back tomorrow.',
-      micDenied: 'The microphone is off, so you can type to Emily instead.',
-      timeUp: 'This conversation reached its 20 minute limit. Start again whenever you like.',
+      // Future: a paywall for more time attaches to this line.
+      minutesUp: 'That is your free five minutes for today. Come back tomorrow, or email 4d@emersa.io.',
+      micDenied: 'The microphone is off; you can keep typing.',
+      timeUp: 'This conversation reached its time limit. Start again whenever you like.',
       failed: 'Something went wrong. Please try again.',
       fileTooBig: 'That file is over 2 MB.',
       fileType: 'Please choose a PDF, .txt or .md file.',
@@ -162,8 +166,8 @@ export const site = {
     ] satisfies Partner[],
   },
 
-  story: {
-    eyebrow: 'Story',
+  about: {
+    eyebrow: 'About',
     title: 'From non-player characters to synthetic beings.',
     steps: [
       {
@@ -204,9 +208,10 @@ export const site = {
       ],
       video: {
         title: 'Emily Wilson at work',
-        placeholder: 'Footage coming soon. Book a demo to see Emily live.',
+        placeholder: 'Footage coming soon. Talk to Emily to see her live.',
       },
-      cta: { label: 'Book a 20-minute demo', href: '/contact?topic=emily' },
+      /** Opens the Talk monitor; the href is the fallback without scripts. */
+      cta: { label: 'Talk to Emily', href: CONTACT_MAILTO },
     },
     krupiq: {
       name: 'Krupiq',
@@ -251,41 +256,6 @@ export const site = {
     },
   },
 
-  games: {
-    eyebrow: 'Games',
-    title: 'Where it started.',
-    lead: 'Our first beings lived in games. New titles will be listed here as we announce them.',
-    cta: { label: 'See the games', href: '/games' },
-    statuses: { 'coming-soon': 'Coming soon', released: 'Released' } satisfies Record<GameStatus, string>,
-  },
-
-  contact: {
-    eyebrow: 'Get in touch',
-    title: 'Tell us what you would build.',
-    lead: 'Book a 20-minute demo of Emily Wilson, ask about Krupiq, or tell us what you would build. We reply from a human inbox.',
-    topics: [
-      { value: 'emily', label: 'Emily Wilson demo' },
-      { value: 'krupiq', label: 'Krupiq' },
-      { value: 'partnership', label: 'Partnership' },
-      { value: 'other', label: 'Something else' },
-    ],
-    submit: 'Send',
-    sent: { title: 'Thank you.', text: 'Your message is on its way. We reply within two working days.' },
-    error: { title: 'That did not send.', text: 'Please email sales@emersa.io and we will pick it up from there.' },
-    privacyNote: 'We use your details only to answer you. See the privacy policy.',
-    /** The words in privacyNote that become the link to the policy. */
-    privacyLink: 'privacy policy',
-    fields: {
-      name: 'Name',
-      email: 'Email',
-      company: 'Company',
-      optional: 'optional',
-      topic: 'Topic',
-      topicPlaceholder: 'Choose a topic',
-      message: 'Message',
-    },
-  },
-
   footer: {
     tagline: 'Synthetic beings, made in London since 2023.',
     columns: [
@@ -299,10 +269,9 @@ export const site = {
       {
         title: 'Company',
         links: [
-          { label: 'Story', href: '/#story' },
+          { label: 'About', href: '/#about' },
           { label: 'Docs', href: '/docs' },
-          { label: 'Games', href: '/games' },
-          { label: 'Contact', href: '/contact' },
+          { label: 'Email us', href: 'mailto:4d@emersa.io' },
         ],
       },
     ],
@@ -329,7 +298,7 @@ export const site = {
     captionsOnlyStill: 'Captions only: the voice plays with the 3D guide, which is off on this device.',
     transcriptEyebrow: 'Transcript',
     transcriptTitle: 'What Emily says on the tour',
-    transcriptHint: 'Open to read all nine stops',
+    transcriptHint: 'Open to read all eight stops',
   },
 
   notFound: {
@@ -343,7 +312,7 @@ export const site = {
     actions: [
       { label: 'Back to the start', href: '/' },
       { label: 'Read the docs', href: '/docs' },
-      { label: 'Write to us', href: '/contact' },
+      { label: 'Email us', href: 'mailto:4d@emersa.io' },
     ],
   },
 
@@ -354,6 +323,8 @@ export const site = {
     menu: 'Menu',
     darkMode: 'Dark mode',
     tourControls: 'Tour controls',
+    talkPanel: 'Talk to Emily',
+    speakButton: 'Hold to speak',
     footerNav: 'Footer',
   },
 } as const;

@@ -1,6 +1,6 @@
 # Data protection impact assessment: emersa.io
 
-Controller: Emersa Ltd (trading as Emersa Labs), London, company no. 15179283. Contact: privacy@emersa.io.
+Controller: Emersa Ltd (trading as Emersa Labs), London, company no. 15179283. Contact: 4d@emersa.io.
 Version 1, 2026-10-07, covering Phase 1 as built and Phase 2 as planned. Review before Phase 2 goes live and
 whenever a processor, a purpose or a retention period changes.
 
@@ -18,7 +18,7 @@ though the scale is small and no decision with legal effect is made.
 | Processing | Data | Purpose | Lawful basis | Processor | Retention |
 | --- | --- | --- | --- | --- | --- |
 | Serving pages | IP address, user agent, requested URL (in transit only) | Delivering the site, security | Legitimate interests | Cloudflare (edge, EU and global) | Not stored: Worker invocation logs are off; no analytics script |
-| Contact form | Name, email, company, topic, message | Answering the enquiry | Steps before a contract / consent by sending | Postmark (US), Cloudflare | Mail in the sales inbox under Google Workspace; the Worker stores nothing |
+| Email to 4d@emersa.io | Whatever the visitor writes | Answering the enquiry | Steps before a contract / consent by sending | Google Workspace | Mail in the inbox; the site stores nothing |
 | Rate limiting and counters | Per-connection counters at the edge; a daily send count | Abuse prevention | Legitimate interests | Cloudflare | Counters expire within minutes; the daily count holds no personal data |
 | CSP violation reports | Directive, blocked host, disposition | Security | Legitimate interests | Cloudflare Analytics Engine | Counts only, 90 days |
 | Theme, tour progress and the edge readout | `em-theme` and `em-tour` in the visitor's local storage; `em-colo`, the three-letter code of the Cloudflare data centre that served the page, in session storage | Remembering a preference; the HUD readout next to the guide | Strictly necessary for the chosen feature | None (never sent) | Until the visitor clears storage; `em-colo` ends with the browser session |
@@ -37,7 +37,7 @@ Postmark as processors and has a cookies section.
 | Daily quotas | Per-visitor turn, session and ASR-second counts | Abuse and cost control | Legitimate interests | Cloudflare D1 | 1 day |
 | File upload | The plain text of one PDF, .txt or .md file (at most 2 MB in, 20,000 characters kept), its name and size | Context the visitor asked Emily to read | Consent | Cloudflare (extraction in the Worker, D1 `document` row); the text reaches Convai as conversation context | Same as memory: 12 idle months or "Forget me". The file itself is never stored or forwarded |
 
-Phase 2 additions, as built: consent version 1 is recorded on the `visitor` row (`consent_version`, `last_seen`)
+Phase 2 additions, as built: consent version 2 (the Talk monitor notice) is recorded on the `visitor` row (`consent_version`, `last_seen`)
 by `POST /api/talk/session`; the cookie is `em_vid=<id>.<mac>; HttpOnly; Secure; SameSite=Lax; Path=/api`,
 about 13 months; quotas are 20 sessions, 200 turns and 10 files per visitor per day, 20 minutes per session;
 the Convai Knowledge Bank is not used. Turnstile runs only inside the Talk sheet, loaded when it opens. The
@@ -68,7 +68,7 @@ Phase 2 CSP and `microphone=(self)` apply to `/` only, observed as Report-Only f
 
 ## 5. Rights and contact
 
-Access and erasure are self-service on the site; any other request goes to privacy@emersa.io and is answered
+Access and erasure are self-service on the site; any other request goes to 4d@emersa.io and is answered
 within one month. Processor list and retention periods are repeated on `/privacy`. Security reports go to
 4d@emersa.io (`/.well-known/security.txt`).
 

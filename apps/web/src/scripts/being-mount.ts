@@ -17,14 +17,16 @@ type TourModule = typeof import('@emersa/being/tour');
 interface Elements {
   stage: HTMLElement;
   canvas: HTMLCanvasElement | null;
-  dock: HTMLElement | null;
+  /** The monitor: the HUD over the being that carries the tour's captions and the conversation. */
+  panel: HTMLElement | null;
+  tourView: HTMLElement | null;
+  label: HTMLElement | null;
   captions: HTMLElement | null;
-  /** The "AI-generated voice" line in the dock, shown while the being speaks. */
+  /** The "AI-generated voice" line in the monitor, shown while the being speaks. */
   voiceLabel: HTMLElement | null;
   bar: HTMLElement | null;
   notice: HTMLElement | null;
   startButtons: HTMLElement[];
-  talkSheet: HTMLDialogElement | null;
 }
 
 interface Device {
@@ -66,7 +68,7 @@ const VOICE_INTERVAL_MS = 250;
 /** A tour left unfinished within this window resumes from its bookmark. */
 const RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Pages without a stop of their own link to the nearest one. */
-const STOP_ALIASES: Record<string, string> = { docs: 'technology', games: 'studio' };
+const STOP_ALIASES: Record<string, string> = { docs: 'technology' };
 
 const mainElement = document.querySelector<HTMLElement>('main[data-being]');
 const mode = mainElement?.dataset.being;
@@ -99,7 +101,7 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
     starting: null,
   };
 
-  if (m.el.dock) publishDockHeight(m.el.dock);
+  if (m.el.panel) publishDockHeight(m.el.panel);
 
   // The tour can run from the poster alone, so the start button works before any heavy code arrives.
   for (const button of m.el.startButtons) {
@@ -117,6 +119,14 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
   document.addEventListener('keydown', (event) => onKey(m, event));
   // Talk (scripts/talk.ts) asks for the being here rather than making a second one: the detail is a callback that
   // receives the handle, or null when this device shows the poster.
+  // Opening the conversation ends a running tour: the monitor is one panel and the being speaks for one at a time.
+  document.addEventListener('em:talk-open', () => {
+    try {
+      m.tour?.stop();
+    } catch {
+      setTouring(m, false);
+    }
+  });
   document.addEventListener('em:being-request', (event) => {
     const reply = (event as CustomEvent<unknown>).detail;
     if (typeof reply !== 'function') return;
@@ -153,17 +163,17 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
 
 function collectElements(stage: HTMLElement): Elements {
   const canvas = stage.querySelector('[data-being-canvas]');
-  const talkSheet = document.querySelector('[data-talk-sheet]');
   return {
     stage,
     canvas: canvas instanceof HTMLCanvasElement ? canvas : null,
-    dock: document.querySelector<HTMLElement>('[data-being-dock]'),
+    panel: document.querySelector<HTMLElement>('[data-monitor]'),
+    tourView: document.querySelector<HTMLElement>('[data-tour-view]'),
+    label: document.querySelector<HTMLElement>('[data-monitor-label]'),
     captions: document.querySelector<HTMLElement>('[data-captions]'),
     voiceLabel: document.querySelector<HTMLElement>('[data-voice-label]'),
     bar: document.querySelector<HTMLElement>('[data-tour]'),
     notice: document.querySelector<HTMLElement>('[data-tour-notice]'),
     startButtons: Array.from(document.querySelectorAll<HTMLElement>('[data-tour-start]')),
-    talkSheet: talkSheet instanceof HTMLDialogElement ? talkSheet : null,
   };
 }
 
@@ -183,18 +193,18 @@ function requestedStop(): string | null {
 }
 
 /**
- * While the dock is pinned, the page keeps that much room at its foot (hud.css reads --dock-h), so the end of the
+ * While the monitor is pinned, the page keeps that much room at its foot (hud.css reads --dock-h), so the end of the
  * page and anything focus scrolls to the bottom edge can still come out from under it. A custom property set
  * through the CSSOM is not an inline style, so the Content-Security-Policy is kept.
  */
-function publishDockHeight(dock: HTMLElement): void {
+function publishDockHeight(panel: HTMLElement): void {
   if (typeof ResizeObserver !== 'function') return;
   const observer = new ResizeObserver((entries) => {
     const box = entries[0]?.borderBoxSize?.[0];
-    const height = box ? box.blockSize : dock.getBoundingClientRect().height;
+    const height = panel.hidden ? 0 : box ? box.blockSize : panel.getBoundingClientRect().height;
     document.documentElement.style.setProperty('--dock-h', `${Math.ceil(height)}px`);
   });
-  observer.observe(dock);
+  observer.observe(panel);
 }
 
 /* Audio ------------------------------------------------------------------------------------------------------ */
@@ -316,7 +326,7 @@ function wireBeing(m: Mount, being: BeingHandle): void {
 }
 
 /**
- * The "AI-generated voice" disclosure in the dock: shown whenever voice plays. The runtime's isSpeaking() decides
+ * The "AI-generated voice" disclosure in the monitor: shown whenever the tour's voice plays (Talk shows its own). The runtime's isSpeaking() decides
  * where it exists; an older runtime falls back to the caption adapter's speaking state on the stage.
  */
 function watchVoice(m: Mount, being: BeingHandle): void {
@@ -388,6 +398,10 @@ function beginTour(m: Mount): Promise<void> {
       const ui = m.el.bar
         ? uiModule.createTourUi({
             bar: m.el.bar,
+            panel: m.el.panel,
+            view: m.el.tourView,
+            label: m.el.label,
+            labelText: m.el.label?.dataset.tourLabel ?? 'Tour',
             notice: m.el.notice,
             startButtons: m.el.startButtons,
             captionsOnly: !being,
@@ -434,16 +448,21 @@ function beginTour(m: Mount): Promise<void> {
   return m.starting;
 }
 
-/** The pinned-dock state, which tour-ui.ts also sets from the tour's own state; adding a class twice is harmless. */
+/** The pinned-monitor state, which tour-ui.ts also sets from the tour's own state; adding a class twice is harmless. */
 function setTouring(m: Mount, on: boolean): void {
   document.documentElement.classList.toggle('is-touring', on);
-  const bar = m.el.bar;
-  if (!bar) return;
+  const { bar, panel, tourView } = m.el;
   if (on) {
-    for (const button of bar.querySelectorAll('button')) button.disabled = true;
-    bar.hidden = false;
+    if (panel) panel.hidden = false;
+    if (tourView) tourView.hidden = false;
+    if (bar) {
+      for (const button of bar.querySelectorAll('button')) button.disabled = true;
+      bar.hidden = false;
+    }
   } else {
-    bar.hidden = true;
+    if (bar) bar.hidden = true;
+    if (tourView) tourView.hidden = true;
+    if (panel && !document.documentElement.classList.contains('is-talking')) panel.hidden = true;
   }
 }
 
@@ -557,10 +576,9 @@ function scrollTargetTop(target: Element): number {
 }
 
 function openTalk(m: Mount): void {
-  const sheet = m.el.talkSheet;
-  if (!sheet || sheet.hidden || sheet.open) return;
-  // talk-boot.ts opens the sheet and loads the talk code; Phase 1 renders the sheet hidden, so nothing happens.
-  document.dispatchEvent(new CustomEvent('em:talk-open'));
+  if (!m.el.panel) return;
+  // talk-boot.ts shows the monitor's consent view and loads the talk code.
+  document.dispatchEvent(new CustomEvent('em:talk-request'));
 }
 
 function onKey(m: Mount, event: KeyboardEvent): void {
@@ -570,11 +588,11 @@ function onKey(m: Mount, event: KeyboardEvent): void {
   const target = event.target;
   if (target instanceof HTMLElement) {
     if (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName)) return;
-    if (target.closest('dialog[open]')) return;
+    if (target.closest('[data-talk-consent], [data-talk-session]')) return;
   }
   // Printable single-key shortcuts work only while the tour's own controls have the focus (SC 2.1.4); the arrow
   // keys and Escape, which no speech-input user utters by accident, work from anywhere on the page.
-  const inDock = target instanceof Element && target.closest('[data-tour], [data-being-dock]') !== null;
+  const inDock = target instanceof Element && target.closest('[data-tour], [data-monitor]') !== null;
   try {
     switch (event.key) {
       case 'ArrowRight':
@@ -582,7 +600,7 @@ function onKey(m: Mount, event: KeyboardEvent): void {
         tour.next();
         break;
       case ' ':
-        // A focused button or link keeps its own activation; Space advances only from the dock itself.
+        // A focused button or link keeps its own activation; Space advances only from the monitor itself.
         if (!inDock) return;
         if (target instanceof HTMLElement && /^(button|a|summary)$/i.test(target.tagName)) return;
         primeVoice(m);
@@ -689,6 +707,7 @@ function createCaptionBeing(): BeingHandle {
       setContrast: noop,
       setOpacity: noop,
       setLineWidth: noop,
+      setRipple: noop,
     },
     stats: () => ({
       fps: 0,

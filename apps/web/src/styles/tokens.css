@@ -65,6 +65,14 @@
   --bg-3d: #040918;
   --bloom: 0;
 
+  /* The monitor: the Talk and tour HUD drawn over the being, phosphor green on a translucent navy panel. */
+  --phos: #7af0b0;
+  --phos-dim: #3fae73;
+  --phos-line: rgba(122, 240, 176, 0.05);
+  --monitor-bg: rgba(4, 9, 24, 0.76);
+  --monitor-bg-solid: #040918;
+  --monitor-border: rgba(122, 240, 176, 0.24);
+
   /* Type: Marcellus for the H1, H2s and the wordmark; Inter for everything else; the system mono for code. */
   --font-display: "Marcellus", "Marcellus Fallback", Georgia, "Times New Roman", serif;
   --font-body: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -182,4 +190,11 @@
   --ribbon: #073a72;
   --bg-3d: #faf6ee;
   --bloom: 0;
+
+  --phos: #0b5d3a;
+  --phos-dim: #1f7a4f;
+  --phos-line: rgba(11, 93, 58, 0.06);
+  --monitor-bg: rgba(250, 246, 238, 0.86);
+  --monitor-bg-solid: #faf6ee;
+  --monitor-border: rgba(11, 93, 58, 0.28);
 }

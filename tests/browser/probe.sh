@@ -85,7 +85,7 @@ has "$(curl $K -D - -o /dev/null -X PUT "$B/api/health" 2>/dev/null | tr -d '\r'
 expect "POST /api/csp (csp-report) -> 204" "$(csp_post)" 204
 BIG=$(mktemp)
 head -c 200000 /dev/zero | tr '\0' 'a' > "$BIG"
-expect "200 KB form body -> 413" "$(code POST /api/contact -H 'accept: application/json' -H "origin: $B" -H 'content-type: application/x-www-form-urlencoded' --data-binary "@$BIG")" 413
+expect "200 KB session body -> 413" "$(code POST /api/talk/session -H 'accept: application/json' -H "origin: $B" -H 'content-type: application/json' --data-binary "@$BIG")" 413
 rm -f "$BIG"
 
 if [[ "$LOCAL" == "1" ]]; then

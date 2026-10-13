@@ -1,6 +1,6 @@
 /**
  * The scripted tour on "/": Start shows the tour bar, the captions change as Emily speaks, Next advances the
- * progress readout to "2 / 9", Escape ends the tour. The dock is checked as the brief describes it: a flat panel
+ * progress readout to "2 / 8", Escape ends the tour. The monitor is checked as the brief describes it: a flat panel
  * with no blur, the "AI-generated voice" line in place, Back, Next, Replay, Mute and End tour each at least 44px
  * tall, and the highlighted step ringed by a 1px outline. Then "/?tour=<stop>" under reduced motion resumes a stop
  * without three.js. Captions-only is enough here: a build without voice clips passes, a tour that never starts
@@ -47,9 +47,9 @@ try {
         barShown ? '[data-tour] visible' : '[data-tour] never became visible',
       );
 
-      // The dock: flat, no blur, the voice line, 44px buttons with their labels.
+      // The monitor: flat, no blur, the voice line, 44px buttons with their labels.
       const dock = await page.evaluate(() => {
-        const dockEl = document.querySelector('[data-being-dock]');
+        const dockEl = document.querySelector('[data-monitor]');
         const cs = dockEl ? getComputedStyle(dockEl) : null;
         const label = (selector) => {
           const el = document.querySelector(selector);
@@ -118,7 +118,7 @@ try {
           { timeout: 5000 },
         );
         check('progress advances on Next', Boolean(after), `"${before}" -> "${after || before}"`);
-        check('progress reads "2 / 9" at the second stop', after === '2 / 9', `"${after || before}"`);
+        check('progress reads "2 / 8" at the second stop', after === '2 / 8', `"${after || before}"`);
         // The highlighted step: a 1px ring, not a 2px box.
         const ring = await until(
           () =>

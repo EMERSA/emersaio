@@ -4,12 +4,12 @@ description: "The scripted tour behind the home page: stops, captions, voice cli
 section: beings
 order: 2
 tour: welcome
-updated: 2026-10-08
+updated: 2026-10-14
 ---
 
 ## A tour, not a conversation
 
-The guide on the home page is Emily Wilson, rendered as the structure beneath the skin. In this first phase she follows a script. There is no microphone, no language model, and nothing is sent to a server when she speaks. "Talk to Emily" is planned for the next phase, with its own consent step.
+The guide on the home page is Emily Wilson, rendered as the structure beneath the skin. On the tour she follows a script: no microphone, no language model, and nothing is sent to a server when she speaks. "Talk to Emily" opens a conversation with her, with its own consent step first.
 
 The tour has nine stops. Each stop is a small text file in the site's source with four things: where on the page to scroll, a line of at most forty words, what to highlight while the line plays, and how long to pause afterwards. Some stops add a gesture: a nod, a smile, a point to the left or to the right.
 
@@ -35,11 +35,11 @@ If your system asks for reduced motion, the site listens. The page moves between
 
 ## Talking with Emily
 
-When Talk is switched on, the Talk to Emily button opens a sheet that says what happens before anything does: the microphone, who handles your voice, what Emily remembers and for how long. Start talking asks the site's edge program for a one-hour session; the voice service's key never reaches your browser. Emily then listens, answers in her own voice and her face moves with every sound she makes. Captions show both sides of the conversation. If you would rather not use the microphone, type instead. What you remember shows what is kept, Forget me erases it, and End closes the conversation and the microphone. A conversation lasts at most 20 minutes.
+The Talk to Emily button opens a green monitor over her that says what happens before anything does: who handles the conversation, when the microphone is used, what Emily remembers and for how long. Start talking asks the site's edge program for a session; the voice service's key never reaches your browser. You type to Emily; she answers in her own voice and her face moves with every sound she makes. Hold the Speak button to talk instead, and the microphone is open only while you hold it. You can add a file for her to read. What you remember shows what is kept, Forget me erases it, and End closes the conversation. Talking is free for five minutes a day, and a conversation lasts at most 20 minutes.
 
 ## Without JavaScript or WebGL
 
-Every page works without JavaScript: the content, the navigation and the contact form. The tour is then a set of captions you can read in order. Without WebGL, the being is a poster and the tour runs with captions only.
+Every page works without JavaScript: the content and the navigation; without scripts, Talk to Emily becomes an email link. The tour is then a set of captions you can read in order. Without WebGL, the being is a poster and the tour runs with captions only.
 
 ## What loads when
 

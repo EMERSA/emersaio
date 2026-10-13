@@ -10,8 +10,8 @@ export default defineConfig({
   trailingSlash: 'never',
   integrations: [
     sitemap({
-      // Result pages of the contact form and the development harness are not content.
-      filter: (page) => !/\/(contact\/(sent|error)|dev(\/.*)?)$/.test(page.replace(/\/$/, '')),
+      // The development harness is not content.
+      filter: (page) => !/\/dev(\/.*)?$/.test(page.replace(/\/$/, '')),
     }),
   ],
   markdown: {

@@ -1,6 +1,6 @@
 /**
- * Content collections (Astro content layer). Three collections feed the site: docs (Markdown pages under /docs),
- * games (the titles listed on /games) and tour (the scripted guide, served as /tour/script.json). The schemas are
+ * Content collections (Astro content layer). Two collections feed the site: docs (Markdown pages under /docs)
+ * and tour (the scripted guide, served as /tour/script.json). The schemas are
  * the contract between the writers and the pages, so a typo in a front matter field fails the build here rather
  * than rendering an empty page.
  */
@@ -12,10 +12,6 @@ import { z } from 'astro/zod';
 /** Sidebar order of the docs sections; their labels are site.docs.sections. */
 export const DOC_SECTIONS = ['beings', 'products', 'trust'] as const;
 export type DocSection = (typeof DOC_SECTIONS)[number];
-
-/** Their labels are site.games.statuses. */
-export const GAME_STATUSES = ['coming-soon', 'released'] as const;
-export type GameStatus = (typeof GAME_STATUSES)[number];
 
 /** A spoken line must fit one breath and one caption bubble. */
 const MAX_TOUR_WORDS = 40;
@@ -35,19 +31,6 @@ const docs = defineCollection({
       .string()
       .regex(/^[a-z][a-z0-9-]*$/)
       .optional(),
-  }),
-});
-
-const games = defineCollection({
-  loader: glob({ pattern: '*.md', base: './src/content/games' }),
-  schema: z.object({
-    title: z.string().min(1),
-    year: z.number().int().min(2023),
-    platform: z.string().min(1),
-    status: z.enum(GAME_STATUSES),
-    /** Path of a cover image under /public, once there is one. */
-    cover: z.string().min(1).optional(),
-    links: z.array(z.object({ label: z.string().min(1), href: z.string().min(1) })).optional(),
   }),
 });
 
@@ -79,7 +62,7 @@ const tour = defineCollection({
   }),
 });
 
-export const collections = { docs, games, tour };
+export const collections = { docs, tour };
 
 /** The shape the docs helpers need; CollectionEntry<'docs'> satisfies it. */
 export interface DocSummary {

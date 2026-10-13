@@ -4,7 +4,7 @@ description: "A plain definition of the thing Emersa makes, where the idea came 
 section: beings
 order: 1
 tour: beings
-updated: 2026-10-07
+updated: 2026-10-14
 ---
 
 ## A short definition

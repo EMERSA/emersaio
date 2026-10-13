@@ -17,7 +17,6 @@ import {
   CSP_PHASE2_HOME_REPORT_ONLY,
   PERMISSIONS_POLICY,
   PERMISSIONS_POLICY_TALK,
-  PHASE,
   parseHeaders,
   REPORT_ONLY,
 } from '../tools/headers.ts';
@@ -174,7 +173,8 @@ function* htmlFiles(dir) {
 
 /** Representative paths with exact expectations: the home override must reach "/" alone, /og.png alone is embeddable. */
 const PATHS = ['/', '/docs', '/docs/x', '/_astro/x.js', '/og.png', '/theme-boot.js'];
-const TALK_ON_HOME = PHASE >= 2;
+/** Talk lives on the home page, so "/" alone carries the Talk policy and the microphone. */
+const TALK_ON_HOME = true;
 
 function expectedFor(path) {
   const home = path === '/' && TALK_ON_HOME;
@@ -247,7 +247,7 @@ function checkHeaders(text) {
     rows.push([
       path,
       issues.length ? 'FAIL' : 'ok',
-      get('content-security-policy') === want.csp ? (want.csp === CSP_PHASE1 ? 'phase-1' : 'phase-2') : 'WRONG',
+      get('content-security-policy') === want.csp ? (want.csp === CSP_PHASE1 ? 'base' : 'talk') : 'WRONG',
       /microphone=\(self\)/.test(get('permissions-policy') ?? '') ? 'mic=self' : 'mic=off',
       get('cross-origin-resource-policy') ?? '-',
       get('cache-control') ?? '-',
@@ -281,7 +281,7 @@ const headersFile = join(dist, '_headers');
 if (!existsSync(headersFile)) {
   problems.push('_headers is missing: run "node tools/headers.ts --emit apps/web/dist/_headers"');
 } else {
-  console.log(`csp-check: _headers simulated for phase ${PHASE}${REPORT_ONLY ? ' (CSP report-only rollout)' : ''}`);
+  console.log(`csp-check: _headers simulated${REPORT_ONLY ? ' (CSP report-only rollout)' : ''}`);
   const text = readFileSync(headersFile, 'utf8');
   printTable(checkHeaders(text));
   const before = problems.length;

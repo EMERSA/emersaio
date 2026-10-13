@@ -1,8 +1,9 @@
 /**
- * The Talk shell (Phase 2), loaded by talk-boot.ts when the sheet first opens. It owns the consent view, the
- * Turnstile widget, the session mint (POST /api/talk/session), the message list, the microphone toggle, the typed
- * fallback, file upload, the memory panel with Forget me, and End. The voice itself, and every Convai byte, arrives
- * with the dynamic import of @emersa/being/talk after the visitor taps Start talking.
+ * The Talk shell, loaded by talk-boot.ts when the monitor first opens. It owns the consent view, the optional
+ * Turnstile widget, the session mint (POST /api/talk/session), the message log, the typed prompt, the Speak button
+ * (push to talk: the microphone is open only while it is held), file upload, the memory panel with Forget me, and
+ * End. The voice itself, and every Convai byte, arrives with the dynamic import of @emersa/being/talk after the
+ * visitor taps Start talking.
  *
  * Every dynamic string goes through textContent. No secret ever reaches this file: the Worker mints a one-hour
  * Convai token per session and the visitor cookie is HttpOnly.
@@ -12,11 +13,11 @@ import { site } from '../data/site.ts';
 
 const copy = site.talk;
 
-/** Plan 4.5: the exact Turnstile URL the Phase 2 CSP allows. Added to the document only when the sheet opens. */
+/** The exact Turnstile URL the CSP allows. Added to the document only when the monitor opens with a site key. */
 const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 const TURNSTILE_WAIT_MS = 15000;
 /** The consent text version the Worker records with the visitor row. Bump it when the consent copy changes. */
-export const CONSENT_VERSION = 1;
+export const CONSENT_VERSION = 2;
 const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
 const UPLOAD_TYPES = /\.(pdf|txt|md)$/i;
 /** The Worker keeps 20,000 characters of a document; the local copy given to Emily is cut the same way. */
@@ -67,7 +68,11 @@ declare global {
 }
 
 interface Ui {
-  sheet: HTMLDialogElement;
+  panel: HTMLElement;
+  label: HTMLElement;
+  voice: HTMLElement;
+  close: HTMLButtonElement;
+  stage: HTMLElement | null;
   consent: HTMLElement;
   session: HTMLElement;
   start: HTMLButtonElement;
@@ -88,28 +93,31 @@ interface Ui {
   end: HTMLButtonElement;
 }
 
-const wired = new WeakSet<HTMLDialogElement>();
+const controllers = new WeakMap<HTMLElement, Controller>();
 
-/** Wire the sheet once; later opens only make sure the Turnstile widget is there. */
-export function wire(sheet: HTMLDialogElement): void {
-  const ui = collect(sheet);
-  if (!ui) return;
-  if (wired.has(sheet)) {
-    if (!ui.session.hidden) return;
-    void mountTurnstile(ui);
-    return;
+/** Show the monitor's consent view (or the open conversation) over the being; wire the panel on the first open. */
+export function open(panel: HTMLElement): void {
+  let controller = controllers.get(panel);
+  if (!controller) {
+    const ui = collect(panel);
+    if (!ui) return;
+    controller = new Controller(ui);
+    controller.bind();
+    controllers.set(panel, controller);
   }
-  wired.add(sheet);
-  new Controller(ui).bind();
+  controller.show();
 }
 
-function collect(sheet: HTMLDialogElement): Ui | null {
+function collect(panel: HTMLElement): Ui | null {
   const q = <T extends Element>(selector: string, type: new () => T): T | null => {
-    const el = sheet.querySelector(selector);
+    const el = panel.querySelector(selector);
     return el instanceof type ? el : null;
   };
   const ui = {
-    sheet,
+    panel,
+    label: q('[data-monitor-label]', HTMLElement),
+    voice: q('[data-voice-label]', HTMLElement),
+    close: q('[data-talk-close]', HTMLButtonElement),
     consent: q('[data-talk-consent]', HTMLElement),
     session: q('[data-talk-session]', HTMLElement),
     start: q('[data-talk-start]', HTMLButtonElement),
@@ -130,7 +138,7 @@ function collect(sheet: HTMLDialogElement): Ui | null {
     end: q('[data-talk-end]', HTMLButtonElement),
   };
   for (const value of Object.values(ui)) if (!value) return null;
-  return ui as Ui;
+  return { ...(ui as Omit<Ui, 'stage'>), stage: document.querySelector<HTMLElement>('[data-being-stage]') };
 }
 
 /* Turnstile ------------------------------------------------------------------------------------------------- */
@@ -157,9 +165,10 @@ function loadTurnstile(): Promise<Turnstile | null> {
   return turnstileLoad;
 }
 
-async function mountTurnstile(ui: Ui): Promise<boolean> {
+/** 'skip' when the build carries no site key (the Worker then mints without the check), true once the widget is up. */
+async function mountTurnstile(ui: Ui): Promise<boolean | 'skip'> {
   const sitekey = ui.turnstile.dataset.sitekey ?? '';
-  if (!sitekey) return false;
+  if (!sitekey) return 'skip';
   const turnstile = await loadTurnstile();
   if (!turnstile) return false;
   if (widgetId !== null) return true;
@@ -183,7 +192,8 @@ async function mountTurnstile(ui: Ui): Promise<boolean> {
 }
 
 /** The current token, consumed: a Turnstile token is single use, so the widget is reset for the next one. */
-function takeTurnstileToken(): Promise<string> {
+function takeTurnstileToken(ui: Ui): Promise<string> {
+  if (!ui.turnstile.dataset.sitekey) return Promise.resolve('');
   const ready = turnstileToken;
   if (ready) {
     turnstileToken = '';
@@ -223,8 +233,10 @@ class Controller {
   private readonly ui: Ui;
   private session: TalkSession | null = null;
   private being: TalkBeing = NO_BEING;
-  private micOn = false;
+  private held = false;
   private starting = false;
+  /** The person check is skipped when the build has no site key. */
+  private guarded = true;
   /** The line being written for each speaker while words still arrive. */
   private live: Partial<Record<Speaker, HTMLElement>> = {};
 
@@ -235,19 +247,54 @@ class Controller {
   bind(): void {
     const { ui } = this;
     ui.start.addEventListener('click', () => this.start());
+    ui.close.addEventListener('click', () => void this.end(true));
     ui.form.addEventListener('submit', (event) => {
       event.preventDefault();
       this.send();
     });
-    ui.mic.addEventListener('click', () => void this.toggleMic());
+    // Push to talk: the microphone opens on the press and closes on the release, never otherwise.
+    const press = (event: Event): void => {
+      event.preventDefault();
+      void this.hold(true);
+    };
+    const release = (): void => void this.hold(false);
+    ui.mic.addEventListener('pointerdown', press);
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) ui.mic.addEventListener(type, release);
+    ui.mic.addEventListener('keydown', (event) => {
+      if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) press(event);
+    });
+    ui.mic.addEventListener('keyup', (event) => {
+      if (event.key === ' ' || event.key === 'Enter') release();
+    });
     ui.file.addEventListener('change', () => void this.upload());
     ui.memoryOpen.addEventListener('click', () => void this.toggleMemory());
     ui.forget.addEventListener('click', () => void this.forget());
-    ui.end.addEventListener('click', () => void this.end(true));
-    ui.sheet.addEventListener('close', () => void this.end(false));
-    void mountTurnstile(ui).then((ok) => {
-      if (!ok) this.notice(ui.turnstile.dataset.sitekey ? 'check' : 'unavailable');
+    ui.end.addEventListener('click', () => void this.end(false));
+    ui.panel.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && document.documentElement.classList.contains('is-talking')) void this.end(true);
     });
+    // A tour that starts takes the monitor; the conversation ends.
+    document.addEventListener('em:tour-start', () => void this.end(true));
+  }
+
+  /** Show the panel over the being: the consent view, or the conversation if one is open. */
+  show(): void {
+    const { ui } = this;
+    ui.panel.hidden = false;
+    ui.close.hidden = false;
+    document.documentElement.classList.add('is-talking');
+    if (this.session) {
+      ui.input.focus({ preventScroll: true });
+      return;
+    }
+    ui.consent.hidden = false;
+    ui.session.hidden = true;
+    ui.label.textContent = copy.monitorConsentLabel;
+    void mountTurnstile(ui).then((state) => {
+      this.guarded = state !== 'skip';
+      if (state === false) this.notice('check');
+    });
+    ui.start.focus({ preventScroll: true });
   }
 
   /** The tap: audio first, synchronously inside the gesture; then the grant, the runtime and the session. */
@@ -259,7 +306,7 @@ class Controller {
     ui.start.disabled = true;
     ui.start.textContent = copy.starting;
     this.notice(null);
-    if (!turnstileToken) this.notice('checkPending');
+    if (this.guarded && !turnstileToken) this.notice('checkPending');
     void this.connect().finally(() => {
       this.starting = false;
       ui.start.disabled = false;
@@ -269,73 +316,84 @@ class Controller {
 
   private async connect(): Promise<void> {
     const { ui } = this;
-    const turnstile = await takeTurnstileToken();
-    if (!turnstile) return this.notice('check');
+    const turnstile = await takeTurnstileToken(ui);
+    if (this.guarded && !turnstile) return this.notice('check');
     this.notice(null);
     let failed: Notice | null = null;
+    let detail = '';
     try {
       const [mod, being] = await Promise.all([import('@emersa/being/talk'), requestBeing()]);
       this.being = being;
       ui.consent.hidden = true;
       ui.session.hidden = false;
-      this.ui.state.textContent = copy.starting;
+      ui.label.textContent = copy.monitorLabel;
+      ui.state.textContent = copy.starting;
       const session = await mod.TalkSession.start({
         being,
         turnstile,
         consentVersion: CONSENT_VERSION,
         refreshTurnstile: async () => {
-          const token = await takeTurnstileToken();
-          if (!token) throw new Error('turnstile');
+          const token = await takeTurnstileToken(ui);
+          if (this.guarded && !token) throw new Error('turnstile');
           return token;
         },
         listen: false,
         onTranscript: (speaker, text, final) => this.caption(speaker, text, final),
-        onState: (state) => {
+        onState: (state, why) => {
           const notice = FAILED_STATES[state];
-          if (notice) failed = notice;
+          if (notice) {
+            failed = notice;
+            // The Worker's own sentence (the free minutes, the day's cap) is more precise than the generic line.
+            detail = state === 'limited' || state === 'unavailable' ? (why ?? '') : '';
+          }
           this.setState(state);
         },
         onNotice: (notice) => this.notice(RUNTIME_NOTICES[notice] ?? 'failed'),
+        onVoice: (speaking) => this.setSpeaking(speaking),
       });
       if (session.state !== 'live') {
         await session.end('error');
         throw new Error(session.state);
       }
       this.session = session;
-      await this.setMic(true);
-      ui.input.focus();
+      ui.input.focus({ preventScroll: true });
     } catch {
       this.session = null;
-      this.notice(failed ?? 'failed');
+      if (detail) this.status(detail);
+      else this.notice(failed ?? 'failed');
       ui.session.hidden = true;
       ui.consent.hidden = false;
+      ui.label.textContent = copy.monitorConsentLabel;
     }
   }
 
   private setState(state: TalkState): void {
     if (state === 'reconnecting') this.ui.state.textContent = copy.notices.reconnecting;
     else if (state === 'requesting' || state === 'connecting') this.ui.state.textContent = copy.starting;
-    else if (state === 'live') this.ui.state.textContent = this.micOn ? copy.listening : copy.muted;
+    else if (state === 'live') this.ui.state.textContent = this.held ? copy.listening : '';
     if (state === 'ended' && this.session) void this.end(false);
   }
 
-  private async setMic(on: boolean): Promise<void> {
-    if (!this.session) return;
-    if (on) {
-      // A refused microphone leaves the typed path; the runtime raises the mic-denied notice itself.
-      this.micOn = await this.session.startListening().catch(() => false);
-    } else {
-      await this.session.stopListening().catch(() => undefined);
-      this.micOn = false;
-    }
-    this.ui.mic.setAttribute('aria-pressed', String(this.micOn));
-    this.ui.mic.textContent = this.micOn ? copy.micOn : copy.micOff;
-    this.ui.state.textContent = this.micOn ? copy.listening : copy.muted;
-    this.being.setListening(this.micOn);
+  /** Emily's voice: the disclosure line and the stage's speaking state, which moves her mouth's shards. */
+  private setSpeaking(speaking: boolean): void {
+    this.ui.voice.hidden = !speaking;
+    this.ui.label.textContent = speaking ? copy.monitorSpeaking : copy.monitorLabel;
+    this.ui.stage?.classList.toggle('is-speaking', speaking);
   }
 
-  private toggleMic(): Promise<void> {
-    return this.setMic(!this.micOn);
+  /** The Speak button held (the microphone open) or released. A refused microphone leaves the typed path. */
+  private async hold(down: boolean): Promise<void> {
+    if (!this.session || this.held === down) return;
+    if (down) {
+      primeAudio();
+      this.held = await this.session.startListening().catch(() => false);
+    } else {
+      await this.session.stopListening().catch(() => undefined);
+      this.held = false;
+    }
+    this.ui.mic.setAttribute('aria-pressed', String(this.held));
+    this.ui.state.textContent = this.held ? copy.listening : '';
+    this.being.setListening(this.held);
   }
 
   private send(): void {
@@ -438,12 +496,14 @@ class Controller {
     }
   }
 
-  private async end(closeSheet: boolean): Promise<void> {
+  /** End the conversation; with `close` the monitor goes as well and the hero copy comes back. */
+  private async end(close: boolean): Promise<void> {
     const session = this.session;
     this.session = null;
     this.live = {};
-    this.micOn = false;
+    this.held = false;
     this.being.setListening(false);
+    this.setSpeaking(false);
     if (session) {
       try {
         await session.end('visitor');
@@ -451,11 +511,19 @@ class Controller {
         // Ending is best effort: the token expires within the hour whatever happens here.
       }
     }
-    this.ui.session.hidden = true;
-    this.ui.consent.hidden = false;
-    this.ui.mic.setAttribute('aria-pressed', 'false');
-    this.ui.mic.textContent = copy.micOff;
-    if (closeSheet && this.ui.sheet.open) this.ui.sheet.close();
+    const { ui } = this;
+    ui.session.hidden = true;
+    ui.consent.hidden = false;
+    ui.mic.setAttribute('aria-pressed', 'false');
+    ui.label.textContent = copy.monitorConsentLabel;
+    if (close) {
+      document.documentElement.classList.remove('is-talking');
+      ui.close.hidden = true;
+      ui.consent.hidden = true;
+      // The tour keeps the panel if it is running; otherwise it goes.
+      if (!document.documentElement.classList.contains('is-touring')) ui.panel.hidden = true;
+      this.notice(null);
+    }
   }
 
   private notice(kind: Notice | null): void {

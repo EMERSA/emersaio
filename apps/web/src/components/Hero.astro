@@ -2,17 +2,21 @@
 /**
  * The hero like the bottle's label: the face is the emblem, the H1 the wordmark, the label line the small print,
  * everything centred on a flat page. Two canvases share the stage: the raw WebGL hero cloud that paints the head
- * once the page is idle, and the three.js being (the face look: the head alone, large, with one azure rim light)
- * that replaces it when the device can carry it. On phones the stage is a 46svh block above the copy; from 720px
- * it fills the hero and the copy sits 48px above the hero's foot. Copy comes from site.ts; the scripts find
- * everything through data attributes, never ids.
+ * once the page is idle, and the three.js being (the kinect-demo look: the bust as tiny navy shards) that replaces
+ * it when the device can carry it. On phones the stage is a 46svh block above the copy; from 720px it fills the
+ * hero and the copy sits 48px above the hero's foot.
+ *
+ * The monitor is the one HUD drawn over the being: a translucent panel in phosphor green, like an old terminal,
+ * that carries the tour's captions and controls while the tour runs and the Talk conversation (consent, then the
+ * typed log with the Speak button) when the visitor opens it. It is hidden until either starts. While the tour
+ * scrolls the page it pins to the bottom edge as a full-width band (hud.css). Copy comes from site.ts; the scripts
+ * find everything through data attributes, never ids.
  */
 import { site } from '../data/site.ts';
 import '../styles/hud.css';
+import { TURNSTILE_SITEKEY } from '../lib/talk-config.ts';
 import BeingStage from './BeingStage.astro';
 import Captions from './Captions.astro';
-import TalkSheet from './TalkSheet.astro';
-import { TALK_ENABLED } from '../lib/phase.ts';
 
 // The avatar pipeline produces these files and a fresh checkout may lack them. Whatever exists reaches the scripts
 // through data attributes; a missing attribute means the procedural cloud and the poster stand in.
@@ -23,7 +27,7 @@ const assetLiteUrl = beingAssets['../assets/being/guide-lite.glb'];
 const cloudDesktop = cloudAssets['../assets/being/cloud-12k.bin'];
 const cloudTouch = cloudAssets['../assets/being/cloud-6k.bin'];
 
-const { hero, tour, a11y } = site;
+const { hero, tour, talk, a11y } = site;
 ---
 
 <section id="hero" class="hero" data-hero>
@@ -35,23 +39,107 @@ const { hero, tour, a11y } = site;
     data-cloud-desktop={cloudDesktop}></canvas>
   <div class="being-dock" data-being-dock>
     <BeingStage assetUrl={assetUrl} assetLiteUrl={assetLiteUrl} />
-    <p class="voice-label label" data-voice-label hidden>{hero.voiceLabel}</p>
-    <Captions />
-    <div class="tour-bar" data-tour hidden tabindex="-1" role="group" aria-label={a11y.tourControls}>
-      <button type="button" class="tour-btn" data-tour-back>{tour.back}</button>
-      <button type="button" class="tour-btn" data-tour-next>{tour.next}</button>
-      <button type="button" class="tour-btn" data-tour-replay>{tour.replay}</button>
-      <button type="button" class="tour-btn" data-tour-mute aria-pressed="false">{tour.mute}</button>
-      <button type="button" class="tour-btn" data-tour-end>{tour.end}</button>
-      <span class="tour-progress num" data-tour-progress></span>
-    </div>
-    <p
-      class="tour-notice"
-      data-tour-notice
-      hidden
-      data-label-connection={tour.captionsOnly}
-      data-label-still={tour.captionsOnlyStill}>{tour.captionsOnly}</p>
   </div>
+
+  <div class="monitor" data-monitor hidden role="region" aria-label={a11y.talkPanel}>
+    <div class="monitor-head">
+      <span class="monitor-label" data-monitor-label data-tour-label={talk.tourLabel}></span>
+      <span class="monitor-label voice-label" data-voice-label hidden>{hero.voiceLabel}</span>
+      <button type="button" class="monitor-btn monitor-close" data-talk-close hidden>{talk.close}</button>
+    </div>
+
+    <div class="monitor-view" data-tour-view hidden>
+      <Captions />
+      <div class="tour-bar" data-tour hidden tabindex="-1" role="group" aria-label={a11y.tourControls}>
+        <button type="button" class="monitor-btn" data-tour-back>{tour.back}</button>
+        <button type="button" class="monitor-btn" data-tour-next>{tour.next}</button>
+        <button type="button" class="monitor-btn" data-tour-replay>{tour.replay}</button>
+        <button type="button" class="monitor-btn" data-tour-mute aria-pressed="false">{tour.mute}</button>
+        <button type="button" class="monitor-btn" data-tour-end>{tour.end}</button>
+        <span class="tour-progress num" data-tour-progress></span>
+      </div>
+      <p
+        class="monitor-note"
+        data-tour-notice
+        hidden
+        data-label-connection={tour.captionsOnly}
+        data-label-still={tour.captionsOnlyStill}>{tour.captionsOnly}</p>
+    </div>
+
+    <div class="monitor-view talk-consent" data-talk-consent hidden>
+      <p class="monitor-copy">{talk.intro}</p>
+      <dl class="talk-terms">
+        {
+          talk.consent.map((item) => (
+            <div class="talk-term">
+              <dt>{item.term}</dt>
+              <dd>{item.text}</dd>
+            </div>
+          ))
+        }
+      </dl>
+      <p class="monitor-note">
+        {talk.freeMinutes} {talk.aiNotice}
+        <a href={talk.privacyLink.href}>{talk.privacyLink.label}</a>
+      </p>
+      <div class="talk-turnstile" data-talk-turnstile data-sitekey={TURNSTILE_SITEKEY}></div>
+      <p class="talk-start">
+        <button type="button" class="monitor-btn monitor-btn-primary" data-talk-start>{talk.start}</button>
+      </p>
+    </div>
+
+    <div class="monitor-view talk-session" data-talk-session hidden>
+      <p class="monitor-label talk-state" data-talk-state aria-live="polite"></p>
+      <ol class="talk-log" data-talk-log aria-live="polite" aria-label={talk.title}></ol>
+      <form class="talk-type" data-talk-form>
+        <label class="sr-only" for="talk-input">{talk.typeLabel}</label>
+        <span class="monitor-prompt" aria-hidden="true">&gt;</span>
+        <input
+          id="talk-input"
+          class="talk-input"
+          type="text"
+          autocomplete="off"
+          enterkeyhint="send"
+          placeholder={talk.typePlaceholder}
+          data-talk-input
+        />
+        <span class="monitor-caret" aria-hidden="true"></span>
+        <button type="submit" class="monitor-btn">{talk.send}</button>
+      </form>
+      <div class="talk-actions">
+        <button type="button" class="monitor-btn" data-talk-mic aria-pressed="false" aria-label={a11y.speakButton}>
+          {talk.speak}
+        </button>
+        <label class="monitor-btn talk-upload">
+          {talk.upload}
+          <input
+            class="sr-only"
+            type="file"
+            accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+            data-talk-file
+          />
+        </label>
+        <button type="button" class="monitor-btn" data-talk-memory-open aria-expanded="false">
+          {talk.memoryOpen}
+        </button>
+        <button type="button" class="monitor-btn" data-talk-end>{talk.end}</button>
+      </div>
+      <p class="monitor-note">{talk.uploadHint}</p>
+      <section class="talk-memory" data-talk-memory hidden aria-labelledby="talk-memory-title">
+        <h3 id="talk-memory-title" class="monitor-label">{talk.memoryTitle}</h3>
+        <h4 class="monitor-label">{talk.memoryFacts}</h4>
+        <ul data-memory-facts></ul>
+        <h4 class="monitor-label">{talk.memoryFiles}</h4>
+        <ul data-memory-files></ul>
+        <h4 class="monitor-label">{talk.memoryTurns}</h4>
+        <ul data-memory-turns></ul>
+        <p><button type="button" class="monitor-btn" data-talk-forget>{talk.forget}</button></p>
+      </section>
+    </div>
+
+    <p class="monitor-note talk-notice" data-talk-notice role="status" hidden></p>
+  </div>
+
   <div class="hero-inner">
     <div class="hero-copy">
       <p class="hero-label label">{hero.eyebrow}</p>
@@ -59,12 +147,11 @@ const { hero, tour, a11y } = site;
       <p class="lead hero-lead">{hero.lead}</p>
       <div class="hero-ctas">
         <a class="btn btn-primary" href={hero.primary.href} data-tour-start>{hero.primary.label}</a>
+        <a class="btn btn-ghost" href={hero.talk.href} data-talk-open>{hero.talk.label}</a>
         <a class="btn btn-ghost" href={hero.secondary.href}>{hero.secondary.label}</a>
-        <a class="btn btn-ghost" href={hero.talk.href} data-talk-open hidden={!TALK_ENABLED}>{hero.talk.label}</a>
       </div>
     </div>
   </div>
-  <TalkSheet />
 </section>
 
 <script>
@@ -107,6 +194,12 @@ const { hero, tour, a11y } = site;
     width: 100%;
     padding: 1.5rem var(--gutter) 2rem;
     pointer-events: none;
+    transition: opacity var(--dur) var(--ease-out);
+  }
+
+  /* While the conversation is open the monitor takes the copy's place over the bust. */
+  :global(html.is-talking) .hero-inner {
+    opacity: 0;
   }
 
   .hero-copy {
@@ -117,6 +210,10 @@ const { hero, tour, a11y } = site;
     margin-inline: auto;
     text-align: center;
     pointer-events: auto;
+  }
+
+  :global(html.is-talking) .hero-copy {
+    pointer-events: none;
   }
 
   .hero-label {
@@ -187,19 +284,9 @@ const { hero, tour, a11y } = site;
     }
   }
 
-  /* While the tour pins the dock to the viewport, the stacked hero keeps its copy where it was. */
-  @media (max-width: 719.98px) {
-    :global(html.is-touring) .hero {
-      justify-content: flex-start;
-    }
-
-    :global(html.is-touring) .hero-inner {
-      padding-top: 3rem;
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .hero-cloud {
+    .hero-cloud,
+    .hero-inner {
       transition: none;
     }
   }

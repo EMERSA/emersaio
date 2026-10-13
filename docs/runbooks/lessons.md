@@ -55,8 +55,7 @@ fails on a missing or empty `dist`, and the deploy script builds first. Watch th
 
 ## A static page cannot read a query string
 
-`Astro.url.searchParams` is empty at build time. Result pages are real pages (`/contact/sent`,
-`/contact/error`) the Worker redirects to; anything that varies by query is read in the browser with a
+`Astro.url.searchParams` is empty at build time. Result pages, when a route needs them, are real pages the Worker redirects to; anything that varies by query is read in the browser with a
 server-rendered default underneath.
 
 ## Secrets in artefacts

@@ -4,7 +4,7 @@ description: "The enterprise hologram assistant: what she does, how she deploys,
 section: products
 order: 1
 tour: emily
-updated: 2026-10-07
+updated: 2026-10-14
 ---
 
 ## What Emily is
@@ -43,4 +43,4 @@ Least privilege, encrypted by default, policy as code and red-team hardened. Tru
 
 ## See her working
 
-Footage of Emily at work is coming soon. The quickest way to see her today is a 20-minute demo: [book one here](/contact?topic=emily). We reply from a human inbox.
+Footage of Emily at work is coming soon. The quickest way to see her today is to [talk to Emily on the home page](/), or email 4d@emersa.io for a demo. We reply from a human inbox.

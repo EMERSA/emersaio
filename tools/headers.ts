@@ -10,24 +10,22 @@
  *
  * Runs directly under Node 24 (type stripping, erasable syntax only):
  *   node tools/headers.ts --emit apps/web/dist/_headers
- *   SITE_PHASE=2 node tools/headers.ts --print
+ *   REPORT_ONLY=1 node tools/headers.ts --print
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-/** 1 = scripted tour only. 2 = Talk: Convai, LiveKit, Turnstile and the microphone, on the home page only. */
-export const PHASE = Number(process.env.SITE_PHASE ?? 1);
-
 /**
- * CSP_ROLLOUT=report-only keeps the Phase 1 policy enforced on "/" and ships the Phase 2 policy as
- * Content-Security-Policy-Report-Only, which is the 48 hour observation the plan requires before any new origin
- * is enforced. Everything else about Phase 2 (microphone, reporting endpoint) is applied as normal.
+ * Talk (Convai, LiveKit, Turnstile and the microphone) lives on the home page only: "/" carries the Talk policy and
+ * every other path the base policy. CSP_ROLLOUT=report-only keeps the base policy enforced on "/" and ships the
+ * Talk policy as Content-Security-Policy-Report-Only, the observation window the plan requires before a new origin
+ * is enforced. Everything else about Talk (microphone, reporting endpoint) is applied as normal.
  */
 export const reportOnlyFrom = (env: Record<string, string | undefined>): boolean =>
   env.CSP_ROLLOUT === 'report-only' || env.REPORT_ONLY === '1' || env.REPORT_ONLY === 'true';
 
-/** Either spelling works: CSP_ROLLOUT=report-only (the runbook's) or REPORT_ONLY=1 (the Phase 2 contract's). */
+/** Either spelling works: CSP_ROLLOUT=report-only (the runbook's) or REPORT_ONLY=1 (the build contract's). */
 export const REPORT_ONLY = reportOnlyFrom(process.env);
 
 /** Cloudflare's documented limits for _headers. render() refuses to emit a file that breaks them. */
@@ -47,7 +45,7 @@ const extend = (directives: readonly Directive[], name: string, extra: readonly 
   });
 
 /**
- * Phase 1, every path. No hash and no nonce: the site ships zero inline scripts and zero inline styles, JSON-LD is
+ * The base policy, every path. No hash and no nonce: the site ships zero inline scripts and zero inline styles, JSON-LD is
  * data and meshopt's WASM needs only 'wasm-unsafe-eval'. Documented degrade if a style ever has to be inline:
  * style-src 'self' 'unsafe-inline'.
  */
@@ -79,7 +77,7 @@ export const TALK_ORIGINS = {
   livekit: ['https://*.livekit.cloud', 'wss://*.livekit.cloud'],
 } as const;
 
-/** Phase 2, home page only. Violations go to the Worker's /api/csp (report-uri for Firefox and Safari, report-to for Chromium). */
+/** The home page: the Talk origins added. Violations go to the Worker's /api/csp (report-uri for Firefox and Safari, report-to for Chromium). */
 const PHASE2_HOME_DIRECTIVES: readonly Directive[] = [
   ...extend(
     extend(extend(BASE_DIRECTIVES, 'script-src', TALK_ORIGINS.turnstile), 'frame-src', TALK_ORIGINS.turnstile),
@@ -95,19 +93,19 @@ export const CSP_PHASE2_HOME = serialise(PHASE2_HOME_DIRECTIVES);
 /**
  * The same policy for the Report-Only observation window, without upgrade-insecure-requests: a report-only policy
  * cannot upgrade anything, browsers ignore the directive there and Chromium logs a console error about it, which
- * would trip the zero-console-errors gate on exactly the build being observed. The enforced Phase 1 policy that sits
+ * would trip the zero-console-errors gate on exactly the build being observed. The enforced base policy that sits
  * next to it on "/" carries the directive already.
  */
 export const CSP_PHASE2_HOME_REPORT_ONLY = serialise(
   PHASE2_HOME_DIRECTIVES.filter(([name]) => name !== 'upgrade-insecure-requests'),
 );
 
-/** The named reporting group the Phase 2 policy's report-to directive refers to. */
+/** The named reporting group the home policy's report-to directive refers to. */
 export const REPORTING_ENDPOINTS = 'csp="/api/csp"';
 
 /**
  * krupiq's feature list. This site has no passkeys, so both publickey-credentials features are off here too; the
- * microphone is the only feature that ever opens, and only on "/" from Phase 2.
+ * microphone is the only feature that ever opens, and only on "/" (the Speak button).
  */
 const FEATURES = [
   'accelerometer',
@@ -182,7 +180,7 @@ const securityLines = (): HeaderLine[] => [
   set('Origin-Agent-Cluster', '?1'),
 ];
 
-/** The home page override for Phase 2: the only place a third-party origin or the microphone is allowed. */
+/** The home page override: the only place a third-party origin or the microphone is allowed. */
 const talkLines = (reportOnly: boolean): HeaderLine[] => [
   ...(reportOnly
     ? [set('Content-Security-Policy-Report-Only', CSP_PHASE2_HOME_REPORT_ONLY)]
@@ -192,7 +190,7 @@ const talkLines = (reportOnly: boolean): HeaderLine[] => [
 ];
 
 /** Every rule, in the order Cloudflare applies them. */
-export function build(phase: number = PHASE, reportOnly: boolean = REPORT_ONLY): HeaderRule[] {
+export function build(reportOnly: boolean = REPORT_ONLY): HeaderRule[] {
   const rules: HeaderRule[] = [
     {
       path: '/*',
@@ -217,15 +215,13 @@ export function build(phase: number = PHASE, reportOnly: boolean = REPORT_ONLY):
       lines: [...replace('Cross-Origin-Resource-Policy', 'cross-origin'), set('Cache-Control', CACHE.daily)],
     },
   ];
-  if (phase >= 2) {
-    rules.push({
-      path: '/',
-      comment: reportOnly
-        ? 'Phase 2 Talk origins under observation: reported, not yet enforced (CSP_ROLLOUT=report-only).'
-        : 'Phase 2: the Talk feature lives on the home page only.',
-      lines: talkLines(reportOnly),
-    });
-  }
+  rules.push({
+    path: '/',
+    comment: reportOnly
+      ? 'Talk origins under observation: reported, not yet enforced (CSP_ROLLOUT=report-only).'
+      : 'Talk to Emily lives on the home page only.',
+    lines: talkLines(reportOnly),
+  });
   return rules;
 }
 
@@ -288,8 +284,7 @@ export function render(rules: readonly HeaderRule[]): string {
   return `${out.join('\n').trimEnd()}\n`;
 }
 
-export const emit = (phase: number = PHASE, reportOnly: boolean = REPORT_ONLY): string =>
-  render(build(phase, reportOnly));
+export const emit = (reportOnly: boolean = REPORT_ONLY): string => render(build(reportOnly));
 
 /**
  * Parse a _headers file the way Cloudflare's deploy does (workers-shared parseHeaders and constructHeaders), so
@@ -404,12 +399,12 @@ export const simulate = (headersText: string, path: string): Record<string, stri
 export const trace = (headersText: string, path: string): Simulation => applyRules(parseHeaders(headersText), path);
 
 const usage = `usage:
-  node tools/headers.ts --emit <path>   write the _headers file (SITE_PHASE=1|2, REPORT_ONLY=1 or CSP_ROLLOUT=report-only)
+  node tools/headers.ts --emit <path>   write the _headers file (REPORT_ONLY=1 or CSP_ROLLOUT=report-only)
   node tools/headers.ts --print         print it to stdout`;
 
 function main(argv: readonly string[]): void {
   const text = emit();
-  const summary = `${build().length} rules, phase ${PHASE}${REPORT_ONLY ? ', Phase 2 CSP report-only' : ''}`;
+  const summary = `${build().length} rules${REPORT_ONLY ? ', Talk CSP report-only' : ''}`;
   if (argv[0] === '--print') {
     process.stdout.write(text);
     return;

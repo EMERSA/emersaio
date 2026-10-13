@@ -4,7 +4,7 @@
  *   1. remove the development harness pages (src/pages/dev) from dist, so they never deploy;
  *   2. remove the scripts that only those pages used: any dist/_astro/*.js that no HTML file left in dist and no
  *      surviving chunk reaches (the harness's own script, and anything only it imported);
- *   3. write dist/.build-info.json (build time, commit, phase) so a deployed site can be matched to a commit.
+ *   3. write dist/.build-info.json (build time, commit) so a deployed site can be matched to a commit.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -87,7 +87,6 @@ const gitSha = () => {
 const info = {
   builtAt: new Date().toISOString(),
   commit: process.env.WORKERS_CI_COMMIT_SHA ?? process.env.GITHUB_SHA ?? gitSha(),
-  phase: Number(process.env.SITE_PHASE ?? 1),
 };
 writeFileSync(join(dist, '.build-info.json'), `${JSON.stringify(info, null, 2)}\n`);
-console.log(`postbuild: wrote .build-info.json (${info.commit ?? 'no commit'}, phase ${info.phase})`);
+console.log(`postbuild: wrote .build-info.json (${info.commit ?? 'no commit'})`);

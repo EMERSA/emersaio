@@ -125,8 +125,6 @@ try {
   for (const [path, name] of [
     ['/docs', 'docs'],
     ['/docs/what-is-a-synthetic-being', 'doc-page'],
-    ['/games', 'games'],
-    ['/contact', 'contact'],
     ['/privacy', 'privacy'],
     ['/nope', '404'],
   ]) {

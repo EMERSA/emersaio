@@ -105,7 +105,6 @@ function classify(chunk) {
   if (being) return 'being';
   if (/^tour(-ui)?\b/i.test(s)) return 'tour';
   if (/^(main|hero|theme-boot|Base\.astro|Hero\.astro)(?:[._-]|$)/i.test(s)) return 'pre';
-  if (/^contact(?:[._-]|$)/i.test(s)) return 'content';
   return 'shared';
 }
 for (const chunk of chunks.values()) chunk.class = classify(chunk);

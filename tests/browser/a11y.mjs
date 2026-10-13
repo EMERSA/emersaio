@@ -35,19 +35,7 @@ function allPages(dist) {
         .filter((f) => f.endsWith('.html'))
         .map((f) => `/docs/${f.replace(/\.html$/, '')}`)
     : [];
-  return [
-    '/',
-    '/docs',
-    ...docs,
-    '/games',
-    '/contact',
-    '/contact/sent',
-    '/contact/error',
-    '/privacy',
-    '/terms',
-    '/security',
-    '/this-page-does-not-exist',
-  ];
+  return ['/', '/docs', ...docs, '/privacy', '/terms', '/security', '/this-page-does-not-exist'];
 }
 
 try {

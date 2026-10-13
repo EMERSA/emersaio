@@ -30,15 +30,17 @@ const PLAN_CSP =
   "frame-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; " +
   "frame-ancestors 'none'; upgrade-insecure-requests";
 
-const phase1 = emit(1, false);
-const phase2 = emit(2, false);
+/** One build: "/" carries the Talk policy, every other path the base one. */
+const phase2 = emit(false);
+/** The base-policy checks below read a content page of the same file. */
+const phase1 = phase2;
 
-test('the Phase 1 policy is the one in the plan', () => {
+test('the base policy is the one in the plan', () => {
   assert.equal(CSP_PHASE1, PLAN_CSP);
 });
 
-test('"/" gets exactly one CSP and one Permissions-Policy in Phase 1', () => {
-  const { headers, joined } = trace(phase1, '/');
+test('a content page gets exactly one CSP and one Permissions-Policy, the base ones', () => {
+  const { headers, joined } = trace(phase1, '/docs');
   assert.equal(headers['Content-Security-Policy'], CSP_PHASE1);
   assert.equal(headers['Permissions-Policy'], PERMISSIONS_POLICY);
   assert.match(headers['Permissions-Policy'] ?? '', /microphone=\(\)/);
@@ -72,7 +74,7 @@ test('caching rules', () => {
 });
 
 test('the file respects the limits Cloudflare enforces', () => {
-  for (const text of [phase1, phase2, emit(2, true)]) {
+  for (const text of [phase2, emit(true)]) {
     const lines = text.split('\n');
     for (const line of lines) assert.ok(line.length <= MAX_LINE_LENGTH, `line too long: ${line.slice(0, 40)}`);
     assert.ok(parseHeaders(text).length <= MAX_RULES);
@@ -84,7 +86,7 @@ test('the file respects the limits Cloudflare enforces', () => {
   }
 });
 
-test('Phase 2: "/" allows the Talk origins and the microphone, /docs does not', () => {
+test('"/" allows the Talk origins and the microphone, every other page does not', () => {
   const home = trace(phase2, '/');
   assert.deepEqual(home.joined, []);
   const csp = home.headers['Content-Security-Policy'] ?? '';
@@ -98,7 +100,7 @@ test('Phase 2: "/" allows the Talk origins and the microphone, /docs does not', 
   assert.equal(home.headers['Reporting-Endpoints'], 'csp="/api/csp"');
   assert.equal(home.headers['Content-Security-Policy-Report-Only'], undefined);
 
-  for (const path of ['/docs', '/docs/what-is-a-synthetic-being', '/games', '/contact', '/index.html']) {
+  for (const path of ['/docs', '/docs/what-is-a-synthetic-being', '/privacy', '/index.html']) {
     const page = trace(phase2, path);
     assert.equal(page.headers['Content-Security-Policy'], CSP_PHASE1, path);
     assert.equal(page.headers['Permissions-Policy'], PERMISSIONS_POLICY, path);
@@ -107,8 +109,8 @@ test('Phase 2: "/" allows the Talk origins and the microphone, /docs does not', 
   }
 });
 
-test('Phase 2 report-only keeps Phase 1 enforced and reports the new policy', () => {
-  const home = trace(emit(2, true), '/');
+test('report-only keeps the base policy enforced on "/" and reports the Talk policy', () => {
+  const home = trace(emit(true), '/');
   assert.equal(home.headers['Content-Security-Policy'], CSP_PHASE1);
   assert.equal(home.headers['Content-Security-Policy-Report-Only'], CSP_PHASE2_HOME_REPORT_ONLY);
   assert.match(home.headers['Permissions-Policy'] ?? '', /microphone=\(self\)/);
@@ -121,7 +123,7 @@ test('the report-only policy drops upgrade-insecure-requests, which browsers rej
   // Otherwise the two policies are the same: every Talk origin, the reporting directives, the same order.
   assert.equal(CSP_PHASE2_HOME.replace('upgrade-insecure-requests; ', ''), CSP_PHASE2_HOME_REPORT_ONLY);
   // The enforced policy next to it still upgrades, so nothing is lost on "/".
-  assert.match(trace(emit(2, true), '/').headers['Content-Security-Policy'] ?? '', /upgrade-insecure-requests/);
+  assert.match(trace(emit(true), '/').headers['Content-Security-Policy'] ?? '', /upgrade-insecure-requests/);
 });
 
 test('render refuses what Cloudflare would drop or rewrite with no more than a deploy warning', () => {
@@ -141,8 +143,8 @@ test('render refuses what Cloudflare would drop or rewrite with no more than a d
   assert.throws(() => render([{ path: '/a/*/:splat', lines: lines('X-A', '1') }]), /:splat/);
   assert.throws(() => render([{ path: 'docs/*', lines: lines('X-A', '1') }]), /must start with/);
   assert.throws(() => render([{ path: '/x', lines: [{ kind: 'detach', name: 'Bad Name' }] }]), /Invalid header name/);
-  // The real file passes, in every phase.
-  for (const text of [emit(1, false), emit(2, false), emit(2, true)]) assert.ok(text.length > 0);
+  // The real file passes, enforced and report-only.
+  for (const text of [emit(false), emit(true)]) assert.ok(text.length > 0);
 });
 
 test('parseHeaders models the deploy: trimmed lines, "! " with a space, dropped empties, one rule per path', () => {
@@ -188,12 +190,15 @@ test('applyRules runs every detach line of a rule before its set lines, as the a
   assert.deepEqual(page.joined, []);
 });
 
-test('Phase 1 emits no home override and no third-party origin anywhere', () => {
-  assert.equal(
-    build(1).some((rule) => rule.path === '/'),
-    false,
-  );
-  assert.equal(/https?:\/\//.test(phase1.replace(/^#.*$/gm, '')), false);
+test('the home override is the only rule that names a third-party origin', () => {
+  const rules = build();
+  assert.equal(rules.filter((rule) => rule.path === '/').length, 1);
+  for (const rule of rules) {
+    if (rule.path === '/') continue;
+    for (const line of rule.lines) {
+      if (line.kind === 'set') assert.equal(line.value.includes('://'), false, rule.path);
+    }
+  }
 });
 
 test('simulate joins duplicates with a comma unless a detach line precedes the new value', () => {
@@ -240,11 +245,11 @@ test('parseHeaders round-trips what emit writes', () => {
   const rules = parseHeaders(phase2);
   assert.deepEqual(
     rules.map((rule) => rule.path),
-    build(2).map((rule) => rule.path),
+    build().map((rule) => rule.path),
   );
   assert.deepEqual(
     rules.map((rule) => rule.lines),
-    build(2).map((rule) => rule.lines),
+    build().map((rule) => rule.lines),
   );
 });
 
@@ -256,7 +261,7 @@ test('REPORT_ONLY=1 and CSP_ROLLOUT=report-only both select the observation wind
 });
 
 test('Phase 2 report-only: "/" carries both policies once each, /docs carries neither the Talk hosts nor the mic', () => {
-  const text = emit(2, true);
+  const text = emit(true);
   const home = trace(text, '/');
   assert.deepEqual(home.joined, []);
   assert.equal(home.headers['Content-Security-Policy'], CSP_PHASE1);

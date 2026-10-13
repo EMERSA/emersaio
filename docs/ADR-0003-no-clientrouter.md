@@ -20,7 +20,7 @@ not have.
 - No `ClientRouter`, no `client:*` islands, no `astro:*` lifecycle in any script.
 - Cross-document transitions come from CSS alone: `@view-transition { navigation: auto }`.
 - Every document mounts its own scripts: `main.ts` on every page, `being-mount.ts` only where
-  `<main data-being="tour|talk">` says so, `contact.ts` on the contact page.
+  `<main data-being="tour|talk">` says so.
 - The theme is applied before paint by the external `/theme-boot.js`, never by an inline script.
 
 ## Consequences

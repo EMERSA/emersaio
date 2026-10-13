@@ -1,19 +1,19 @@
 ---
 /**
- * The company story as a vertical timeline: a hairline rail with a 7px azure dot level with each title, the year
+ * About: the company story as a vertical timeline: a hairline rail with a 7px azure dot level with each title, the year
  * to the left in tabular figures. Each step is an article the tour can point at through data-story-step
  * ("2023" | "2024" | "2025" | "now").
  */
 import { site } from '../data/site.ts';
 
-const steps = site.story.steps.map((step) => ({ ...step, key: step.year.toLowerCase() }));
+const steps = site.about.steps.map((step) => ({ ...step, key: step.year.toLowerCase() }));
 ---
 
-<section id="story" class="story section" aria-labelledby="story-title" data-reveal>
+<section id="about" class="about section" aria-labelledby="about-title" data-reveal>
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">{site.story.eyebrow}</p>
-      <h2 id="story-title">{site.story.title}</h2>
+      <p class="eyebrow">{site.about.eyebrow}</p>
+      <h2 id="about-title">{site.about.title}</h2>
     </div>
 
     <ol class="timeline">
