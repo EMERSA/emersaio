@@ -72,14 +72,14 @@ void main() {
       float near = 1.0 - smoothstep(0.0, 0.45, vDepthT);
       // A saturated royal blue body lit by the key light (the moodboard's depth scans), darker with depth.
       vec3 royalCore = max(uGlow + (uGlow - vec3(dot(uGlow, vec3(0.2126, 0.7152, 0.0722)))) * 0.6, 0.0);
-      vec3 core = royalCore * (0.05 + 0.6 * lambert * lambert) * mix(1.0, 0.25, vDepthT);
+      vec3 core = royalCore * (0.035 + 0.45 * lambert * lambert) * mix(0.85, 0.18, vDepthT);
       // The hot colour: the glow token lifted toward the wire token, then pushed further from grey (cyan-azure).
       vec3 cyan = mix(uGlow, uWire, 0.35);
       cyan = max(cyan + (cyan - vec3(dot(cyan, vec3(0.2126, 0.7152, 0.0722)))) * 0.8, 0.0);
       // The inner shell seen through the eyes and the mouth lies far behind the face: it stays a dim, recessed blue.
       float recess = 1.0 - vRecess;
       float hot = clamp(turn * 4.5 + vSil * 2.0 + lambert * lambert * lambert * 0.25, 0.0, 2.2) * (0.75 + 0.25 * shimmer) * recess;
-      colour = core + cyan * hot * (0.6 + 0.4 * near) + uWire * (edge * 0.05 + 0.02 * near * lambert * lambert);
+      colour = core + cyan * hot * (0.5 + 0.4 * near) + uWire * (edge * 0.05 + 0.02 * near * lambert * lambert);
       colour = mix(colour, vec3(1.0), smoothstep(1.6, 2.2, hot) * 0.2) * mix(1.0, 0.45, vRecess);
       colour = max((colour - 0.5) * uContrast + 0.5 + uBrightness, 0.0);
       alpha = 1.0;

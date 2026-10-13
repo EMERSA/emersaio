@@ -974,6 +974,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
       setContrast: (value) => cloud.setContrast(value),
       setOpacity: (value) => cloud.setOpacity(value),
       setLineWidth: (px) => cloud.setLineWidth(px),
+      setRipple: (m) => cloud.setRipple(m),
     },
     face: { pushArkit },
     stats: () => ({

@@ -70,6 +70,8 @@ export interface ConvaiBrainOptions {
   /** Captions: the visitor's words and Emily's, growing while they stream; final once the line is settled. */
   onTranscript?: (speaker: Speaker, text: string, final: boolean) => void;
   onState?: (state: ConvaiState, detail?: string) => void;
+  /** The character's voice starting (true) and stopping (false), straight from the SDK's speakingChange. */
+  onSpeaking?: (speaking: boolean) => void;
   /** Injectable for tests; the browser loads the SDK. */
   sdk?: ConvaiSdk | (() => Promise<ConvaiSdk>);
   /** Injectable frame clock for tests. */
@@ -303,6 +305,7 @@ export class ConvaiBrain implements Brain {
   private onSpeaking(speaking: boolean): void {
     // A new line restarts the face clock at its first frame (pumpFace); the end of one settles the captions.
     this.speakingSince = null;
+    this.options.onSpeaking?.(speaking);
     if (speaking) return;
     this.finalizeAll();
     this.turn?.push({ type: 'done', reason: 'complete' });

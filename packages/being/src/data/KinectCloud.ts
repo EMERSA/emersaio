@@ -91,6 +91,7 @@ type CloudUniforms = {
   uMaskB: IUniform<Vector4>;
   uShrink: IUniform<number>;
   uMinY: IUniform<number>;
+  uRipple: IUniform<number>;
   uMirrorPlane: SharedUniforms['uMirrorPlane'];
   uViewport: SharedUniforms['uViewport'];
   uDot: SharedUniforms['uDot'];
@@ -120,6 +121,10 @@ const NO_ZONE = new Vector4(0, -1000, 0, 0);
 const NO_CROP = -1000;
 /** How far each shard is pulled toward its centroid: the hairline gaps that part the lattice into facets. */
 export const SHARD_SHRINK = 0.2;
+/** The shards' liquid ripple: how far the surface breathes along the sensor ray, in metres (none under reduced motion). */
+const RIPPLE_M = 0.004;
+/** The most setRipple() allows, in metres. */
+const MAX_RIPPLE_M = 0.02;
 
 /**
  * The kinect cloud: a dense regular grid that back-projects the current DepthSource the way three's
@@ -186,6 +191,7 @@ export class KinectCloud {
       uMaskB: { value: NO_ZONE.clone() },
       uShrink: { value: SHARD_SHRINK },
       uMinY: { value: NO_CROP },
+      uRipple: { value: this.reducedMotion ? 0 : RIPPLE_M },
       uMirrorPlane: shared.uMirrorPlane,
       uViewport: shared.uViewport,
       uDot: shared.uDot,
@@ -287,6 +293,11 @@ export class KinectCloud {
   /** Nothing below this world height is drawn (the head-and-shoulders crop); null draws everything. */
   setCrop(minY: number | null): void {
     this.uniforms.uMinY.value = minY !== null && Number.isFinite(minY) ? minY : NO_CROP;
+  }
+
+  /** Amplitude of the shards' liquid ripple in metres, 0 to 0.02; 0 stills the surface. */
+  setRipple(metres: number): void {
+    if (Number.isFinite(metres)) this.uniforms.uRipple.value = Math.min(MAX_RIPPLE_M, Math.max(0, metres));
   }
 
   /** The lattice the triangle modes draw: the point grid itself for shards, the fixed 160 x 120 otherwise. */

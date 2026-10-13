@@ -35,6 +35,8 @@ uniform float uMode;
 uniform float uShrink;
 uniform float uMinY;
 uniform float uIsLight;
+uniform float uTime;
+uniform float uRipple;
 
 varying vec3 vBary;
 varying vec3 vColor;
@@ -61,6 +63,17 @@ float hash01(uint cell, uint salt) {
   return float(pcg(pcg(cell) + salt)) / 4294967295.0;
 }
 
+// A slow water-like field over the sensor plane: three sines with periods of about 8, 11 and 13.5 s and
+// wavelengths of 0.22, 0.31 and 0.17 m, summed and scaled to +-uRipple metres along the sensor ray. Evaluated at
+// the shared corner uvs, so neighbouring cells agree exactly and the lattice never cracks. p is backProject()'s xy.
+float ripple(vec2 uv, float d) {
+  vec2 p = (uv - 0.5) * uTangents * d;
+  float w = sin(p.x * 28.6 + uTime * 0.785)
+    + sin(p.y * 20.3 - uTime * 0.571 + 1.7)
+    + sin((p.x + p.y) * 37.0 + uTime * 0.465 + 3.1);
+  return uRipple * w * (1.0 / 3.0);
+}
+
 float distanceAt(vec2 uv) {
   vec4 texel = texture2D(uDepth, uv);
   float d;
@@ -77,7 +90,9 @@ float distanceAt(vec2 uv) {
     hit = d >= uNear && d <= uFar;
   }
   float centre = 0.5 * (uRamp.x + uRamp.y);
-  return hit ? centre + (d - centre) * uDisplacement : -1.0;
+  if (!hit) return -1.0;
+  float base = centre + (d - centre) * uDisplacement;
+  return base + ripple(uv, base);
 }
 
 vec3 backProject(vec2 uv, float d) {
@@ -174,7 +189,7 @@ void main() {
 
   float depthT = clamp((d - uRamp.x) / max(uRamp.y - uRamp.x, 1e-3), 0.0, 1.0);
   vDepthT = depthT;
-  vec3 royal = mix(uGlow, uBg, 0.55);
+  vec3 royal = mix(uGlow, uBg, 0.68);
   vec3 colour = depthT < 0.5 ? mix(uWire, uGlow, depthT * 2.0) : mix(uGlow, royal, depthT * 2.0 - 1.0);
   if (uMode > 1.5 && uIsLight < 0.5) {
     // The demo's ramp (dark theme; cream keeps the token ramp, whose near end is ink), ice-white at the nearest surface, the wire and glow tokens through the middle, navy far.

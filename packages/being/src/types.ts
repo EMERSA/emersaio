@@ -165,6 +165,11 @@ export interface BeingHandle {
     setOpacity(value: number): void;
     /** Stroke width of the wire mode in CSS pixels. */
     setLineWidth(px: number): void;
+    /**
+     * Amplitude of the shards' slow liquid ripple, in metres along the sensor ray (0 to 0.02; 4 mm by default,
+     * 0 under reduced motion). 0 stills the surface.
+     */
+    setRipple(metres: number): void;
   };
   /**
    * Live face input. pushArkit feeds one 61-value ARKit frame (the order of ARKIT_ORDER_61, as Convai streams it)

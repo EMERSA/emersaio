@@ -45,6 +45,7 @@ const fakeBeing = () => {
       setContrast: () => undefined,
       setOpacity: () => undefined,
       setLineWidth: () => undefined,
+      setRipple: () => undefined,
     },
     stats: () => ({
       fps: 0,

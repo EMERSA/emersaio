@@ -380,6 +380,21 @@ test('documents become silent context, clipped', async () => {
   assert.ok(context.length < 6200);
 });
 
+test('onVoice follows the voice speaking: true when Emily starts, false when she stops', async () => {
+  const spoken: boolean[] = [];
+  const t = setup({
+    onVoice: (speaking) => {
+      spoken.push(speaking);
+    },
+  });
+  await t.session.start();
+  const voice = t.voices[0];
+  assert.ok(voice);
+  voice.init.onSpeaking?.(true);
+  voice.init.onSpeaking?.(false);
+  assert.deepEqual(spoken, [true, false]);
+});
+
 test('parseGrant rejects off-shape answers and isBusyError reads limits', () => {
   assert.equal(parseGrant({ ok: false }), undefined);
   assert.equal(parseGrant({ ...grantBody(), token: '' }), undefined);
@@ -451,6 +466,7 @@ test('ConvaiBrain connects with the token, pumps ARKit frames while speaking and
   };
   const frames: ((now: number) => void)[] = [];
   const captions: [string, string, boolean][] = [];
+  const spoken: boolean[] = [];
   const brain = new ConvaiBrain({
     token: 'tok',
     characterId: 'char',
@@ -459,6 +475,9 @@ test('ConvaiBrain connects with the token, pumps ARKit frames while speaking and
     sdk,
     onTranscript: (speaker, text, final) => {
       captions.push([speaker, text, final]);
+    },
+    onSpeaking: (speaking) => {
+      spoken.push(speaking);
     },
     requestFrame: (cb) => frames.push(cb),
     cancelFrame: () => undefined,
@@ -497,6 +516,7 @@ test('ConvaiBrain connects with the token, pumps ARKit frames while speaking and
     { type: 'done', reason: 'complete' },
   ]);
   assert.deepEqual(captions.at(-1), ['being', 'Hello there.', true]);
+  assert.deepEqual(spoken, [true, false]);
   assert.equal(log.tokens, 'Hello there.'.length);
 
   brain.addContext('doc');

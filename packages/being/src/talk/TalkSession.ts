@@ -60,6 +60,8 @@ export interface TalkSessionOptions {
   onState?: (state: TalkState, detail?: string) => void;
   onTranscript?: (speaker: Speaker, text: string, final: boolean) => void;
   onNotice?: (notice: TalkNotice) => void;
+  /** Emily's voice starting (true) and stopping (false), for the shell's speaking state. */
+  onVoice?: (speaking: boolean) => void;
   /** Start with the microphone open (false keeps the session text-only until startListening()). */
   listen?: boolean;
   /** Injectable for tests. */
@@ -252,6 +254,7 @@ export class TalkSession {
         if (final) this.record(speaker, text);
       },
       onState: (state, detail) => this.onVoiceState(state, detail),
+      onSpeaking: (speaking) => this.options.onVoice?.(speaking),
     };
     return this.options.createVoice ? this.options.createVoice(init) : new ConvaiBrain(init);
   }
