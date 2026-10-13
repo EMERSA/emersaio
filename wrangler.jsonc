@@ -19,6 +19,10 @@
   "workers_dev": false,
   "preview_urls": false,
 
+  // The apex is a Custom Domain of this Worker: a deploy creates the DNS record and the certificate itself, so no
+  // A or AAAA is added by hand (docs/runbooks/dns-records.md).
+  "routes": [{ "pattern": "emersa.io", "custom_domain": true }],
+
   "assets": {
     "directory": "./apps/web/dist",
     "binding": "ASSETS",
