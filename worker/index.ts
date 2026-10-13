@@ -12,9 +12,8 @@
 import { compose, hostCheck, quota, rateLimit, readBody, sameSiteOnly, traversalGuard } from './lib/compose.ts';
 import type { Env } from './lib/env.ts';
 import { dispatch, looksLikeTraversal, notFound, type Route } from './lib/http.ts';
-import { CONTACT_SENDS } from './lib/quota.ts';
+import { TALK_SESSIONS } from './lib/quota.ts';
 import { brain, MAX_BRAIN_BYTES } from './routes/brain.ts';
-import { contact, contactReplies, MAX_FORM_BYTES } from './routes/contact.ts';
 import { cspReport } from './routes/csp.ts';
 import { health } from './routes/health.ts';
 import { MAX_TURN_BYTES, memoryDelete, memoryGet, memoryTurn } from './routes/memory.ts';
@@ -24,21 +23,6 @@ import { runScheduled } from './scheduled.ts';
 /** Every /api/* path. The key is the path after /api/, without a trailing slash. */
 const API: Readonly<Record<string, Route>> = {
   health: { GET: compose('health', [traversalGuard, hostCheck], health) },
-  contact: {
-    POST: compose(
-      'contact',
-      [
-        traversalGuard,
-        hostCheck,
-        contactReplies,
-        sameSiteOnly(),
-        readBody(MAX_FORM_BYTES),
-        rateLimit('CONTACT_LIMITER'),
-        quota(CONTACT_SENDS),
-      ],
-      contact,
-    ),
-  },
   // No readBody: the handler reads its own two content types under its own cap. Headerless posts are allowed
   // because browser reports carry fewer headers than a form; a report from elsewhere costs one counted point,
   // whatever its body holds (routes/csp.ts writes at most one per request).
@@ -49,12 +33,20 @@ const API: Readonly<Record<string, Route>> = {
       cspReport,
     ),
   },
-  // Phase 2. Visitor caps (sessions, turns, uploads) are per visitor, so the handlers take them from D1 once the
-  // cookie is verified; the D1 quota() middleware counts sitewide totals and is not needed here.
+  // Phase 2. Visitor caps (sessions, turns, talk time, uploads) are per visitor, so the handlers take them from D1
+  // once the cookie is verified. The one sitewide counter is TALK_SESSIONS: quota() is its cheap read and the
+  // handler takes the atomic slot once Convai has answered.
   'talk/session': {
     POST: compose(
       'talk-session',
-      [traversalGuard, hostCheck, sameSiteOnly(), readBody(MAX_SESSION_BYTES), rateLimit('TALK_LIMITER')],
+      [
+        traversalGuard,
+        hostCheck,
+        sameSiteOnly(),
+        readBody(MAX_SESSION_BYTES),
+        rateLimit('TALK_LIMITER'),
+        quota(TALK_SESSIONS),
+      ],
       talkSession,
     ),
   },

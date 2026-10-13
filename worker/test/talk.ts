@@ -10,12 +10,16 @@ import { type FetchMock, fakeEnv, mockFetch } from './harness.ts';
 
 export const HMAC = 'test-key-that-is-long-enough-for-hmac';
 
-export function talkEnv(overrides: Partial<Env> = {}): { env: Env; db: TestD1 } {
+/** Everything Talk needs. `guarded: false` leaves TURNSTILE_SECRET out, the deployment without a person check. */
+export function talkEnv({ guarded = true, ...overrides }: Partial<Env> & { guarded?: boolean } = {}): {
+  env: Env;
+  db: TestD1;
+} {
   const db = testDatabase();
   const env = fakeEnv({
     MEMORY: asD1(db),
     VISITOR_HMAC_KEY: HMAC,
-    TURNSTILE_SECRET: '1x0000000000000000000000000000000AA',
+    ...(guarded ? { TURNSTILE_SECRET: '1x0000000000000000000000000000000AA' } : {}),
     CONVAI_API_KEY: 'convai-test-key',
     CONVAI_CHARACTER_ID: 'char-1',
     ...overrides,

@@ -1,6 +1,8 @@
 /**
- * POST /api/talk/session: Turnstile, consent, the signed visitor cookie, then a one-hour Convai token.
- * POST /api/talk/revoke: ends the visitor's open sessions; Convai has no documented revocation, so the token lapses.
+ * POST /api/talk/session: consent, the signed visitor cookie, Turnstile when TURNSTILE_SECRET is set, the free
+ * talk-time budget, then a one-hour Convai token under the sitewide daily cap.
+ * POST /api/talk/revoke: ends the visitor's open sessions and refunds the talk time they did not use; Convai has
+ * no documented revocation, so the token lapses.
  * POST /api/talk/upload: one PDF, .txt or .md file (2 MB at most) as plain text for Emily's context. The file
  * itself is never stored or forwarded; only its extracted text (20,000 characters at most) is kept.
  */
@@ -18,18 +20,21 @@ import { contentType, fail, json, noContent, SITE_HOST } from '../lib/http.ts';
 import {
   addDocument,
   bump,
+  capsFor,
   endSessions,
-  MAX_SESSIONS_PER_DAY,
-  MAX_TURNS_PER_DAY,
+  FREE_TALK_SECONDS_PER_DAY,
   MAX_UPLOADS_PER_DAY,
+  type MemoryDb,
   recordConsent,
+  refund,
   SESSION_MINUTES,
   startSession,
+  unusedSeconds,
   usage,
 } from '../lib/memory.ts';
 import { writePoint } from '../lib/metrics.ts';
 import { pdfText } from '../lib/pdf.ts';
-import { secondsUntilTomorrow } from '../lib/quota.ts';
+import { dayKey, reserve, secondsUntilTomorrow, TALK_SESSIONS } from '../lib/quota.ts';
 import { multiLine, oneLine } from '../lib/text.ts';
 import { verify } from '../lib/turnstile.ts';
 import { consented, OLD_CONSENT, secureCookie, store } from '../lib/visitor.ts';
@@ -40,13 +45,22 @@ export const VOICE_BUSY = 'Voice is not answering right now. Please try again in
 export const NOT_HUMAN = 'We could not confirm the check. Please try again.';
 export { OLD_CONSENT };
 export const DAY_FULL = 'That is all the talking for today. Please come back tomorrow.';
+export const MINUTES_UP = 'That is your free five minutes for today. Please come back tomorrow.';
 export const UPLOADS_FULL = 'That is all the files for today. Please come back tomorrow.';
 
 const tomorrow = (): Record<string, string> => ({ 'Retry-After': String(secondsUntilTomorrow()) });
 
+/** End the visitor's open sessions and give back the talk time they were charged but did not use. */
+async function settle(db: MemoryDb, id: string, nowMs = Date.now()): Promise<number> {
+  const ended = await endSessions(db, id, nowMs);
+  const back = ended.reduce((sum, session) => sum + unusedSeconds(session, nowMs), 0);
+  if (back > 0) await refund(db, id, 'talk_seconds', back, nowMs);
+  return back;
+}
+
 export async function talkSession(c: ApiContext): Promise<Response> {
   const { env } = c;
-  if (!env.CONVAI_API_KEY || !env.CONVAI_CHARACTER_ID || !env.TURNSTILE_SECRET) {
+  if (!env.CONVAI_API_KEY || !env.CONVAI_CHARACTER_ID) {
     writePoint(env, c.route, '503-binding');
     return fail(503, VOICE_OFF);
   }
@@ -56,23 +70,42 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   const version = Number(c.fields.consentVersion);
   if (!Number.isInteger(version)) return fail(422, 'Agree to the notice first.');
   if (version !== CONSENT_VERSION) return fail(422, OLD_CONSENT);
-  const token = c.fields.turnstile ?? '';
-  // Production names its host so a pass solved on another site's page is refused; dev and beta pass nothing.
-  const host = env.ENV === 'production' ? SITE_HOST : undefined;
-  if (!(await verify(env.TURNSTILE_SECRET, token, c.request.headers.get('cf-connecting-ip'), host))) {
-    writePoint(env, c.route, '403-turnstile');
-    return fail(403, NOT_HUMAN);
+  // Turnstile is optional (lib/env.ts). With the secret the pass is checked as before; without it the session
+  // is counted as unguarded and the visitor runs on the tighter caps from capsFor().
+  const guarded = Boolean(env.TURNSTILE_SECRET);
+  if (env.TURNSTILE_SECRET) {
+    const token = c.fields.turnstile ?? '';
+    // Production names its host so a pass solved on another site's page is refused; dev and beta pass nothing.
+    const host = env.ENV === 'production' ? SITE_HOST : undefined;
+    if (!(await verify(env.TURNSTILE_SECRET, token, c.request.headers.get('cf-connecting-ip'), host))) {
+      writePoint(env, c.route, '403-turnstile');
+      return fail(403, NOT_HUMAN);
+    }
+  } else {
+    writePoint(env, c.route, 'unguarded');
   }
+  const caps = capsFor(env);
 
   const id = (await cookieVisitor(c.request, s.key)) ?? newVisitorId();
   await recordConsent(s.db, id, version);
   const cookie = { 'Set-Cookie': visitorCookie(await signVisitorId(s.key, id), secureCookie(c)) };
-  if ((await bump(s.db, id, 'sessions')) > MAX_SESSIONS_PER_DAY) {
+  if ((await bump(s.db, id, 'sessions')) > caps.sessions) {
     writePoint(env, c.route, '429-cap');
     return fail(429, DAY_FULL, { ...tomorrow(), ...cookie });
   }
-  const turnsLeft = Math.max(0, MAX_TURNS_PER_DAY - (await usage(s.db, id, 'turns')));
+  const turnsLeft = Math.max(0, caps.turns - (await usage(s.db, id, 'turns')));
   if (turnsLeft === 0) return fail(429, DAY_FULL, { ...tomorrow(), ...cookie });
+
+  // A session the visitor left open (a closed tab, a refresh) is settled first, so its unused time is theirs again.
+  await settle(s.db, id);
+  const used = await usage(s.db, id, 'talk_seconds');
+  const left = FREE_TALK_SECONDS_PER_DAY - used;
+  if (left <= 0) {
+    writePoint(env, c.route, '429-minutes');
+    return json({ ok: false, error: MINUTES_UP, reason: 'minutes' }, 429, { ...tomorrow(), ...cookie });
+  }
+  // Future: a paywall attaches here.
+  const maxMinutes = Math.min(SESSION_MINUTES, Math.ceil(left / 60));
 
   let minted: Awaited<ReturnType<typeof connect>>;
   try {
@@ -83,8 +116,15 @@ export async function talkSession(c: ApiContext): Promise<Response> {
     writePoint(env, c.route, `503-convai-${kind}`);
     return fail(503, kind === 'unauthorized' ? VOICE_OFF : VOICE_BUSY, cookie);
   }
-  await endSessions(s.db, id);
-  await startSession(s.db, id, 'convai');
+  // The sitewide brake: the atomic slot under TALK_SESSIONS (the quota() middleware did the cheap read).
+  if (!(await reserve(s.db, TALK_SESSIONS, dayKey())).allowed) {
+    writePoint(env, c.route, '503-cap');
+    return fail(503, TALK_SESSIONS.full, { ...tomorrow(), ...cookie });
+  }
+  const charged = maxMinutes * 60;
+  await bump(s.db, id, 'talk_seconds', charged);
+  await startSession(s.db, id, 'convai', Date.now(), charged);
+  writePoint(env, c.route, guarded ? 'guarded' : 'unguarded-session');
   return json(
     {
       ok: true,
@@ -93,7 +133,7 @@ export async function talkSession(c: ApiContext): Promise<Response> {
       expiresAt: minted.expiresAt,
       characterId: env.CONVAI_CHARACTER_ID,
       endUserId: await endUserId(s.key, id),
-      session: { turnsLeft, maxMinutes: SESSION_MINUTES },
+      session: { turnsLeft, maxMinutes, secondsLeft: left },
     },
     200,
     cookie,
@@ -107,7 +147,7 @@ export async function talkRevoke(c: ApiContext): Promise<Response> {
     const id = await cookieVisitor(c.request, env.VISITOR_HMAC_KEY);
     if (id) {
       try {
-        await endSessions(env.MEMORY, id);
+        await settle(env.MEMORY, id);
       } catch (error) {
         console.error('talk: could not end sessions', error instanceof Error ? error.message : 'unknown');
       }

@@ -47,19 +47,19 @@ test('a reply streams as token events, markers become actions, and it ends with 
       assert.equal(url, 'https://nim.example/v1/chat/completions');
       assert.equal(new Headers(init.headers).get('authorization'), 'Bearer nvapi-test');
       sent = JSON.parse(String(init.body));
-      return nimStream(['Hello Ada. ', 'Let me show you [[go', 'to:contact]] the form.', ' [[bogus:x]]Done.']);
+      return nimStream(['Hello Ada. ', 'Let me show you [[go', 'to:products]] the range.', ' [[bogus:x]]Done.']);
     },
   });
-  const response = await call(BRAIN, ask('Where is the contact form?', v.cookie, { page: 'hero' }), env);
+  const response = await call(BRAIN, ask('What do you make?', v.cookie, { page: 'hero' }), env);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'text/event-stream; charset=utf-8');
   assertSecure(response, 'brain');
   const got = events(await response.text());
   const tokens = got.filter((e) => e.event === 'token').map((e) => (e.data as { text: string }).text);
-  assert.equal(tokens.join(''), 'Hello Ada. Let me show you  the form. Done.');
+  assert.equal(tokens.join(''), 'Hello Ada. Let me show you  the range. Done.');
   assert.deepEqual(
     got.filter((e) => e.event === 'action').map((e) => e.data),
-    [{ type: 'goto', target: 'contact' }],
+    [{ type: 'goto', target: 'products' }],
   );
   assert.deepEqual(got.at(-1), { event: 'done', data: { reason: 'complete' } });
   assert.equal(sent?.stream, true);
@@ -68,7 +68,7 @@ test('a reply streams as token events, markers become actions, and it ends with 
   assert.match(system, /name: Ada/);
   assert.match(system, /The museum opens in May\./);
   assert.match(system, /page section "hero"/);
-  assert.deepEqual(sent?.messages.at(-1), { role: 'user', content: 'Where is the contact form?' });
+  assert.deepEqual(sent?.messages.at(-1), { role: 'user', content: 'What do you make?' });
 });
 
 test('an upstream failure is an error event, not a broken stream', async () => {

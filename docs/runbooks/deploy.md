@@ -16,8 +16,8 @@ token.
 5. Save and let the first build run. The log must end with `csp-check: PASS`, `preflight: dist looks
    deployable` and `bundle-budget: PASS` before the deploy step. A deploy that runs without a build fails with
    `assets.directory ... does not exist`, which is the mistake preflight exists to make loud.
-6. The deploy creates the bindings in `wrangler.jsonc`: `ASSETS`, the rate limiters, `METRICS`, the cron. D1 is
-   commented out until the database exists (below).
+6. The deploy creates the bindings in `wrangler.jsonc`: `ASSETS`, the rate limiters, `METRICS`, the cron and
+   the D1 database `MEMORY` (below).
 
 ## Custom domain
 
@@ -38,11 +38,15 @@ token.
 npx wrangler d1 create emersa-memory --location weur     # EU; the region is fixed at creation
 ```
 
-Paste the printed `database_id` into `wrangler.jsonc`, uncomment the `d1_databases` block, commit, then
-`npm run db:migrate`. Do this before `npx wrangler secret put POSTMARK_TOKEN`: the form counts every send in D1,
-so with a token but no bound and migrated database it answers 503 (not connected) and sends nothing, the same
-answer as without the token. The cron logs that it skipped until the database exists. Beta needs its own
-database and `npm run db:migrate:beta` (bindings are not inherited).
+The production database exists and is bound in `wrangler.jsonc`. Every new file in `worker/migrations` is
+applied with `npm run db:migrate` (wrangler tracks what ran in `d1_migrations`); run it before deploying code
+that needs the new columns. The current set is `0001_counters`, `0002_memory` and `0003_talk_seconds` (the free
+talk-time budget: `quota.talk_seconds` and `session.charged_seconds`). Check with
+`npx wrangler d1 execute emersa-memory --remote --command "select name from d1_migrations"`. Do this before
+`npx wrangler secret put CONVAI_API_KEY`: Talk keeps its visitors, caps and the sitewide session counter in D1,
+so with a key but no bound and migrated database it answers 503 (not connected), the same answer as without the
+key. The cron logs that it skipped until the database exists. Beta needs its own database and
+`npm run db:migrate:beta` (bindings are not inherited).
 
 ## The beta environment
 
@@ -66,12 +70,15 @@ submit the domain at hstspreload.org. The header already carries `preload`. Prel
 
 ## Phase 2 header rollout
 
-0. Before the first Phase 2 deploy: set the secrets (`CONVAI_API_KEY`, `TURNSTILE_SECRET`, `VISITOR_HMAC_KEY`,
-   and `NVIDIA_API_KEY` on beta only; secrets.md), set the `TURNSTILE_SITEKEY` var in `wrangler.jsonc` and the
-   same key as the `PUBLIC_TURNSTILE_SITEKEY` build variable (the sheet reads it at build time), and apply
-   migration `0002_memory.sql` with `npm run db:migrate` (and `npm run db:migrate:beta`). Check it with
+0. Before the first Phase 2 deploy: set the secrets (`CONVAI_API_KEY`, `VISITOR_HMAC_KEY`, `NVIDIA_API_KEY` on
+   beta only, and `TURNSTILE_SECRET` when the person check is wanted; secrets.md), with the secret also set the
+   `TURNSTILE_SITEKEY` var in `wrangler.jsonc` and the same key as the `PUBLIC_TURNSTILE_SITEKEY` build variable
+   (the sheet reads it at build time), and apply the migrations with `npm run db:migrate` (and
+   `npm run db:migrate:beta`), `0003_talk_seconds.sql` included. Check it with
    `npx wrangler d1 execute emersa-memory --remote --command "select name from sqlite_master"`: `visitor`,
-   `session`, `turn`, `fact`, `quota` and `document` must be listed.
+   `session`, `turn`, `fact`, `quota` and `document` must be listed. Without `TURNSTILE_SECRET` the Worker
+   mints on the tighter unguarded caps; the sitewide `TALK_SESSIONS` cap of 120 tokens a day, the WAF rule and
+   Convai's concurrency are then the spend limits (secrets.md).
 1. Build and deploy with `SITE_PHASE=2` and `REPORT_ONLY=1` (`CSP_ROLLOUT=report-only` is the same switch). The home page then carries the Phase 1
    policy enforced plus the Phase 2 policy as `Content-Security-Policy-Report-Only`, `microphone=(self)` and
    `Reporting-Endpoints` pointing at `/api/csp`.

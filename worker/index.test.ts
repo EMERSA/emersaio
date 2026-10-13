@@ -4,18 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import {
-  assertSecure,
-  assetsAsked,
-  body,
-  call,
-  fakeEnv,
-  form,
-  good,
-  JSON_ACCEPT,
-  post,
-  SAME_SITE,
-} from './test/harness.ts';
+import { assertSecure, assetsAsked, body, call, fakeEnv, JSON_ACCEPT, post, SAME_SITE } from './test/harness.ts';
 
 const SITE = 'https://emersa.io';
 
@@ -29,11 +18,11 @@ test('every response the Worker builds carries the security headers', async () =
     [`${SITE}/api/health`, { method: 'HEAD' }],
     [`${SITE}/api/nope`],
     [`${SITE}/api/health`, { method: 'POST' }],
-    [`${SITE}/api/contact`],
-    [`${SITE}/api/contact`, { method: 'OPTIONS' }],
-    [`${SITE}/api/contact`, post(form(good), { ...JSON_ACCEPT, origin: 'https://evil.example' })],
-    [`${SITE}/api/contact`, post(form(good), { ...JSON_ACCEPT, ...SAME_SITE })],
-    [`${SITE}/api/contact`, post(form(good), SAME_SITE)],
+    [`${SITE}/api/talk/session`],
+    [`${SITE}/api/talk/session`, { method: 'OPTIONS' }],
+    [`${SITE}/api/talk/session`, post('{}', { ...JSON_ACCEPT, origin: 'https://evil.example' }, 'application/json')],
+    [`${SITE}/api/talk/session`, post('{}', { ...JSON_ACCEPT, ...SAME_SITE }, 'application/json')],
+    [`${SITE}/api/talk/session`, post('{}', SAME_SITE, 'application/json')],
     [`${SITE}/api/csp`, { method: 'POST' }],
     [`${SITE}/x%2e%2e/secret`],
     ['https://evil.example/api/health'],
@@ -62,7 +51,7 @@ test('unknown API paths are a JSON 404, prototype names included, and never reac
   assert.equal((await call(`${SITE}/api/health/`)).status, 200, 'a trailing slash is tolerated');
 });
 
-test('methods: GET and HEAD on reads, POST on the form, 405 with Allow otherwise', async () => {
+test('methods: GET and HEAD on reads, POST on the writes, 405 with Allow otherwise', async () => {
   const health = await call(`${SITE}/api/health`);
   assert.equal(health.status, 200);
   assert.equal((await body(health)).ok, true);
@@ -73,8 +62,8 @@ test('methods: GET and HEAD on reads, POST on the form, 405 with Allow otherwise
 
   const cases: Array<[string, string, string]> = [
     [`${SITE}/api/health`, 'POST', 'GET, HEAD'],
-    [`${SITE}/api/contact`, 'GET', 'POST'],
-    [`${SITE}/api/contact`, 'PUT', 'POST'],
+    [`${SITE}/api/talk/session`, 'GET', 'POST'],
+    [`${SITE}/api/talk/session`, 'PUT', 'POST'],
     [`${SITE}/api/csp`, 'OPTIONS', 'POST'],
     [`${SITE}/api/health`, 'constructor', 'GET, HEAD'],
   ];

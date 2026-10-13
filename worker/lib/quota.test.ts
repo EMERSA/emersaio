@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { asD1, seedCounter, testDatabase } from '../test/d1.ts';
 import {
-  CONTACT_SENDS,
   type Counter,
   count,
   counterTotals,
@@ -11,6 +10,7 @@ import {
   purgeCounters,
   reserve,
   secondsUntilTomorrow,
+  TALK_SESSIONS,
 } from './quota.ts';
 
 const NOON = Date.UTC(2026, 9, 7, 12, 0, 0);
@@ -35,21 +35,21 @@ test('increment is one statement that returns the new value; reserve compares it
   assert.equal(await count(d1, small, day), 2);
   assert.deepEqual(await reserve(d1, small, day), { allowed: false, n: 3 });
   assert.equal(await count(d1, small, dayKey(NOON + 86_400_000)), 0, 'a new day starts at zero');
-  assert.equal(await count(d1, CONTACT_SENDS, day), 0, 'other counters are untouched');
+  assert.equal(await count(d1, TALK_SESSIONS, day), 0, 'other counters are untouched');
   db.close();
 });
 
 test('the purge keeps today and yesterday; the totals sum what is left', async () => {
   const db = testDatabase();
   const d1 = asD1(db);
-  const other: Counter = { scope: 'talk', key: 'sessions', cap: 20, full: 'full' };
-  seedCounter(db, CONTACT_SENDS, '2026-10-07', 5);
-  seedCounter(db, CONTACT_SENDS, '2026-10-06', 7);
-  seedCounter(db, CONTACT_SENDS, '2026-10-05', 9);
-  seedCounter(db, CONTACT_SENDS, '2026-09-01', 11);
+  const other: Counter = { scope: 'csp', key: 'reports', cap: 20, full: 'full' };
+  seedCounter(db, TALK_SESSIONS, '2026-10-07', 5);
+  seedCounter(db, TALK_SESSIONS, '2026-10-06', 7);
+  seedCounter(db, TALK_SESSIONS, '2026-10-05', 9);
+  seedCounter(db, TALK_SESSIONS, '2026-09-01', 11);
   seedCounter(db, other, '2026-10-04', 1);
   assert.equal(await purgeCounters(d1, NOON, 2), 3);
-  assert.deepEqual(await counterTotals(d1), [{ scope: 'contact', key: 'sends', days: 2, total: 12 }]);
+  assert.deepEqual(await counterTotals(d1), [{ scope: 'talk', key: 'sessions', days: 2, total: 12 }]);
   assert.equal(await purgeCounters(d1, NOON, 2), 0, 'a repeated run does nothing more');
   db.close();
 });

@@ -48,10 +48,9 @@
   },
 
   // Per-connection limits enforced at the edge. They are advisory (per location, eventually consistent), so the
-  // Worker treats every limiter as optional and relies on D1 counters, Turnstile and the honeypot for the
-  // authoritative caps. namespace_id only has to be unique within the account; bindings sharing an id share counters.
+  // Worker treats every limiter as optional and relies on the D1 counters (and Turnstile, where its secret is
+  // set) for the authoritative caps. namespace_id only has to be unique within the account; bindings sharing an id share counters.
   "ratelimits": [
-    { "name": "CONTACT_LIMITER", "namespace_id": "2001", "simple": { "limit": 5, "period": 60 } },
     { "name": "CSP_LIMITER", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } },
     // Phase 2 (plan 4.5): Talk sessions, the NIM text brain, memory reads and writes, file attachments.
     { "name": "TALK_LIMITER", "namespace_id": "2003", "simple": { "limit": 10, "period": 60 } },
@@ -64,17 +63,15 @@
   // request log: invocation logs are off below so no visitor address or path is ever stored.
   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "emersa_metrics" }],
 
-  // Visitor memory and the daily cap of the contact form. Deliberately not bound until the database exists:
-  //   1. npx wrangler d1 create emersa-memory --location weur     (EU; the region is fixed at creation)
-  //   2. paste the printed database_id below and uncomment the block
-  //   3. npm run db:migrate                                        (applies worker/migrations: 0001_counters, then
-  //      0002_memory for Talk; an existing database only takes 0002, which wrangler tracks in d1_migrations)
-  //   4. the same for beta, which inherits no binding: npx wrangler d1 create emersa-memory-beta --location weur,
-  //      then paste its id into the block under env.beta, uncomment it, and run npm run db:migrate:beta
-  // Until then the contact form answers 503 (not connected) even once POSTMARK_TOKEN is set, every Phase 2 route
-  // (talk, brain, memory) answers 503, and the cron logs that it skipped: bind and migrate the database before the
-  // tokens (worker/routes/contact.ts counts every send here; worker/lib/memory.ts keeps visitor memory here).
-  // Phase 2 secrets, after the database: VISITOR_HMAC_KEY, TURNSTILE_SECRET, CONVAI_API_KEY (and NVIDIA_API_KEY on beta).
+  // The Talk memory (worker/lib/memory.ts: visitors, sessions, turns, facts, documents and the per-visitor daily
+  // caps) and the sitewide daily counters (worker/lib/quota.ts: TALK_SESSIONS). The production database exists in
+  // weur (EU; the region is fixed at creation) and is bound and migrated. Every new file in worker/migrations is
+  // applied with "npm run db:migrate" (wrangler tracks what ran in d1_migrations): 0001_counters, 0002_memory,
+  // 0003_talk_seconds. Without the binding every Talk route (talk, brain, memory) answers 503 and the cron logs
+  // that it skipped. Beta inherits no binding: npx wrangler d1 create emersa-memory-beta --location weur, paste
+  // its id into the block under env.beta, and run npm run db:migrate:beta.
+  // Secrets, after the database: VISITOR_HMAC_KEY, CONVAI_API_KEY, optionally TURNSTILE_SECRET (and NVIDIA_API_KEY
+  // on beta); worker/lib/env.ts and docs/runbooks/secrets.md say what each one changes.
   "d1_databases": [
     {
       "binding": "MEMORY",
@@ -108,7 +105,6 @@
         "PUBLIC_BRAIN": "convai"
       },
       "ratelimits": [
-        { "name": "CONTACT_LIMITER", "namespace_id": "2101", "simple": { "limit": 5, "period": 60 } },
         { "name": "CSP_LIMITER", "namespace_id": "2102", "simple": { "limit": 30, "period": 60 } },
         { "name": "TALK_LIMITER", "namespace_id": "2103", "simple": { "limit": 10, "period": 60 } },
         { "name": "BRAIN_LIMITER", "namespace_id": "2104", "simple": { "limit": 30, "period": 60 } },
@@ -116,8 +112,8 @@
         { "name": "UPLOAD_LIMITER", "namespace_id": "2106", "simple": { "limit": 5, "period": 60 } }
       ],
       "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "emersa_metrics_beta" }]
-      // Beta's own database (step 4 of the D1 recipe above); d1_databases is not inherited from the top level.
-      // Without it beta's contact form answers 503 whatever its POSTMARK_TOKEN says.
+      // Beta's own database (the D1 note above); d1_databases is not inherited from the top level.
+      // Without it every Talk route on beta answers 503.
       // Uncomment and add the comma after the analytics_engine_datasets line.
       // "d1_databases": [
       //   { "binding": "MEMORY", "database_name": "emersa-memory-beta", "database_id": "<from step 4>", "migrations_dir": "worker/migrations" }

@@ -14,7 +14,7 @@ import {
 } from './compose.ts';
 import type { Env } from './env.ts';
 import { json } from './http.ts';
-import { CONTACT_SENDS, dayKey } from './quota.ts';
+import { dayKey, TALK_SESSIONS } from './quota.ts';
 
 const run = (
   middlewares: Middleware[],
@@ -76,20 +76,17 @@ test('sameSiteOnly: reads pass; a post needs the site; headerless posts need the
 test('rateLimit: 429 with Retry-After when the binding says no, counted; absent or broken bindings let it through', async () => {
   const m = metrics();
   const denied = await run(
-    [rateLimit('CONTACT_LIMITER')],
+    [rateLimit('CSP_LIMITER')],
     {},
-    fakeEnv({ METRICS: m.binding, CONTACT_LIMITER: limiter(false) }),
+    fakeEnv({ METRICS: m.binding, CSP_LIMITER: limiter(false) }),
   );
   assert.equal(denied.status, 429);
   assert.equal(denied.headers.get('Retry-After'), '60');
   assert.equal((await body(denied)).ok, false);
   assert.deepEqual(kinds(m), ['429']);
 
-  assert.equal(
-    (await run([rateLimit('CONTACT_LIMITER')], {}, fakeEnv({ CONTACT_LIMITER: limiter(true) }))).status,
-    200,
-  );
-  assert.equal((await run([rateLimit('CONTACT_LIMITER')], {}, fakeEnv())).status, 200, 'no binding, no limit');
+  assert.equal((await run([rateLimit('CSP_LIMITER')], {}, fakeEnv({ CSP_LIMITER: limiter(true) }))).status, 200);
+  assert.equal((await run([rateLimit('CSP_LIMITER')], {}, fakeEnv())).status, 200, 'no binding, no limit');
   assert.equal(
     (await run([rateLimit('CSP_LIMITER')], {}, fakeEnv({ CSP_LIMITER: brokenLimiter }))).status,
     200,
@@ -101,18 +98,18 @@ test('quota: refused at the cap when the database is bound, counted; skipped wit
   const m = metrics();
   const db = testDatabase();
   const env = fakeEnv({ METRICS: m.binding, MEMORY: asD1(db) });
-  assert.equal((await run([quota(CONTACT_SENDS)], {}, env)).status, 200, 'an empty table is under the cap');
+  assert.equal((await run([quota(TALK_SESSIONS)], {}, env)).status, 200, 'an empty table is under the cap');
 
-  seedCounter(db, CONTACT_SENDS, dayKey(), CONTACT_SENDS.cap);
-  const full = await run([quota(CONTACT_SENDS)], {}, env);
+  seedCounter(db, TALK_SESSIONS, dayKey(), TALK_SESSIONS.cap);
+  const full = await run([quota(TALK_SESSIONS)], {}, env);
   assert.equal(full.status, 503);
-  assert.equal((await body(full)).error, CONTACT_SENDS.full);
+  assert.equal((await body(full)).error, TALK_SESSIONS.full);
   const retry = Number(full.headers.get('Retry-After'));
   assert.ok(retry >= 1 && retry <= 86_400, `Retry-After ${retry} reaches the next day`);
   assert.deepEqual(kinds(m), ['503-cap']);
 
-  assert.equal((await run([quota(CONTACT_SENDS)], {}, fakeEnv())).status, 200, 'no database, no cap');
+  assert.equal((await run([quota(TALK_SESSIONS)], {}, fakeEnv())).status, 200, 'no database, no cap');
   db.break();
-  assert.equal((await run([quota(CONTACT_SENDS)], {}, env)).status, 200, 'a database fault fails open');
+  assert.equal((await run([quota(TALK_SESSIONS)], {}, env)).status, 200, 'a database fault fails open');
   db.close();
 });

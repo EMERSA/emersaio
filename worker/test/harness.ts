@@ -102,16 +102,6 @@ export const post = (
 export const JSON_ACCEPT = { accept: 'application/json' } as const;
 export const SAME_SITE = { origin: 'https://emersa.io', 'sec-fetch-site': 'same-origin' } as const;
 
-/** A submission that passes every check. `started` is long ago, so the fill-time check is satisfied. */
-export const good = {
-  name: 'Ada Lovelace',
-  email: 'ada@example.com',
-  company: 'Analytical Engines',
-  topic: 'emily',
-  message: 'We would like to see Emily walk a runbook with our operations team.',
-  started: '1',
-};
-
 export type FetchMock = (url: string, init: RequestInit) => Response | Promise<Response>;
 
 /** Replace the global fetch for a test; returns the function that puts the real one back. */

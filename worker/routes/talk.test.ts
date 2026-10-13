@@ -4,11 +4,20 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { CONSENT_VERSION, verifyVisitorId } from '../lib/consent.ts';
-import { bump, listDocuments, MAX_SESSIONS_PER_DAY, openSession, usage } from '../lib/memory.ts';
-import { asD1 } from '../test/d1.ts';
-import { assertSecure, body, call, limiter, post, SAME_SITE } from '../test/harness.ts';
+import {
+  bump,
+  FREE_TALK_SECONDS_PER_DAY,
+  listDocuments,
+  MAX_SESSIONS_PER_DAY,
+  openSession,
+  UNGUARDED_SESSIONS_PER_DAY,
+  usage,
+} from '../lib/memory.ts';
+import { dayKey, TALK_SESSIONS } from '../lib/quota.ts';
+import { asD1, seedCounter } from '../test/d1.ts';
+import { assertSecure, body, call, kinds, limiter, metrics, post, SAME_SITE } from '../test/harness.ts';
 import { HMAC, seen, talkEnv, upstreams, visitor } from '../test/talk.ts';
-import { OLD_CONSENT, UNREADABLE_PDF, VOICE_BUSY, VOICE_OFF } from './talk.ts';
+import { MINUTES_UP, OLD_CONSENT, UNREADABLE_PDF, VOICE_BUSY, VOICE_OFF } from './talk.ts';
 
 const SESSION = 'https://emersa.io/api/talk/session';
 const UPLOAD = 'https://emersa.io/api/talk/upload';
@@ -34,7 +43,7 @@ test('a session: Turnstile, consent row, signed cookie with its attributes, and 
   assert.equal(reply.token, 'tok-1');
   assert.equal(reply.characterId, 'char-1');
   assert.match(String(reply.endUserId), /^[0-9a-f]{32}$/);
-  assert.deepEqual(reply.session, { turnsLeft: 200, maxMinutes: 20 });
+  assert.deepEqual(reply.session, { turnsLeft: 200, maxMinutes: 5, secondsLeft: 300 });
   assert.ok(Date.parse(String(reply.expiresAt)) > Date.now());
 
   const cookie = response.headers.get('set-cookie') ?? '';
@@ -115,6 +124,93 @@ test('the daily session cap answers 429 with Retry-After', async () => {
   const response = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
   assert.equal(response.status, 429);
   assert.ok(Number(response.headers.get('retry-after')) > 0);
+});
+
+test('without TURNSTILE_SECRET: no siteverify call, the session is counted unguarded, and the 4th is refused', async () => {
+  const m = metrics();
+  const { env, db } = talkEnv({ guarded: false, METRICS: m.binding });
+  const v = await visitor(db);
+  restore = upstreams();
+  const first = await call(
+    SESSION,
+    jsonPost(JSON.stringify({ consentVersion: CONSENT_VERSION }), { cookie: v.cookie }),
+    env,
+  );
+  assert.equal(first.status, 200);
+  assert.deepEqual(seen, ['https://api.convai.com/user/connect']);
+  assert.ok(kinds(m).includes('unguarded'));
+  assert.equal(UNGUARDED_SESSIONS_PER_DAY, 3);
+  for (let i = 1; i < UNGUARDED_SESSIONS_PER_DAY; i++) {
+    assert.equal((await call(SESSION, jsonPost(good, { cookie: v.cookie }), env)).status, 200, `session ${i + 1}`);
+  }
+  const fourth = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  assert.equal(fourth.status, 429);
+  assert.ok(Number(fourth.headers.get('retry-after')) > 0);
+  // The guarded deployment keeps its wider cap for the same visitor.
+  const guarded = talkEnv();
+  const g = await visitor(guarded.db);
+  for (let i = 0; i < UNGUARDED_SESSIONS_PER_DAY; i++) await bump(asD1(guarded.db), g.id, 'sessions');
+  assert.equal((await call(SESSION, jsonPost(good, { cookie: g.cookie }), guarded.env)).status, 200);
+});
+
+test('talk time: a used-up day answers 429 with reason "minutes"; a partial day shortens the session', async () => {
+  const { env, db } = talkEnv();
+  const v = await visitor(db);
+  restore = upstreams();
+  await bump(asD1(db), v.id, 'talk_seconds', FREE_TALK_SECONDS_PER_DAY);
+  const up = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  assert.equal(up.status, 429);
+  assert.ok(Number(up.headers.get('retry-after')) > 0);
+  assert.deepEqual(await body(up), { ok: false, error: MINUTES_UP, reason: 'minutes' });
+  assert.equal(seen.length, 1, 'Turnstile only: no Convai token is minted for a used-up day');
+
+  const w = await visitor(db, 'e'.repeat(32));
+  await bump(asD1(db), w.id, 'talk_seconds', 240);
+  const short = await call(SESSION, jsonPost(good, { cookie: w.cookie }), env);
+  assert.equal(short.status, 200);
+  assert.deepEqual((await body(short)).session, { turnsLeft: 200, maxMinutes: 1, secondsLeft: 60 });
+  assert.equal(await usage(asD1(db), w.id, 'talk_seconds'), 300, 'the minute is charged when the token is minted');
+  const row = db.sqlite.prepare('SELECT charged_seconds FROM session WHERE visitor_id = ?').get(w.id);
+  assert.equal(row?.charged_seconds, 60);
+});
+
+test('revoke refunds the charged time the session did not use, never below zero', async () => {
+  const { env, db } = talkEnv();
+  const v = await visitor(db);
+  restore = upstreams();
+  assert.equal((await call(SESSION, jsonPost(good, { cookie: v.cookie }), env)).status, 200);
+  assert.equal(await usage(asD1(db), v.id, 'talk_seconds'), 300);
+  // The session ran for 100 seconds of its five minutes.
+  db.sqlite.prepare('UPDATE session SET started_at = started_at - 100000 WHERE visitor_id = ?').run(v.id);
+  assert.equal((await call(REVOKE, { method: 'POST', headers: { ...SAME_SITE, cookie: v.cookie } }, env)).status, 204);
+  const used = await usage(asD1(db), v.id, 'talk_seconds');
+  assert.ok(used >= 100 && used <= 102, `used ${used}`);
+  // A session that overran its charge refunds nothing and the counter stays where it was.
+  assert.equal((await call(SESSION, jsonPost(good, { cookie: v.cookie }), env)).status, 200);
+  const charged = await usage(asD1(db), v.id, 'talk_seconds');
+  db.sqlite
+    .prepare('UPDATE session SET started_at = started_at - 900000 WHERE visitor_id = ? AND ended_at IS NULL')
+    .run(v.id);
+  await call(REVOKE, { method: 'POST', headers: { ...SAME_SITE, cookie: v.cookie } }, env);
+  assert.equal(await usage(asD1(db), v.id, 'talk_seconds'), charged);
+});
+
+test('the sitewide TALK_SESSIONS cap: the handler takes the last slot, then the chain answers 503', async () => {
+  const m = metrics();
+  const { env, db } = talkEnv({ METRICS: m.binding });
+  restore = upstreams();
+  seedCounter(db, TALK_SESSIONS, dayKey(), TALK_SESSIONS.cap - 1);
+  assert.equal((await call(SESSION, jsonPost(good), env)).status, 200, 'the last slot is taken by the handler');
+  const full = await call(SESSION, jsonPost(good), env);
+  assert.equal(full.status, 503);
+  assert.equal((await body(full)).error, TALK_SESSIONS.full);
+  assert.ok(Number(full.headers.get('retry-after')) > 0);
+  assert.equal(kinds(m).filter((k) => k === '503-cap').length, 1);
+  assert.deepEqual(
+    seen,
+    ['https://challenges.cloudflare.com/turnstile/v0/siteverify', 'https://api.convai.com/user/connect'],
+    'a full day is refused by the cheap read in the chain, before Turnstile or Convai is asked',
+  );
 });
 
 test('Convai refusing the key or timing out answers 503 with a sentence', async () => {

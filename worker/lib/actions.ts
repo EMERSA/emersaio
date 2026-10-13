@@ -1,5 +1,5 @@
 /**
- * The action markers the NIM brain may write inside its reply, e.g. "[[goto:contact]]". Only the whitelisted
+ * The action markers the NIM brain may write inside its reply, e.g. "[[goto:products]]". Only the whitelisted
  * shapes become "action" events (the runtime's TourAction); anything else between the brackets is dropped, and a
  * marker never reaches the visitor as text. MarkerParser copes with a marker split across stream chunks.
  */

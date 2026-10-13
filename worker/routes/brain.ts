@@ -1,7 +1,7 @@
 /**
  * POST /api/brain: the NIM text brain as server-sent events ("token", "action", "done", "error"). Only where
  * NIM_BASE_URL is set (wrangler dev and beta; the hosted NIM is licensed for prototyping only), with NVIDIA_API_KEY.
- * The visitor must have consented (the em_vid cookie); 40 turns per session, 200 per day. The system prompt carries
+ * The visitor must have consented (the em_vid cookie); 40 turns per session, 200 per day (60 without Turnstile). The system prompt carries
  * the site's facts, what Emily remembers and the visitor's attached documents.
  */
 import { MARKER_HELP, MarkerParser } from '../lib/actions.ts';
@@ -9,9 +9,9 @@ import type { ApiContext } from '../lib/compose.ts';
 import { fail } from '../lib/http.ts';
 import {
   bump,
+  capsFor,
   documentContext,
   listFacts,
-  MAX_TURNS_PER_DAY,
   MAX_TURNS_PER_SESSION,
   type MemoryDb,
   openSession,
@@ -35,7 +35,7 @@ export const PERSONA = [
   'You are Emily, the AI guide of emersa.io, the site of Emersa Labs. You are an AI and say so if asked.',
   'Emersa Labs builds intelligent NPCs and synthetic beings: real-time 3D characters that listen, think, speak and remember.',
   'Answer in plain British English, warmly and briefly: two or three sentences. Never invent clients, prices or figures.',
-  'If you do not know, say so and suggest the contact form or sales@emersa.io.',
+  'If you do not know, say so and suggest emailing 4d@emersa.io.',
   MARKER_HELP,
 ].join('\n');
 
@@ -68,7 +68,7 @@ export async function brain(c: ApiContext): Promise<Response> {
   if ((await sessionTurn(s.db, session)) > MAX_TURNS_PER_SESSION) {
     return fail(429, 'This conversation has reached its length. Start a new one to carry on.');
   }
-  if ((await bump(s.db, id, 'turns')) > MAX_TURNS_PER_DAY) {
+  if ((await bump(s.db, id, 'turns')) > capsFor(env).turns) {
     return fail(429, 'That is all the talking for today. Please come back tomorrow.');
   }
 

@@ -6,8 +6,28 @@ import { dayKey } from './quota.ts';
 
 export type MemoryDb = Pick<D1Database, 'prepare' | 'batch'>;
 
+/** Per visitor per day when TURNSTILE_SECRET guards the session route. */
 export const MAX_SESSIONS_PER_DAY = 20;
 export const MAX_TURNS_PER_DAY = 200;
+/**
+ * Per visitor per day without TURNSTILE_SECRET. The visitor is only a cookie then, which a script can drop, so
+ * the caps are tight; the sitewide TALK_SESSIONS counter (lib/quota.ts) and the free talk time hold the rest.
+ */
+export const UNGUARDED_SESSIONS_PER_DAY = 3;
+export const UNGUARDED_TURNS_PER_DAY = 60;
+/** Voice time a visitor gets a day, charged per session when the token is minted and refunded on revoke. */
+export const FREE_TALK_SECONDS_PER_DAY = 300;
+
+export interface Caps {
+  sessions: number;
+  turns: number;
+}
+
+/** The per-visitor daily caps for this deployment: tighter when nothing checks that a visitor is a person. */
+export const capsFor = (env: { TURNSTILE_SECRET?: string }): Caps =>
+  env.TURNSTILE_SECRET
+    ? { sessions: MAX_SESSIONS_PER_DAY, turns: MAX_TURNS_PER_DAY }
+    : { sessions: UNGUARDED_SESSIONS_PER_DAY, turns: UNGUARDED_TURNS_PER_DAY };
 export const MAX_UPLOADS_PER_DAY = 10;
 export const MAX_TURNS_PER_SESSION = 40;
 export const SESSION_MINUTES = 20;
@@ -46,9 +66,9 @@ export async function touch(db: MemoryDb, id: string, nowMs = Date.now()): Promi
   await db.prepare('UPDATE visitor SET last_seen = ? WHERE id = ?').bind(nowMs, id).run();
 }
 
-export type QuotaField = 'turns' | 'sessions' | 'uploads' | 'asr_seconds';
+export type QuotaField = 'turns' | 'sessions' | 'uploads' | 'asr_seconds' | 'talk_seconds';
 
-/** Add `by` to today's field and return the new value, atomically. The field is one of four fixed names. */
+/** Add `by` to today's field and return the new value, atomically. The field is one of five fixed names. */
 export async function bump(db: MemoryDb, id: string, field: QuotaField, by = 1, nowMs = Date.now()): Promise<number> {
   const n = await db
     .prepare(
@@ -60,6 +80,23 @@ export async function bump(db: MemoryDb, id: string, field: QuotaField, by = 1, 
   return n;
 }
 
+/** Give back `by` of today's field, never below zero; returns the new value (zero when there is no row). */
+export async function refund(
+  db: MemoryDb,
+  id: string,
+  field: QuotaField,
+  by: number,
+  nowMs = Date.now(),
+): Promise<number> {
+  const n = await db
+    .prepare(
+      `UPDATE quota SET ${field} = max(0, ${field} - ?) WHERE visitor_id = ? AND day = ? RETURNING ${field} AS n`,
+    )
+    .bind(Math.max(0, Math.floor(by)), id, dayKey(nowMs))
+    .first<number>('n');
+  return typeof n === 'number' ? n : 0;
+}
+
 export async function usage(db: MemoryDb, id: string, field: QuotaField, nowMs = Date.now()): Promise<number> {
   const n = await db
     .prepare(`SELECT ${field} AS n FROM quota WHERE visitor_id = ? AND day = ?`)
@@ -68,16 +105,18 @@ export async function usage(db: MemoryDb, id: string, field: QuotaField, nowMs =
   return typeof n === 'number' ? n : 0;
 }
 
+/** Open a session; `chargedSeconds` is the talk time taken for it, which revoke refunds in part. */
 export async function startSession(
   db: MemoryDb,
   visitorId: string,
   provider: string,
   nowMs = Date.now(),
+  chargedSeconds = 0,
 ): Promise<string> {
   const id = newId();
   await db
-    .prepare('INSERT INTO session (id, visitor_id, provider, started_at) VALUES (?, ?, ?, ?)')
-    .bind(id, visitorId, provider, nowMs)
+    .prepare('INSERT INTO session (id, visitor_id, provider, started_at, charged_seconds) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, visitorId, provider, nowMs, chargedSeconds)
     .run();
   return id;
 }
@@ -87,24 +126,32 @@ export interface SessionRow {
   started_at: number;
   ended_at: number | null;
   turns: number;
+  charged_seconds: number;
 }
+
+const SESSION_COLUMNS = 'id, started_at, ended_at, turns, charged_seconds';
 
 /** The visitor's newest session that has not ended. */
 export const openSession = (db: MemoryDb, visitorId: string): Promise<SessionRow | null> =>
   db
     .prepare(
-      'SELECT id, started_at, ended_at, turns FROM session WHERE visitor_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',
+      `SELECT ${SESSION_COLUMNS} FROM session WHERE visitor_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
     )
     .bind(visitorId)
     .first<SessionRow>();
 
-export async function endSessions(db: MemoryDb, visitorId: string, nowMs = Date.now()): Promise<number> {
-  const r = await db
-    .prepare('UPDATE session SET ended_at = ? WHERE visitor_id = ? AND ended_at IS NULL')
+/** End every open session of the visitor and return them, so a caller can settle what they were charged. */
+export async function endSessions(db: MemoryDb, visitorId: string, nowMs = Date.now()): Promise<SessionRow[]> {
+  const { results } = await db
+    .prepare(`UPDATE session SET ended_at = ? WHERE visitor_id = ? AND ended_at IS NULL RETURNING ${SESSION_COLUMNS}`)
     .bind(nowMs, visitorId)
-    .run();
-  return r.meta.changes;
+    .all<SessionRow>();
+  return results;
 }
+
+/** What revoke gives back: the charged seconds the session did not use, counted from when it started. */
+export const unusedSeconds = (session: Pick<SessionRow, 'started_at' | 'charged_seconds'>, nowMs: number): number =>
+  Math.max(0, session.charged_seconds - Math.floor((nowMs - session.started_at) / 1000));
 
 /** One more brain turn in the session; returns the new count. */
 export async function sessionTurn(db: MemoryDb, sessionId: string): Promise<number> {

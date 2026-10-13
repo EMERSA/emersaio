@@ -11,12 +11,12 @@ import { fail, json, SECURE_HEADERS } from '../lib/http.ts';
 import {
   addTurn,
   bump,
+  capsFor,
   deleteVisitor,
   getVisitor,
   listDocuments,
   listFacts,
   MAX_TURN_CHARS,
-  MAX_TURNS_PER_DAY,
   type MemoryDb,
   openSession,
   recentTurns,
@@ -93,7 +93,7 @@ export async function memoryTurn(c: ApiContext): Promise<Response> {
   if (text.length > MAX_TURN_CHARS) return fail(413, 'That turn is too long.');
   const id = await consented(c, s);
   if (id instanceof Response) return id;
-  if ((await bump(s.db, id, 'turns')) > MAX_TURNS_PER_DAY) {
+  if ((await bump(s.db, id, 'turns')) > capsFor(c.env).turns) {
     writePoint(c.env, c.route, '429-cap');
     return fail(429, 'That is all the talking for today. Please come back tomorrow.', {
       'Retry-After': String(secondsUntilTomorrow()),

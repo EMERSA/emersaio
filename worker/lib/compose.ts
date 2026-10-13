@@ -25,7 +25,7 @@ export interface ApiContext {
   readonly env: Env;
   readonly ctx: ExecutionContext;
   readonly url: URL;
-  /** Short route name for metrics ("contact", "csp"): from the route table, never from the visitor. */
+  /** Short route name for metrics ("talk-session", "csp"): from the route table, never from the visitor. */
   readonly route: string;
   /** Flat string fields of the body, filled by readBody(); empty before it runs. */
   fields: Readonly<Record<string, string>>;
@@ -72,7 +72,7 @@ export const readBody =
 export interface SameSiteOptions {
   /**
    * Let a state-changing request through when neither Origin nor Sec-Fetch-Site was sent. Off by default: a
-   * browser form always sends both, so a headerless POST is a script. On for the CSP endpoint, whose reports some
+   * browser fetch() from the site always sends both, so a headerless POST is a script. On for the CSP endpoint, whose reports some
    * browsers send with fewer headers than a form, and where a stray report costs one counted point.
    */
   allowHeaderless?: boolean;
@@ -92,13 +92,7 @@ export const sameSiteOnly =
     return fail(403, 'Requests from other sites are not accepted.');
   };
 
-export type LimiterName =
-  | 'CONTACT_LIMITER'
-  | 'CSP_LIMITER'
-  | 'TALK_LIMITER'
-  | 'BRAIN_LIMITER'
-  | 'MEMORY_LIMITER'
-  | 'UPLOAD_LIMITER';
+export type LimiterName = 'CSP_LIMITER' | 'TALK_LIMITER' | 'BRAIN_LIMITER' | 'MEMORY_LIMITER' | 'UPLOAD_LIMITER';
 
 /**
  * The Cloudflare rate limiter named in wrangler.jsonc, when bound. It is advisory (per location, eventually
@@ -127,8 +121,8 @@ export const rateLimit =
 /**
  * The daily cap in D1, when the database is bound. This is the cheap read, so a full day is answered before the
  * handler runs; the handler takes its slot with reserve(), the atomic check, which decides. A database error
- * passes the request on, and the handler says what a database that cannot answer means for its route (the
- * contact form sends nothing without its cap).
+ * passes the request on, and the handler says what a database that cannot answer means for its route (Talk
+ * mints no token without its store).
  */
 export const quota =
   (counter: Counter): Middleware =>

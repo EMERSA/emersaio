@@ -173,7 +173,7 @@ test('cookie helpers: read, set and clear with fixed attributes; endUserId is op
   assert.match(user, /^[0-9a-f]{32}$/);
   assert.notEqual(user, id);
   assert.equal(await endUserId(key, id), user);
-  assert.equal(CONSENT_VERSION, 1);
+  assert.equal(CONSENT_VERSION, 2);
 });
 
 test('apiBase: CONVAI_API_BASE overrides only outside production and only for http(s) origins', () => {

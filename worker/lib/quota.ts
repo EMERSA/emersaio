@@ -12,12 +12,12 @@ export interface Counter {
   full: string;
 }
 
-/** The contact form: at most this many messages a day leave the Worker, whoever sends them. */
-export const CONTACT_SENDS: Counter = {
-  scope: 'contact',
-  key: 'sends',
-  cap: 40,
-  full: 'The form is full for today. Please write to sales@emersa.io and we will pick it up from there.',
+/** Talk: at most this many Convai sessions a day are minted sitewide, whoever asks for them. */
+export const TALK_SESSIONS: Counter = {
+  scope: 'talk',
+  key: 'sessions',
+  cap: 120,
+  full: 'Emily is talking with a lot of people today. Please try again tomorrow.',
 };
 
 /** The part of D1 these helpers use, so a test can stand in with a small in-memory database. */
