@@ -532,6 +532,47 @@ test('ConvaiBrain connects with the token, pumps ARKit frames while speaking and
   assert.deepEqual(log.listening, [true, false]);
 });
 
+test('ConvaiBrain captions neither the echo of a typed line nor an empty bot bubble', async () => {
+  const { being } = fakeBeing();
+  const client = new FakeClient();
+  const captions: [string, string, boolean][] = [];
+  const brain = new ConvaiBrain({
+    token: 'tok',
+    characterId: 'char',
+    endUserId: 'eu',
+    being,
+    sdk: { createClient: () => client },
+    onTranscript: (speaker, text, final) => {
+      captions.push([speaker, text, final]);
+    },
+    requestFrame: () => 0,
+    cancelFrame: () => undefined,
+  });
+  await brain.connect();
+  brain.sendText('Hello Emily');
+  // The SDK appends the typed line itself, then opens an empty streaming bubble on bot-llm-started.
+  client.emit('messagesChange', [{ id: 'u1', type: 'user-llm-text', content: 'Hello Emily' }]);
+  client.emit('messagesChange', [
+    { id: 'u1', type: 'user-llm-text', content: 'Hello Emily' },
+    { id: 'b1', type: 'bot-llm-text', content: '' },
+  ]);
+  assert.deepEqual(captions, [], 'nothing captioned yet');
+  client.emit('messagesChange', [
+    { id: 'u1', type: 'user-llm-text', content: 'Hello Emily' },
+    { id: 'b1', type: 'bot-llm-text', content: '' },
+    { id: 'b2', type: 'bot-output', content: 'Ask and you shall receive.' },
+  ]);
+  client.emit('speakingChange', false);
+  assert.deepEqual(captions, [
+    ['being', 'Ask and you shall receive.', false],
+    ['being', 'Ask and you shall receive.', true],
+  ]);
+  // A spoken line from the visitor (not the typed echo) is still captioned.
+  client.emit('messagesChange', [{ id: 'u2', type: 'user-transcription', content: 'And another thing' }]);
+  assert.deepEqual(captions.at(-1), ['user', 'And another thing', false]);
+  await brain.end();
+});
+
 // ---------- AudioSink with a fake room ----------
 
 class FakeRoom {

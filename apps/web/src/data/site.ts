@@ -130,6 +130,7 @@ export const site = {
       minutesUp:
         'That is your five free minutes for today. Come back tomorrow, or email 4d@emersa.io for Emily in your organisation.',
       micDenied: 'The microphone is off; you can keep typing.',
+      audioBlocked: 'Your browser is holding Emily’s sound back. Tap anywhere on the page to hear her.',
       timeUp: 'This conversation reached its time limit. Start again whenever you like.',
       failed: 'Something went wrong. Please try again.',
       offline: 'The site could not be reached. Check your connection and try again.',

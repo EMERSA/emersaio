@@ -95,6 +95,8 @@ export interface ConvaiBrainOptions {
   onState?: (state: ConvaiState, detail?: string) => void;
   /** The character's voice starting (true) and stopping (false), straight from the SDK's speakingChange. */
   onSpeaking?: (speaking: boolean) => void;
+  /** The browser refused to play the character's audio without a gesture (autoplay); resumeAudio() in the next tap. */
+  onAudioBlocked?: () => void;
   /** Injectable for tests; the browser loads the SDK. */
   sdk?: ConvaiSdk | (() => Promise<ConvaiSdk>);
   /** Injectable frame clock for tests. */
@@ -150,8 +152,12 @@ export class AudioSink {
   private readonly elements = new Map<TrackLike, HTMLMediaElement>();
   private streamElement: HTMLMediaElement | null = null;
   private readonly unsubscribe: (() => void)[] = [];
+  /** Elements the browser refused to start (autoplay policy); played again by resume() inside a gesture. */
+  private readonly blocked = new Set<HTMLMediaElement>();
+  private readonly onBlocked: (() => void) | undefined;
 
-  constructor(room: unknown) {
+  constructor(room: unknown, onBlocked?: () => void) {
+    this.onBlocked = onBlocked;
     if (!isRoom(room)) return;
     const onSubscribed = (track: TrackLike): void => this.attach(track);
     const onUnsubscribed = (track: TrackLike): void => this.detach(track);
@@ -171,6 +177,7 @@ export class AudioSink {
       element.hidden = true;
       this.elements.set(track, element);
       this.hold(element);
+      this.play(element);
     } catch {
       // No element could be made (no document); the track still carries the level meter.
     }
@@ -198,7 +205,32 @@ export class AudioSink {
     element.srcObject = new MediaStream([track]);
     this.streamElement = element;
     this.hold(element);
-    element.play().catch(() => undefined);
+    this.play(element);
+  }
+
+  /** Inside a gesture: start every element the browser held back. */
+  resume(): void {
+    for (const element of [...this.blocked]) this.play(element);
+  }
+
+  /** Play, and remember a refusal: Safari and iOS allow media only after a gesture has touched the page. */
+  private play(element: HTMLMediaElement): void {
+    if (typeof element.play !== 'function') return;
+    let result: Promise<void> | undefined;
+    try {
+      result = element.play();
+    } catch {
+      return;
+    }
+    result
+      ?.then(() => {
+        this.blocked.delete(element);
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof Error) || error.name !== 'NotAllowedError') return;
+        if (this.blocked.size === 0) this.onBlocked?.();
+        this.blocked.add(element);
+      });
   }
 
   /** Release every element and stop listening to the room. */
@@ -214,6 +246,7 @@ export class AudioSink {
   }
 
   private release(element: HTMLMediaElement): void {
+    this.blocked.delete(element);
     try {
       element.pause();
       element.srcObject = null;
@@ -281,6 +314,8 @@ export class ConvaiBrain implements Brain {
   private readonly seen = new Map<string, { speaker: Speaker; text: string; final: boolean }>();
   private turn: EventQueue | null = null;
   private turnText = '';
+  /** The last typed line the shell sent: the SDK echoes it as a user message, and the shell has already shown it. */
+  private lastSent = '';
 
   constructor(options: ConvaiBrainOptions) {
     this.options = options;
@@ -307,7 +342,7 @@ export class ConvaiBrain implements Brain {
       await client.disconnect();
       return;
     }
-    this.sink = new AudioSink(client.room);
+    this.sink = new AudioSink(client.room, () => this.options.onAudioBlocked?.());
     this.watchRoomAudio(client.room);
     this.startLoop();
     this.options.onState?.('connected');
@@ -331,6 +366,7 @@ export class ConvaiBrain implements Brain {
   sendText(text: string): void {
     const trimmed = text.trim();
     if (trimmed === '' || this.client === null) return;
+    this.lastSent = trimmed;
     this.client.sendUserTextMessage(trimmed);
   }
 
@@ -342,6 +378,11 @@ export class ConvaiBrain implements Brain {
 
   interrupt(): void {
     this.client?.sendInterruptMessage();
+  }
+
+  /** Called inside a tap after onAudioBlocked: the held-back audio starts. */
+  resumeAudio(): void {
+    this.sink?.resume();
   }
 
   /** Brain interface: send the text and stream Emily's words until she finishes the turn. */
@@ -433,16 +474,22 @@ export class ConvaiBrain implements Brain {
 
   /**
    * The SDK keeps one growing message per line and rewrites it as words arrive; a line is settled once a newer
-   * message follows it, or when the character stops speaking.
+   * message follows it, or when the character stops speaking. Two kinds of line are not captioned here: the echo
+   * of a typed line (the shell showed it when it was sent) and a bot line that has no words yet (the SDK opens an
+   * empty bubble on bot-llm-started and may never fill it when the words arrive as bot-output instead).
    */
   private onMessages(messages: unknown): void {
     if (!Array.isArray(messages)) return;
-    const lines = messages.filter(isMessage).filter((m) => USER_TYPES.has(m.type) || BEING_TYPES.has(m.type));
+    const lines = messages
+      .filter(isMessage)
+      .filter((m) => USER_TYPES.has(m.type) || BEING_TYPES.has(m.type))
+      .filter((m) => !(USER_TYPES.has(m.type) && m.content.trim() === this.lastSent));
     lines.forEach((message, index) => {
       const speaker: Speaker = USER_TYPES.has(message.type) ? 'user' : 'being';
       const last = index === lines.length - 1;
       const known = this.seen.get(message.id);
       if (known?.final) return;
+      if (message.content === '' && known === undefined) return;
       const grew = known === undefined || known.text !== message.content;
       if (grew) {
         if (speaker === 'being') this.streamBeing(known?.text ?? '', message.content);

@@ -24,7 +24,7 @@ export type TalkState =
 export type TalkEndReason = 'visitor' | 'cap' | 'busy' | 'error' | 'disconnected';
 
 /** Why the shell should show a notice; the copy lives in site.ts. */
-export type TalkNotice = 'busy' | 'cap' | 'mic-denied' | 'reconnecting' | 'expired';
+export type TalkNotice = 'busy' | 'cap' | 'mic-denied' | 'reconnecting' | 'expired' | 'audio-blocked';
 
 export interface TalkSessionGrant {
   token: string;
@@ -42,6 +42,8 @@ export interface TalkVoice {
   stopListening(): Promise<void>;
   sendText(text: string): void;
   addContext(text: string): void;
+  /** Inside a gesture: start audio the browser held back (after the audio-blocked notice). */
+  resumeAudio?(): void;
   end(): Promise<void>;
 }
 
@@ -177,6 +179,11 @@ export class TalkSession {
     return true;
   }
 
+  /** Inside a tap, after the audio-blocked notice: the character's held-back audio starts. */
+  resumeAudio(): void {
+    this.voice?.resumeAudio?.();
+  }
+
   /** Wire a typed input (TypedIn) so its final lines go to Emily; returns the detach function. */
   bindTyped(input: SpeechIn): () => void {
     const off = input.onTranscript((text, final) => {
@@ -255,6 +262,7 @@ export class TalkSession {
       },
       onState: (state, detail) => this.onVoiceState(state, detail),
       onSpeaking: (speaking) => this.options.onVoice?.(speaking),
+      onAudioBlocked: () => this.options.onNotice?.('audio-blocked'),
     };
     return this.options.createVoice ? this.options.createVoice(init) : new ConvaiBrain(init);
   }

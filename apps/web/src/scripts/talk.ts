@@ -37,6 +37,7 @@ const RUNTIME_NOTICES: Record<string, Notice> = {
   'mic-denied': 'micDenied',
   reconnecting: 'reconnecting',
   expired: 'failed',
+  'audio-blocked': 'audioBlocked',
 };
 
 /** Session states that end the attempt, and what the visitor is told. */
@@ -385,7 +386,10 @@ class Controller {
           } else if (state === 'requesting' || state === 'connecting') reached = state;
           this.setState(state);
         },
-        onNotice: (notice) => this.notice(RUNTIME_NOTICES[notice] ?? 'failed'),
+        onNotice: (notice) => {
+          this.notice(RUNTIME_NOTICES[notice] ?? 'failed');
+          if (notice === 'audio-blocked') this.resumeOnTap(session);
+        },
         onVoice: (speaking) => this.setSpeaking(speaking),
       });
       // Held from the first moment, so Close, Escape or a tour start during the connect ends this session rather
@@ -414,6 +418,23 @@ class Controller {
     } finally {
       document.removeEventListener('securitypolicyviolation', onViolation);
     }
+  }
+
+  /**
+   * The browser held Emily's sound back (autoplay): the next tap or key anywhere on the page starts it, and the
+   * notice goes. Registered once per refusal.
+   */
+  private resumeOnTap(session: TalkSession): void {
+    const resume = (): void => {
+      document.removeEventListener('pointerdown', resume, true);
+      document.removeEventListener('keydown', resume, true);
+      if (this.session !== session) return;
+      primeAudio();
+      session.resumeAudio();
+      this.notice(null);
+    };
+    document.addEventListener('pointerdown', resume, true);
+    document.addEventListener('keydown', resume, true);
   }
 
   /** A failed attempt: the sentence that names where it broke, and a Retry beside it. */
@@ -486,6 +507,8 @@ class Controller {
   /** Captions for both sides: the line grows while words arrive, and a final line closes it. */
   private caption(role: Speaker, text: string, final: boolean): void {
     let line = this.live[role];
+    // No line for no words: a bubble the runtime opened before any word arrived would print a bare name.
+    if (!line && text.trim() === '') return;
     if (!line) {
       line = document.createElement('li');
       line.dataset.role = role;
