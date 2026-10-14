@@ -28,6 +28,10 @@ token.
 - SSL/TLS: "Always Use HTTPS" on, minimum TLS 1.2. Leave Cloudflare's own HSTS switch off: the header comes
   from `_headers` and a second copy would double it.
 - Security: "Under Attack" mode off. Keep verified bots allowed and "Block AI bots" off; a managed challenge
+- Bots: "Bot Fight Mode" and "JavaScript Detections" must be OFF. Both inject an inline script
+  (`cdn-cgi/challenge-platform/scripts/jsd/main.js`) into every HTML page; the strict Content-Security-Policy
+  blocks it, so the detection never runs and every visit logs a console error and posts a CSP report to
+  `/api/csp`. Verified live on 2026-10-14. The Worker's caps and the WAF rate-limit rule are the bot defence.
   blocks search and AI crawlers, which defeats `robots.txt`, `llms.txt` and the structured data (krupiq lesson).
 - WAF, one custom rate-limiting rule: URI path starts with `/api/`, 60 requests per 10 seconds per IP, block for
   10 seconds. The `ratelimits` bindings are advisory; this rule and the D1 counters are the real caps.
