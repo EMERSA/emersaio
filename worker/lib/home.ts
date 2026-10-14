@@ -14,8 +14,8 @@ export const HOME_PATHS: ReadonlySet<string> = new Set(['/', '/index.html', '/in
 
 export async function home(request: Request, assets: Fetcher): Promise<Response> {
   const response = await assets.fetch(request);
-  // Redirects (/index.html -> /) and errors pass through untouched.
-  if (response.status !== 200) return response;
+  // Redirects (/index.html -> /) and errors pass through untouched; a 304 carries the policies too, so it is fixed as well.
+  if (response.status !== 200 && response.status !== 304) return response;
   const headers = new Headers(response.headers);
   const reportOnly = headers.has('content-security-policy-report-only');
   headers.set('Content-Security-Policy', reportOnly ? CSP_PHASE1 : CSP_PHASE2_HOME);

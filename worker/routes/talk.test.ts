@@ -13,7 +13,7 @@ import {
   UNGUARDED_SESSIONS_PER_DAY,
   usage,
 } from '../lib/memory.ts';
-import { dayKey, TALK_SESSIONS } from '../lib/quota.ts';
+import { count, dayKey, TALK_SESSIONS } from '../lib/quota.ts';
 import { asD1, seedCounter } from '../test/d1.ts';
 import { assertSecure, body, call, kinds, limiter, metrics, post, SAME_SITE } from '../test/harness.ts';
 import { HMAC, seen, talkEnv, upstreams, visitor } from '../test/talk.ts';
@@ -344,4 +344,27 @@ test('upload refusals: 403 without consent, 411, 413, 415, 422 for an unreadable
   for (let i = 0; i < 10; i++) await bump(asD1(db), v.id, 'uploads');
   assert.equal((await upload('a.txt', 'hello', env, v.cookie)).status, 429);
   assert.equal((await upload('a.txt', 'hello', { ...env, MEMORY: undefined }, v.cookie)).status, 503);
+});
+
+test('a refused mint leaves nothing behind: no visitor row, no session counted, the sitewide slot given back', async () => {
+  const { env, db } = talkEnv();
+  restore = upstreams({ convai: () => new Response('busy', { status: 503 }) });
+  const refused = await call(SESSION, jsonPost(good), env);
+  assert.equal(refused.status, 503);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM visitor').get()?.n, 0);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM quota').get()?.n, 0);
+  assert.equal(await count(asD1(db), TALK_SESSIONS, dayKey()), 0);
+  restore();
+  // Dropping the cookie and trying again creates nothing either.
+  restore = upstreams({ convai: () => new Response('busy', { status: 503 }) });
+  await call(SESSION, jsonPost(good), env);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM visitor').get()?.n, 0);
+  restore();
+  // A granted session writes the visitor, counts the session and keeps the slot.
+  restore = upstreams();
+  const granted = await call(SESSION, jsonPost(good), env);
+  assert.equal(granted.status, 200);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM visitor').get()?.n, 1);
+  assert.equal(db.sqlite.prepare('SELECT sessions FROM quota').get()?.sessions, 1);
+  assert.equal(await count(asD1(db), TALK_SESSIONS, dayKey()), 1);
 });

@@ -34,7 +34,7 @@ import {
 } from '../lib/memory.ts';
 import { writePoint } from '../lib/metrics.ts';
 import { pdfText } from '../lib/pdf.ts';
-import { dayKey, reserve, secondsUntilTomorrow, TALK_SESSIONS } from '../lib/quota.ts';
+import { dayKey, release, reserve, secondsUntilTomorrow, TALK_SESSIONS } from '../lib/quota.ts';
 import { multiLine, oneLine } from '../lib/text.ts';
 import { verify } from '../lib/turnstile.ts';
 import { consented, OLD_CONSENT, secureCookie, store } from '../lib/visitor.ts';
@@ -86,10 +86,12 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   }
   const caps = capsFor(env);
 
-  const id = (await cookieVisitor(c.request, s.key)) ?? newVisitorId();
-  await recordConsent(s.db, id, version);
+  // Nothing is written for the visitor until a session is granted: a request refused by a cap, by the sitewide
+  // brake or by the voice service leaves no row behind, so dropping the cookie and retrying creates nothing.
+  const known = await cookieVisitor(c.request, s.key);
+  const id = known ?? newVisitorId();
   const cookie = { 'Set-Cookie': visitorCookie(await signVisitorId(s.key, id), secureCookie(c)) };
-  if ((await bump(s.db, id, 'sessions')) > caps.sessions) {
+  if ((await usage(s.db, id, 'sessions')) >= caps.sessions) {
     writePoint(env, c.route, '429-cap');
     return fail(429, DAY_FULL, { ...tomorrow(), ...cookie });
   }
@@ -97,7 +99,7 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   if (turnsLeft === 0) return fail(429, DAY_FULL, { ...tomorrow(), ...cookie });
 
   // A session the visitor left open (a closed tab, a refresh) is settled first, so its unused time is theirs again.
-  await settle(s.db, id);
+  if (known) await settle(s.db, id);
   const used = await usage(s.db, id, 'talk_seconds');
   const left = FREE_TALK_SECONDS_PER_DAY - used;
   if (left <= 0) {
@@ -107,20 +109,27 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   // Future: a paywall attaches here.
   const maxMinutes = Math.min(SESSION_MINUTES, Math.ceil(left / 60));
 
+  // The sitewide brake first: the atomic slot under TALK_SESSIONS is taken before the voice service is asked for
+  // anything that costs money (the quota() middleware did the cheap read). A mint the service then refuses gives
+  // the slot back.
+  const day = dayKey();
+  if (!(await reserve(s.db, TALK_SESSIONS, day)).allowed) {
+    writePoint(env, c.route, '503-cap');
+    return fail(503, TALK_SESSIONS.full, { ...tomorrow(), ...cookie });
+  }
   let minted: Awaited<ReturnType<typeof connect>>;
   try {
     minted = await connect(env.CONVAI_API_KEY, Date.now(), apiBase(env));
   } catch (error) {
+    await release(s.db, TALK_SESSIONS, day);
     const kind = error instanceof ConvaiError ? error.kind : 'unknown';
     console.error('talk: convai connect failed', kind);
     writePoint(env, c.route, `503-convai-${kind}`);
     return fail(503, kind === 'unauthorized' ? VOICE_OFF : VOICE_BUSY, cookie);
   }
-  // The sitewide brake: the atomic slot under TALK_SESSIONS (the quota() middleware did the cheap read).
-  if (!(await reserve(s.db, TALK_SESSIONS, dayKey())).allowed) {
-    writePoint(env, c.route, '503-cap');
-    return fail(503, TALK_SESSIONS.full, { ...tomorrow(), ...cookie });
-  }
+  // Granted: now the visitor exists, with their consent, the session counted and the time charged.
+  await recordConsent(s.db, id, version);
+  await bump(s.db, id, 'sessions');
   const charged = maxMinutes * 60;
   await bump(s.db, id, 'talk_seconds', charged);
   await startSession(s.db, id, 'convai', Date.now(), charged);

@@ -68,6 +68,17 @@ export async function reserve(db: CounterDb, counter: Counter, day: string): Pro
   return { allowed: n <= counter.cap, n };
 }
 
+/**
+ * Give a reserved slot back, never below zero: the request that took it failed downstream (the voice service did
+ * not answer), so the day's cap is not spent on an attempt that granted nothing.
+ */
+export async function release(db: CounterDb, counter: Counter, day: string): Promise<void> {
+  await db
+    .prepare('UPDATE counters SET n = max(0, n - 1) WHERE scope = ? AND key = ? AND day = ?')
+    .bind(counter.scope, counter.key, day)
+    .run();
+}
+
 /** Keep the latest `keepDays` days (today counts as one) and delete the rest; returns how many rows went. */
 export async function purgeCounters(db: CounterDb, nowMs: number, keepDays: number): Promise<number> {
   const cutoff = dayKey(nowMs - (keepDays - 1) * DAY_MS);
