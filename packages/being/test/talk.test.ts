@@ -5,7 +5,14 @@ import { CHANNEL, CHANNEL_COUNT, createFrame } from '../src/face/source.ts';
 import { ArkitStreamSource } from '../src/face/sources/ArkitStream.ts';
 import { ARKIT_ORDER_61, arkit52 } from '../src/face/tables/arkit52.ts';
 import { TypedIn } from '../src/speech/in/TypedIn.ts';
-import { ConvaiBrain, type ConvaiClientLike, type ConvaiSdk, type TalkBeing } from '../src/talk/ConvaiBrain.ts';
+import {
+  AudioSink,
+  ConvaiBrain,
+  type ConvaiClientLike,
+  type ConvaiSdk,
+  type TalkBeing,
+  type TrackLike,
+} from '../src/talk/ConvaiBrain.ts';
 import {
   isBusyError,
   parseGrant,
@@ -462,7 +469,6 @@ test('ConvaiBrain connects with the token, pumps ARKit frames while speaking and
       config = c;
       return client;
     },
-    createAudioRenderer: () => ({ destroy: () => undefined }),
   };
   const frames: ((now: number) => void)[] = [];
   const captions: [string, string, boolean][] = [];
@@ -524,4 +530,77 @@ test('ConvaiBrain connects with the token, pumps ARKit frames while speaking and
   await brain.end();
   assert.equal(client.connected, false);
   assert.deepEqual(log.listening, [true, false]);
+});
+
+// ---------- AudioSink with a fake room ----------
+
+class FakeRoom {
+  readonly listeners = new Map<string, ((track: TrackLike) => void)[]>();
+  on(event: string, callback: (track: TrackLike) => void): void {
+    this.listeners.set(event, [...(this.listeners.get(event) ?? []), callback]);
+  }
+  off(event: string, callback: (track: TrackLike) => void): void {
+    this.listeners.set(
+      event,
+      (this.listeners.get(event) ?? []).filter((cb) => cb !== callback),
+    );
+  }
+  emit(event: string, track: TrackLike): void {
+    for (const callback of this.listeners.get(event) ?? []) callback(track);
+  }
+}
+
+const fakeTrack = (kind: string) => {
+  const element = {
+    hidden: false,
+    srcObject: {} as unknown,
+    pause: () => undefined,
+    remove: () => undefined,
+  };
+  const log = { attached: 0, detached: [] as unknown[] };
+  const track: TrackLike = {
+    kind,
+    attach: () => {
+      log.attached += 1;
+      return element as unknown as HTMLMediaElement;
+    },
+    detach: (el) => {
+      log.detached.push(el);
+    },
+  };
+  return { track, element, log };
+};
+
+test('AudioSink attaches a subscribed audio track once and detaches it on end', () => {
+  const room = new FakeRoom();
+  const sink = new AudioSink(room);
+  const audio = fakeTrack('audio');
+  const video = fakeTrack('video');
+  room.emit('trackSubscribed', audio.track);
+  room.emit('trackSubscribed', audio.track);
+  room.emit('trackSubscribed', video.track);
+  assert.equal(audio.log.attached, 1, 'attached once');
+  assert.equal(video.log.attached, 0, 'video is not played');
+  assert.equal(audio.element.hidden, true);
+  sink.end();
+  assert.deepEqual(audio.log.detached, [audio.element], 'detached from its own element');
+  assert.equal(audio.element.srcObject, null);
+  room.emit('trackSubscribed', audio.track);
+  assert.equal(audio.log.attached, 1, 'the room is no longer watched after end');
+  assert.deepEqual(room.listeners.get('trackSubscribed'), []);
+  assert.deepEqual(room.listeners.get('trackUnsubscribed'), []);
+});
+
+test('AudioSink releases a track the room unsubscribes and accepts a room-less client', () => {
+  const room = new FakeRoom();
+  const sink = new AudioSink(room);
+  const audio = fakeTrack('audio');
+  room.emit('trackSubscribed', audio.track);
+  room.emit('trackUnsubscribed', audio.track);
+  assert.deepEqual(audio.log.detached, [audio.element]);
+  room.emit('trackSubscribed', audio.track);
+  assert.equal(audio.log.attached, 2, 'a track may come back');
+  sink.end();
+  assert.equal(audio.log.detached.length, 2);
+  new AudioSink(null).end();
 });

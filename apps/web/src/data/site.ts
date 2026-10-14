@@ -89,6 +89,7 @@ export const site = {
     close: 'Close',
     end: 'End',
     speak: 'Hold to speak',
+    retry: 'Retry',
     speakHold: 'Hold to speak',
     howTo: 'Type your message and press Send, or hold the microphone button and speak.',
     listening: 'Listening. Release to send.',
@@ -119,6 +120,10 @@ export const site = {
       micDenied: 'The microphone is off; you can keep typing.',
       timeUp: 'This conversation reached its time limit. Start again whenever you like.',
       failed: 'Something went wrong. Please try again.',
+      offline: 'The site could not be reached. Check your connection and try again.',
+      voiceBlocked:
+        'Emily’s voice could not connect from this browser. A content blocker or a strict network may be stopping it.',
+      policyBlocked: 'This page’s security policy blocked the voice service. Please reload the page and try again.',
       fileTooBig: 'That file is over 2 MB.',
       fileType: 'Please choose a PDF, .txt or .md file.',
       fileFailed: 'Emily could not read that file.',

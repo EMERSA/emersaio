@@ -37,11 +37,8 @@ export interface ConvaiClientConfig {
 
 export interface ConvaiSdk {
   createClient(config: ConvaiClientConfig): ConvaiClientLike;
-  /** Plays the character's audio (the SDK's vanilla AudioRenderer); destroy() removes its elements. */
-  createAudioRenderer(room: unknown): { destroy(): void };
 }
 
-/** The one dynamic import of the SDK: /core and /vanilla only, never the root, which pulls React. */
 /**
  * The SDK's logger (loglevel, through livekit-client) persists its level the moment the module loads: about
  * fifteen `loglevel:*` keys in local storage, or a cookie where storage is blocked. The site promises three keys
@@ -65,13 +62,15 @@ export function forgetSdkStorage(): void {
   }
 }
 
+/**
+ * The one dynamic import of the SDK: /core only, never the root (React) nor /vanilla (the widget and its
+ * AudioRenderer, about 18 KB gzipped); AudioSink below plays the character's audio instead.
+ */
 export const loadConvaiSdk = async (): Promise<ConvaiSdk> => {
-  const [core, vanilla] = await Promise.all([import('@convai/web-sdk/core'), import('@convai/web-sdk/vanilla')]);
+  const core = await import('@convai/web-sdk/core');
   forgetSdkStorage();
   return {
     createClient: (config) => new core.ConvaiClient(config) as unknown as ConvaiClientLike,
-    createAudioRenderer: (room) =>
-      new vanilla.AudioRenderer(room as ConstructorParameters<typeof vanilla.AudioRenderer>[0]),
   };
 };
 
@@ -118,13 +117,19 @@ const isMessage = (value: unknown): value is MessageLike => {
   return typeof record.id === 'string' && typeof record.type === 'string' && typeof record.content === 'string';
 };
 
-/** LiveKit's remote audio track, structurally: kind and the underlying MediaStreamTrack. */
-interface TrackLike {
+/**
+ * LiveKit's remote audio track, structurally: kind, the underlying MediaStreamTrack, and attach() / detach(),
+ * which make (and release) an autoplaying media element for it.
+ */
+export interface TrackLike {
   kind?: string;
   mediaStreamTrack?: MediaStreamTrack;
+  attach?(): HTMLMediaElement;
+  detach?(element: HTMLMediaElement): unknown;
 }
 
-interface RoomLike {
+/** The slice of LiveKit's Room this module listens to: `trackSubscribed` and `trackUnsubscribed` (RoomEvent). */
+export interface RoomLike {
   on(event: string, callback: (track: TrackLike) => void): unknown;
   off(event: string, callback: (track: TrackLike) => void): unknown;
 }
@@ -134,6 +139,96 @@ const isRoom = (value: unknown): value is RoomLike =>
   value !== null &&
   typeof (value as RoomLike).on === 'function' &&
   typeof (value as RoomLike).off === 'function';
+
+/**
+ * Plays the character's audio: what the SDK's vanilla AudioRenderer did, without the /vanilla chunk. Every
+ * subscribed remote audio track is attached to a hidden autoplaying element under document.body, released when
+ * the track goes or the sink ends; a websocket transport's `botAudioTrack` (a bare MediaStreamTrack) plays through
+ * one element of its own. The hidden elements never draw, so nothing here touches styles.
+ */
+export class AudioSink {
+  private readonly elements = new Map<TrackLike, HTMLMediaElement>();
+  private streamElement: HTMLMediaElement | null = null;
+  private readonly unsubscribe: (() => void)[] = [];
+
+  constructor(room: unknown) {
+    if (!isRoom(room)) return;
+    const onSubscribed = (track: TrackLike): void => this.attach(track);
+    const onUnsubscribed = (track: TrackLike): void => this.detach(track);
+    room.on('trackSubscribed', onSubscribed);
+    room.on('trackUnsubscribed', onUnsubscribed);
+    this.unsubscribe.push(
+      () => room.off('trackSubscribed', onSubscribed),
+      () => room.off('trackUnsubscribed', onUnsubscribed),
+    );
+  }
+
+  /** A LiveKit remote audio track: one hidden element per track, autoplaying (LiveKit's attach() plays it). */
+  attach(track: TrackLike): void {
+    if (track.kind !== 'audio' || typeof track.attach !== 'function' || this.elements.has(track)) return;
+    try {
+      const element = track.attach();
+      element.hidden = true;
+      this.elements.set(track, element);
+      this.hold(element);
+    } catch {
+      // No element could be made (no document); the track still carries the level meter.
+    }
+  }
+
+  detach(track: TrackLike): void {
+    const element = this.elements.get(track);
+    if (element === undefined) return;
+    this.elements.delete(track);
+    try {
+      track.detach?.(element);
+    } catch {
+      // Already released by LiveKit.
+    }
+    this.release(element);
+  }
+
+  /** A bare MediaStreamTrack (the websocket transport): played through its own element. */
+  attachStream(track: MediaStreamTrack): void {
+    if (typeof Audio === 'undefined' || typeof MediaStream === 'undefined') return;
+    this.releaseStream();
+    const element = new Audio();
+    element.autoplay = true;
+    element.hidden = true;
+    element.srcObject = new MediaStream([track]);
+    this.streamElement = element;
+    this.hold(element);
+    element.play().catch(() => undefined);
+  }
+
+  /** Release every element and stop listening to the room. */
+  end(): void {
+    for (const off of this.unsubscribe.splice(0)) off();
+    for (const track of [...this.elements.keys()]) this.detach(track);
+    this.releaseStream();
+  }
+
+  private hold(element: HTMLMediaElement): void {
+    if (typeof document === 'undefined' || typeof element.remove !== 'function') return;
+    document.body.appendChild(element);
+  }
+
+  private release(element: HTMLMediaElement): void {
+    try {
+      element.pause();
+      element.srcObject = null;
+      element.remove();
+    } catch {
+      // A fake element in tests, or one LiveKit already cleared.
+    }
+  }
+
+  private releaseStream(): void {
+    if (this.streamElement === null) return;
+    this.release(this.streamElement);
+    this.streamElement = null;
+  }
+}
 
 /** An async queue the respond() generator drains while SDK callbacks fill it. */
 class EventQueue {
@@ -174,7 +269,7 @@ export class ConvaiBrain implements Brain {
   readonly name = 'convai';
   private readonly options: ConvaiBrainOptions;
   private client: ConvaiClientLike | null = null;
-  private renderer: { destroy(): void } | null = null;
+  private sink: AudioSink | null = null;
   private readonly unsubscribe: (() => void)[] = [];
   private readonly bands = new AudioBands();
   private analyserSource: MediaStreamAudioSourceNode | null = null;
@@ -212,7 +307,7 @@ export class ConvaiBrain implements Brain {
       await client.disconnect();
       return;
     }
-    this.renderer = loaded.createAudioRenderer(client.room);
+    this.sink = new AudioSink(client.room);
     this.watchRoomAudio(client.room);
     this.startLoop();
     this.options.onState?.('connected');
@@ -283,8 +378,8 @@ export class ConvaiBrain implements Brain {
     this.analyserSource?.disconnect();
     this.analyserSource = null;
     this.bands.attach(null);
-    this.renderer?.destroy();
-    this.renderer = null;
+    this.sink?.end();
+    this.sink = null;
     const client = this.client;
     this.client = null;
     if (client !== null) await client.disconnect().catch(() => undefined);
@@ -389,13 +484,15 @@ export class ConvaiBrain implements Brain {
     if (client !== null) {
       this.unsubscribe.push(
         client.on('botAudioTrack', ((track: unknown) => {
-          if (typeof MediaStreamTrack !== 'undefined' && track instanceof MediaStreamTrack) this.meter(track);
+          if (typeof MediaStreamTrack === 'undefined' || !(track instanceof MediaStreamTrack)) return;
+          this.sink?.attachStream(track);
+          this.meter(track);
         }) as (...args: never[]) => void),
       );
     }
   }
 
-  /** Tap the character's audio for the level; the SDK's renderer plays it, this only listens. */
+  /** Tap the character's audio for the level; the AudioSink plays it, this only listens. */
   private meter(track: MediaStreamTrack): void {
     const context = getAudioContext();
     if (context === undefined || typeof MediaStream === 'undefined') return;

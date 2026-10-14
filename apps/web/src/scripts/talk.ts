@@ -72,6 +72,7 @@ interface Ui {
   label: HTMLElement;
   voice: HTMLElement;
   close: HTMLButtonElement;
+  retry: HTMLButtonElement;
   stage: HTMLElement | null;
   consent: HTMLElement;
   session: HTMLElement;
@@ -118,6 +119,7 @@ function collect(panel: HTMLElement): Ui | null {
     label: q('[data-monitor-label]', HTMLElement),
     voice: q('[data-voice-label]', HTMLElement),
     close: q('[data-talk-close]', HTMLButtonElement),
+    retry: q('[data-talk-retry]', HTMLButtonElement),
     consent: q('[data-talk-consent]', HTMLElement),
     session: q('[data-talk-session]', HTMLElement),
     start: q('[data-talk-start]', HTMLButtonElement),
@@ -250,6 +252,12 @@ class Controller {
   bind(): void {
     const { ui } = this;
     ui.start.addEventListener('click', () => this.start());
+    ui.retry.addEventListener('click', () => this.start());
+    // Hovering or focusing Start warms the runtime chunk (first-party, no side effects); the SDK itself waits for
+    // the tap, as the privacy policy says.
+    for (const type of ['pointerenter', 'focus', 'pointerdown'] as const) {
+      ui.start.addEventListener(type, () => void import('@emersa/being/talk').catch(() => undefined), { once: true });
+    }
     ui.close.addEventListener('click', () => void this.end(true));
     ui.form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -309,7 +317,12 @@ class Controller {
     if (this.starting) return;
     this.starting = true;
     primeAudio();
+    performance.mark('talk:tap');
+    // The voice service's code starts downloading now, in the tap, so it overlaps the person check and the mint
+    // instead of following them.
+    void import('@emersa/being/talk').then((mod) => mod.loadConvaiSdk()).catch(() => undefined);
     const { ui } = this;
+    ui.retry.hidden = true;
     ui.start.setAttribute('aria-disabled', 'true');
     ui.start.textContent = copy.starting;
     this.notice(null);
@@ -320,7 +333,7 @@ class Controller {
         if (state === false) throw new Error('turnstile');
         return this.connect();
       })
-      .catch(() => this.notice('check'))
+      .catch(() => this.fail('check'))
       .finally(() => {
         this.starting = false;
         ui.start.removeAttribute('aria-disabled');
@@ -335,6 +348,13 @@ class Controller {
     this.notice(null);
     let failed: Notice | null = null;
     let detail = '';
+    let reached: TalkState = 'idle';
+    // A policy that blocks the voice service shows up here, not as an error the SDK can name.
+    let blocked = false;
+    const onViolation = (): void => {
+      blocked = true;
+    };
+    document.addEventListener('securitypolicyviolation', onViolation);
     try {
       const [mod, being] = await Promise.all([import('@emersa/being/talk'), requestBeing()]);
       this.being = being;
@@ -359,7 +379,10 @@ class Controller {
             failed = notice;
             // The Worker's own sentence (the free minutes, the day's cap) is more precise than the generic line.
             detail = state === 'limited' || state === 'unavailable' ? (why ?? '') : '';
-          }
+            // Where it broke: the site itself unreachable, or the voice service after the grant.
+            if (state === 'error')
+              failed = why === 'network' ? 'offline' : reached === 'connecting' ? 'voiceBlocked' : 'failed';
+          } else if (state === 'requesting' || state === 'connecting') reached = state;
           this.setState(state);
         },
         onNotice: (notice) => this.notice(RUNTIME_NOTICES[notice] ?? 'failed'),
@@ -378,15 +401,26 @@ class Controller {
         await session.end('error');
         throw new Error(session.state);
       }
+      performance.mark('talk:live');
+      performance.measure('talk:tap-to-live', 'talk:tap', 'talk:live');
       ui.input.focus({ preventScroll: true });
     } catch {
       this.session = null;
-      if (detail) this.status(detail);
-      else this.notice(failed ?? 'failed');
+      if (detail) this.fail(detail, true);
+      else this.fail(blocked ? 'policyBlocked' : (failed ?? 'failed'));
       ui.session.hidden = true;
       ui.consent.hidden = false;
       ui.label.textContent = copy.monitorConsentLabel;
+    } finally {
+      document.removeEventListener('securitypolicyviolation', onViolation);
     }
+  }
+
+  /** A failed attempt: the sentence that names where it broke, and a Retry beside it. */
+  private fail(what: Notice | string, verbatim = false): void {
+    if (verbatim) this.status(what);
+    else this.notice(what as Notice);
+    this.ui.retry.hidden = false;
   }
 
   private setState(state: TalkState): void {
@@ -581,6 +615,7 @@ class Controller {
     if (kind === null) {
       this.ui.notice.hidden = true;
       this.ui.notice.textContent = '';
+      this.ui.retry.hidden = true;
       return;
     }
     this.status(copy.notices[kind]);
