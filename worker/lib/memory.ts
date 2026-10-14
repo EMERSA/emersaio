@@ -11,9 +11,11 @@ export const MAX_SESSIONS_PER_DAY = 20;
 export const MAX_TURNS_PER_DAY = 200;
 /**
  * Per visitor per day without TURNSTILE_SECRET. The visitor is only a cookie then, which a script can drop, so
- * the caps are tight; the sitewide TALK_SESSIONS counter (lib/quota.ts) and the free talk time hold the rest.
+ * the turn cap is tight; the free talk time is what bounds the cost (a session charges its minutes up front), so
+ * the session count only stops a loop, and failed or retried starts must not lock a real visitor out for the day.
+ * The sitewide TALK_SESSIONS counter (lib/quota.ts) holds the rest.
  */
-export const UNGUARDED_SESSIONS_PER_DAY = 3;
+export const UNGUARDED_SESSIONS_PER_DAY = 10;
 export const UNGUARDED_TURNS_PER_DAY = 60;
 /** Voice time a visitor gets a day, charged per session when the token is minted and refunded on revoke. */
 export const FREE_TALK_SECONDS_PER_DAY = 300;

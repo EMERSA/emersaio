@@ -139,13 +139,13 @@ test('without TURNSTILE_SECRET: no siteverify call, the session is counted ungua
   assert.equal(first.status, 200);
   assert.deepEqual(seen, ['https://api.convai.com/user/connect']);
   assert.ok(kinds(m).includes('unguarded'));
-  assert.equal(UNGUARDED_SESSIONS_PER_DAY, 3);
+  assert.equal(UNGUARDED_SESSIONS_PER_DAY, 10);
   for (let i = 1; i < UNGUARDED_SESSIONS_PER_DAY; i++) {
     assert.equal((await call(SESSION, jsonPost(good, { cookie: v.cookie }), env)).status, 200, `session ${i + 1}`);
   }
-  const fourth = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
-  assert.equal(fourth.status, 429);
-  assert.ok(Number(fourth.headers.get('retry-after')) > 0);
+  const over = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  assert.equal(over.status, 429);
+  assert.ok(Number(over.headers.get('retry-after')) > 0);
   // The guarded deployment keeps its wider cap for the same visitor.
   const guarded = talkEnv();
   const g = await visitor(guarded.db);

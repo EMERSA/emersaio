@@ -17,7 +17,7 @@ repository: `scripts/preflight.mjs` fails the build when a key shape or a secret
 ### Running without `TURNSTILE_SECRET`
 
 `POST /api/talk/session` works with the secret unset: it skips the person check, counts the session as
-`unguarded` in Analytics Engine and applies the tighter per-visitor caps (3 sessions and 60 turns a day instead
+`unguarded` in Analytics Engine and applies the tighter per-visitor caps (10 sessions and 60 turns a day instead
 of 20 and 200, `capsFor()` in `worker/lib/memory.ts`). The spend caveat: the per-visitor caps and the free
 five minutes of talk time (`talk_seconds`) key off the `em_vid` cookie, and a script that drops the cookie is a
 new visitor each time, so without Turnstile they do not bound what one person can spend. What does bound it is

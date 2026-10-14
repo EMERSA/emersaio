@@ -8,7 +8,7 @@
  * skipped. Talk, the brain and memory count MEMORY and VISITOR_HMAC_KEY as things they need (lib/visitor.ts).
  *
  * TURNSTILE_SECRET is optional on purpose: without it POST /api/talk/session skips the person check, counts the
- * session as "unguarded" and runs on the tighter unguarded caps (lib/memory.ts capsFor: 3 sessions and 60 turns
+ * session as "unguarded" and runs on the tighter unguarded caps (lib/memory.ts capsFor: 10 sessions and 60 turns
  * a visitor a day instead of 20 and 200). The sitewide TALK_SESSIONS counter (lib/quota.ts) and the free
  * talk-time budget apply either way.
  */
