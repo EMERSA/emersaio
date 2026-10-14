@@ -74,7 +74,7 @@ export const site = {
       },
       {
         term: 'What Emily remembers',
-        text: 'What you say, what she replies, a few facts you mention (such as your name, your company or what you are interested in) and any file you add. She keeps this so she can pick up where you left off.',
+        text: 'What you say, what she replies, a few facts you mention (such as your name, your company or what you are interested in) and any file you add (its first 6,000 characters go to Emily). She keeps this so she can pick up where you left off.',
       },
       {
         term: 'How long',

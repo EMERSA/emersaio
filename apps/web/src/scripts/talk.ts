@@ -20,7 +20,7 @@ const TURNSTILE_WAIT_MS = 15000;
 export const CONSENT_VERSION = 2;
 const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
 const UPLOAD_TYPES = /\.(pdf|txt|md)$/i;
-/** The Worker keeps 20,000 characters of a document; the local copy given to Emily is cut the same way. */
+/** The Worker keeps 20,000 characters of a document; the session hands Emily the first 6,000 of them. */
 const DOCUMENT_MAX_CHARS = 20000;
 
 type Notice = keyof typeof copy.notices;
@@ -233,7 +233,10 @@ class Controller {
   private readonly ui: Ui;
   private session: TalkSession | null = null;
   private being: TalkBeing = NO_BEING;
+  /** The microphone as achieved (open) and as intended (the button down): they differ while it is opening. */
   private held = false;
+  private wantMic = false;
+  private micOp: Promise<void> = Promise.resolve();
   private starting = false;
   /** The person check is skipped when the build has no site key. */
   private guarded = true;
@@ -266,6 +269,13 @@ class Controller {
     ui.mic.addEventListener('keyup', (event) => {
       if (event.key === ' ' || event.key === 'Enter') release();
     });
+    // Losing the button, the window or the tab releases it too: the microphone is open only while it is held.
+    ui.mic.addEventListener('blur', release);
+    window.addEventListener('blur', release);
+    window.addEventListener('pagehide', release);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) release();
+    });
     ui.file.addEventListener('change', () => void this.upload());
     ui.memoryOpen.addEventListener('click', () => void this.toggleMemory());
     ui.forget.addEventListener('click', () => void this.forget());
@@ -290,10 +300,7 @@ class Controller {
     ui.consent.hidden = false;
     ui.session.hidden = true;
     ui.label.textContent = copy.monitorConsentLabel;
-    void mountTurnstile(ui).then((state) => {
-      this.guarded = state !== 'skip';
-      if (state === false) this.notice('check');
-    });
+    this.guarded = Boolean(ui.turnstile.dataset.sitekey);
     ui.start.focus({ preventScroll: true });
   }
 
@@ -303,15 +310,22 @@ class Controller {
     this.starting = true;
     primeAudio();
     const { ui } = this;
-    ui.start.disabled = true;
+    ui.start.setAttribute('aria-disabled', 'true');
     ui.start.textContent = copy.starting;
     this.notice(null);
+    // The person check loads only now, on the tap, never on opening the panel.
     if (this.guarded && !turnstileToken) this.notice('checkPending');
-    void this.connect().finally(() => {
-      this.starting = false;
-      ui.start.disabled = false;
-      ui.start.textContent = copy.start;
-    });
+    void mountTurnstile(ui)
+      .then((state) => {
+        if (state === false) throw new Error('turnstile');
+        return this.connect();
+      })
+      .catch(() => this.notice('check'))
+      .finally(() => {
+        this.starting = false;
+        ui.start.removeAttribute('aria-disabled');
+        ui.start.textContent = copy.start;
+      });
   }
 
   private async connect(): Promise<void> {
@@ -328,7 +342,7 @@ class Controller {
       ui.session.hidden = false;
       ui.label.textContent = copy.monitorLabel;
       ui.state.textContent = copy.starting;
-      const session = await mod.TalkSession.start({
+      const session = new mod.TalkSession({
         being,
         turnstile,
         consentVersion: CONSENT_VERSION,
@@ -351,11 +365,19 @@ class Controller {
         onNotice: (notice) => this.notice(RUNTIME_NOTICES[notice] ?? 'failed'),
         onVoice: (speaking) => this.setSpeaking(speaking),
       });
+      // Held from the first moment, so Close, Escape or a tour start during the connect ends this session rather
+      // than leaving it live behind a hidden panel.
+      this.session = session;
+      await session.start();
+      if (this.session !== session) {
+        await session.end('visitor').catch(() => undefined);
+        return;
+      }
       if (session.state !== 'live') {
+        this.session = null;
         await session.end('error');
         throw new Error(session.state);
       }
-      this.session = session;
       ui.input.focus({ preventScroll: true });
     } catch {
       this.session = null;
@@ -381,16 +403,39 @@ class Controller {
     this.ui.stage?.classList.toggle('is-speaking', speaking);
   }
 
-  /** The Speak button held (the microphone open) or released. A refused microphone leaves the typed path. */
-  private async hold(down: boolean): Promise<void> {
-    if (!this.session || this.held === down) return;
-    if (down) {
-      primeAudio();
-      this.held = await this.session.startListening().catch(() => false);
-    } else {
-      await this.session.stopListening().catch(() => undefined);
-      this.held = false;
+  /**
+   * The microphone button pressed (the microphone opens) or released (it closes). Opening takes time (the browser's
+   * permission prompt, the audio track), and the visitor may let go meanwhile, so the intended state is recorded
+   * at once and every change is applied in order, each one re-reading the intent when it finishes: a button that
+   * is up by then closes the microphone it just opened. A refused microphone leaves the typed path.
+   */
+  private hold(down: boolean): Promise<void> {
+    if (!this.session && !this.held) return Promise.resolve();
+    if (down) primeAudio();
+    this.wantMic = down;
+    this.micOp = this.micOp.then(() => this.settleMic());
+    return this.micOp;
+  }
+
+  private async settleMic(): Promise<void> {
+    const session = this.session;
+    if (this.wantMic && !this.held && session) {
+      this.held = await session.startListening().catch(() => false);
+      this.reflectMic();
+      // Released while it was opening: close it again, in order.
+      if (!this.wantMic && this.held) await this.closeMic(session);
+    } else if (!this.wantMic && this.held) {
+      await this.closeMic(session);
     }
+  }
+
+  private async closeMic(session: TalkSession | null): Promise<void> {
+    if (session) await session.stopListening().catch(() => undefined);
+    this.held = false;
+    this.reflectMic();
+  }
+
+  private reflectMic(): void {
     this.ui.mic.setAttribute('aria-pressed', String(this.held));
     this.ui.state.textContent = this.held ? copy.listening : '';
     this.being.setListening(this.held);
@@ -461,22 +506,25 @@ class Controller {
     try {
       const response = await fetch('/api/memory', { credentials: 'same-origin' });
       if (!response.ok) throw new Error(String(response.status));
-      const data = (await response.json()) as {
-        facts?: Array<{ key: string; value: string }>;
-        turns?: Array<{ role: string; text: string }>;
-        documents?: Array<{ name: string; chars: number }>;
+      const data: unknown = await response.json();
+      const list = (name: string): Record<string, unknown>[] => {
+        const value = data && typeof data === 'object' ? (data as Record<string, unknown>)[name] : undefined;
+        return Array.isArray(value)
+          ? value.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+          : [];
       };
+      const text = (value: unknown): string => (typeof value === 'string' ? value : '');
       fill(
         facts,
-        (data.facts ?? []).map((f) => `${f.key}: ${f.value}`),
+        list('facts').map((f) => `${text(f.key)}: ${text(f.value)}`),
       );
       fill(
         files,
-        (data.documents ?? []).map((d) => d.name),
+        list('documents').map((d) => text(d.name)),
       );
       fill(
         turns,
-        (data.turns ?? []).map((t) => `${t.role === 'user' ? copy.you : copy.emily}: ${t.text}`),
+        list('turns').map((t) => `${t.role === 'user' ? copy.you : copy.emily}: ${text(t.text)}`),
       );
     } catch {
       this.notice('failed');
@@ -490,6 +538,7 @@ class Controller {
       for (const list of [this.ui.facts, this.ui.files, this.ui.turns]) fill(list, []);
       this.ui.log.replaceChildren();
       await this.end(false);
+      (await import('@emersa/being/talk')).forgetSdkStorage();
       this.status(copy.forgotten);
     } catch {
       this.notice('failed');
@@ -501,6 +550,7 @@ class Controller {
     const session = this.session;
     this.session = null;
     this.live = {};
+    this.wantMic = false;
     this.held = false;
     this.being.setListening(false);
     this.setSpeaking(false);
@@ -523,6 +573,7 @@ class Controller {
       // The tour keeps the panel if it is running; otherwise it goes.
       if (!document.documentElement.classList.contains('is-touring')) ui.panel.hidden = true;
       this.notice(null);
+      document.querySelector<HTMLElement>('.hero-ctas [data-talk-open]')?.focus({ preventScroll: true });
     }
   }
 

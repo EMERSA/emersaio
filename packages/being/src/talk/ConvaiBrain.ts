@@ -42,8 +42,32 @@ export interface ConvaiSdk {
 }
 
 /** The one dynamic import of the SDK: /core and /vanilla only, never the root, which pulls React. */
+/**
+ * The SDK's logger (loglevel, through livekit-client) persists its level the moment the module loads: about
+ * fifteen `loglevel:*` keys in local storage, or a cookie where storage is blocked. The site promises three keys
+ * and one cookie, so they are removed again here; loglevel reads them only when a logger is created, so nothing
+ * changes for the SDK. Called after the import and again by `forgetSdkStorage` whenever the visitor forgets.
+ */
+export function forgetSdkStorage(): void {
+  try {
+    for (const key of Object.keys(localStorage)) if (key.startsWith('loglevel')) localStorage.removeItem(key);
+  } catch {
+    // Storage blocked: the cookie fallback below is the one that may have been set.
+  }
+  try {
+    for (const pair of document.cookie.split(';')) {
+      const name = pair.slice(0, pair.indexOf('=')).trim();
+      // biome-ignore lint/suspicious/noDocumentCookie: clearing a cookie the SDK's logger set; cookieStore is not everywhere yet
+      if (name.startsWith('loglevel')) document.cookie = `${name}=; Max-Age=0; Path=/`;
+    }
+  } catch {
+    // No document (tests).
+  }
+}
+
 export const loadConvaiSdk = async (): Promise<ConvaiSdk> => {
   const [core, vanilla] = await Promise.all([import('@convai/web-sdk/core'), import('@convai/web-sdk/vanilla')]);
+  forgetSdkStorage();
   return {
     createClient: (config) => new core.ConvaiClient(config) as unknown as ConvaiClientLike,
     createAudioRenderer: (room) =>

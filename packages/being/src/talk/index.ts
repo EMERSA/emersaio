@@ -10,6 +10,7 @@ export {
   type ConvaiClientLike,
   type ConvaiSdk,
   type ConvaiState,
+  forgetSdkStorage,
   loadConvaiSdk,
   type Speaker,
   type TalkBeing,
