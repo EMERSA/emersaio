@@ -240,6 +240,17 @@
 }
 
 /* ---------- The Talk views ---------- */
+/* The one line that says how to talk: type, or hold the microphone. */
+.monitor-howto {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--phos);
+}
+
+.monitor-mic {
+  gap: 0.5rem;
+}
+
 .talk-terms {
   display: grid;
   gap: 0.5rem;

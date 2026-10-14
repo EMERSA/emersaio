@@ -80,14 +80,14 @@ if (args.mock) {
       'monitor opens over the being',
       await page.evaluate(() => document.documentElement.classList.contains('is-talking')),
     );
-    check('Speak button present', (await page.locator('[data-talk-mic]').count()) === 1);
+    check('microphone button present', (await page.locator('[data-talk-mic]').count()) === 1);
     const consent = (await page.locator('[data-talk-consent]').textContent()) ?? '';
     for (const phrase of [
       'Convai Technologies',
       'Cloudflare',
       'Microsoft',
       '12 months',
-      'Speak button',
+      'microphone button',
       'Emily is an AI',
     ]) {
       check(`consent mentions ${phrase}`, consent.includes(phrase));

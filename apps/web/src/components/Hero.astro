@@ -8,7 +8,7 @@
  *
  * The monitor is the one HUD drawn over the being: a translucent panel in phosphor green, like an old terminal,
  * that carries the tour's captions and controls while the tour runs and the Talk conversation (consent, then the
- * typed log with the Speak button) when the visitor opens it. It is hidden until either starts. While the tour
+ * typed log with the hold-to-speak microphone button) when the visitor opens it. It is hidden until either starts. While the tour
  * scrolls the page it pins to the bottom edge as a full-width band (hud.css). Copy comes from site.ts; the scripts
  * find everything through data attributes, never ids.
  */
@@ -90,6 +90,7 @@ const { hero, tour, talk, a11y } = site;
 
     <div class="monitor-view talk-session" data-talk-session hidden>
       <p class="monitor-label talk-state" data-talk-state aria-live="polite"></p>
+      <p class="monitor-howto">{talk.howTo}</p>
       <ol class="talk-log" data-talk-log aria-live="polite" aria-label={talk.title}></ol>
       <form class="talk-type" data-talk-form>
         <label class="sr-only" for="talk-input">{talk.typeLabel}</label>
@@ -107,8 +108,13 @@ const { hero, tour, talk, a11y } = site;
         <button type="submit" class="monitor-btn">{talk.send}</button>
       </form>
       <div class="talk-actions">
-        <button type="button" class="monitor-btn" data-talk-mic aria-pressed="false" aria-label={a11y.speakButton}>
-          {talk.speak}
+        <button type="button" class="monitor-btn monitor-mic" data-talk-mic aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+            <path
+              d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+              fill="currentColor"></path>
+          </svg>
+          <span>{talk.speak}</span>
         </button>
         <label class="monitor-btn talk-upload">
           {talk.upload}

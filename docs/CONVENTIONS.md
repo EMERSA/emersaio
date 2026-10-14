@@ -43,7 +43,7 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
   `[data-tour]`, `[data-tour-start]`, `[data-tour-next]`, `[data-tour-back]`, `[data-tour-mute]`,
   `[data-tour-transcript]` (the no-script transcript, opened when no tour could be built), `[data-theme-toggle]`,
   `[data-menu]`, `[data-monitor]` (the green HUD over the being: `[data-monitor-label]`, `[data-tour-view]`,
-  `[data-talk-open]`, `[data-talk-consent]`, `[data-talk-session]`, `[data-talk-mic]` the push-to-talk Speak button,
+  `[data-talk-open]`, `[data-talk-consent]`, `[data-talk-session]`, `[data-talk-mic]` the push-to-talk microphone button,
   `[data-talk-close]`), `[data-story-step]` (the About timeline the tour points at), `[data-reveal]`, `[data-marquee]` and `[data-marquee-toggle]` (the partner
   marquee and its pause control). State classes: `is-ready`,
   `is-fallback`, `is-speaking`, `is-listening`, `is-touring`, `is-talking` (the conversation is open), `is-open`, `is-paused` (the marquee), and for reveals
