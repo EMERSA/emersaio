@@ -111,6 +111,10 @@
   --dur-fast: 160ms;
   --dur: 240ms;
   --dur-slow: 720ms;
+
+  /* The QR code generator's default inks: navy on white, so any scanner reads the print. */
+  --qr-fg: #040918;
+  --qr-bg: #ffffff;
 }
 
 @media (max-width: 399.98px) {
@@ -192,4 +196,8 @@
   --phos: #0b5d3a;
   --phos-dim: #1f7a4f;
   --phos-halo: 0 0 2px #faf6ee, 0 0 6px #faf6ee, 0 1px 3px rgba(250, 246, 238, 0.9);
+
+  /* The QR code's default inks are the same in both themes: the code is printed, not themed. */
+  --qr-fg: #040918;
+  --qr-bg: #ffffff;
 }

@@ -1,0 +1,100 @@
+---
+/**
+ * Stay safe: free advice between the products and the technology. An ordered list of the eight checks in two
+ * columns from 768 px, a closing line, the link to the full guide and the Report button (a mailto with a short
+ * template, so it works without JavaScript). Same section, eyebrow and title classes as the other sections.
+ */
+import { site } from '../data/site.ts';
+
+const { staySafe, report } = site;
+---
+
+<section id="stay-safe" class="stay-safe section" aria-labelledby="stay-safe-title" data-reveal>
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">{staySafe.eyebrow}</p>
+      <h2 id="stay-safe-title">{staySafe.title}</h2>
+      <p class="lead">{staySafe.lead}</p>
+    </div>
+
+    <ol class="checks">
+      {
+        staySafe.items.map((item) => (
+          <li class="check">
+            <h3 class="check-title">{item.title}</h3>
+            <p class="check-text">{item.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+
+    <p class="closing">{staySafe.closing}</p>
+    <p class="actions">
+      <a class="btn btn-ghost btn-sm" href={staySafe.guide.href}>{staySafe.guide.label}</a>
+      <a class="btn btn-ghost btn-sm" href={report.href} title={report.hint}>{report.long}</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  /* The list numbers itself: a tabular figure in the accent colour, the text to its right. */
+  .checks {
+    display: grid;
+    gap: 1.5rem 2rem;
+    max-width: 960px;
+    padding: 0;
+    list-style: none;
+    counter-reset: check;
+  }
+
+  .check {
+    position: relative;
+    display: grid;
+    gap: 0.4rem;
+    padding-left: 2.5rem;
+    counter-increment: check;
+  }
+
+  .check::before {
+    content: counter(check, decimal-leading-zero);
+    position: absolute;
+    top: 0.2rem;
+    left: 0;
+    font-family: var(--font-body);
+    font-size: var(--text-legal);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tracking-number);
+    color: var(--accent-text);
+  }
+
+  .check-title {
+    font-size: var(--text-base);
+  }
+
+  .check-text {
+    max-width: 52ch;
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
+  .closing {
+    max-width: 60ch;
+    margin-top: 2.5rem;
+    color: var(--ink-2);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .checks {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

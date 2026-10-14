@@ -35,7 +35,11 @@ export default defineConfig({
       rolldownOptions: {
         output: {
           codeSplitting: {
-            groups: [{ name: 'three', test: /node_modules[\\/]three[\\/]/ }],
+            groups: [
+              { name: 'three', test: /node_modules[\\/]three[\\/]/ },
+              // The QR encoder and its two helpers, loaded on the first focus inside the QR card (tools-boot.ts).
+              { name: 'qr', test: /node_modules[\\/](?:qrcode|dijkstrajs|encode-utf8)[\\/]/ },
+            ],
           },
         },
       },

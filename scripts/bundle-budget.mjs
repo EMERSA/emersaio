@@ -42,6 +42,7 @@ const LIMITS = {
   threeWarn: 185 * KB,
   being: 30 * KB,
   talk: 200 * KB,
+  qr: 40 * KB,
 };
 
 if (!existsSync(join(dist, 'index.html'))) {
@@ -89,9 +90,12 @@ const THREE_MARK = /THREE\.(?:WebGLRenderer|Object3D|BufferGeometry|Material|GLT
 // own shader chunks use too and would make the three chunk read as "three+being".
 const BEING_MARK = /uTokenRate|uTokenPulse|@emersa\/being/;
 const TALK_MARK = /convai|livekit/i;
+/** The QR encoder (qrcode) by its own markers. */
+const QR_MARK = /qr-code\.png|errorCorrectionLevel/i;
 
 /**
- * three | being | talk | tour | pre | content | shared. "shared" chunks take the class of whoever reaches them.
+ * three | being | talk | tour | qr | pre | content | shared. "shared" chunks take the class of whoever
+ * reaches them.
  * Astro names a component's script "<Component>.astro_astro_type_script_…", so Base (main.ts) and Hero (hero.ts and
  * being-mount.ts) are matched by their component names as well as by the source names a manual chunk would carry.
  */
@@ -104,15 +108,19 @@ function classify(chunk) {
   if (TALK_MARK.test(chunk.code) || /^talk/i.test(s)) return 'talk';
   if (being) return 'being';
   if (/^tour(-ui)?\b/i.test(s)) return 'tour';
-  if (/^(main|hero|theme-boot|Base\.astro|Hero\.astro)(?:[._-]|$)/i.test(s)) return 'pre';
+  if (QR_MARK.test(chunk.code) || /^qr(code)?\b/i.test(s)) return 'qr';
+  if (/^(main|hero|theme-boot|tools-boot|Base\.astro|Hero\.astro|Tools\.astro)(?:[._-]|$)/i.test(s)) return 'pre';
   return 'shared';
 }
 for (const chunk of chunks.values()) chunk.class = classify(chunk);
 
 /** Loaded after LCP + idle on hover-capable desktops, on a tap elsewhere: never part of the pre-interaction set. */
 const HEAVY = new Set(['three', 'being', 'talk', 'three+being']);
-/** Loaded on the Start tap (or a ?tour= deep link), so interaction-only. */
-const ON_TAP = new Set(['tour']);
+/**
+ * Loaded on a gesture only: the tour on Start (or a ?tour= deep link), the game on Play, the QR encoder on the first
+ * focus or tap inside its card.
+ */
+const ON_TAP = new Set(['tour', 'qr']);
 
 const failures = [];
 const warnings = [];
@@ -221,6 +229,9 @@ if (byClass('three+being').length) {
 }
 const talk = byClass('talk');
 if (talk.length) judge('talk chunk(s) (Phase 2, tap only)', sum(talk), LIMITS.talk);
+const qr = byClass('qr');
+if (qr.length) judge('qr chunk(s) (the encoder, on the first focus)', sum(qr), LIMITS.qr);
+else rows.push(['qr chunk(s) (the encoder, on the first focus)', 'absent', kb(LIMITS.qr), 'skip']);
 
 // Print.
 const table = (header, body) => {

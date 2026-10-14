@@ -11,15 +11,21 @@ updated: 2026-10-14
 
 A synthetic being is a character with three abilities: it sees, it remembers and it acts. It perceives the place it is in, whether that place is a game level, a dashboard or a network. It keeps a memory of the people it meets and the things that happened. And it takes the next step on its own, within limits that a human sets.
 
+Emersa builds beings for four kinds of work: compliance, machine learning, cybersecurity and resilience. Emily Wilson carries out procedures with the people in an enterprise and leaves an audit trail behind her; Krupiq watches a network from inside a decoy of it. The idea started in games, which is where the history below begins.
+
 The word "synthetic" is deliberate. A being is made, not born, and it should say so. On this site the guide introduces herself as a synthetic being, her voice is labelled as AI-generated, and she is drawn as the structure beneath the skin rather than as a photograph of a person.
 
 ## Where the idea came from
+
+The idea came first, in 2021: a character that remembers and acts on its own, and the first research and prototypes around it.
 
 Emersa started in London in 2023 as a games studio. We were unhappy with how characters in games behaved: scripted, forgetful and lifeless. A character would greet you the same way on the hundredth visit as on the first, and forget you the moment you walked out of the room.
 
 In 2024 we gave our characters memory, perception and intent. They remembered the player, read the room and acted on their own. People stopped calling them NPCs.
 
-By 2025 the characters had outgrown the games. A character that can see, remember and act is useful wherever people need guidance, and that is most workplaces. We gave the idea a name.
+By 2025 the characters had outgrown the games. A character that can see, remember and act is useful wherever people need guidance, and that is most workplaces. We gave the idea a name, and Emily Wilson took her first enterprise work.
+
+In 2026 the beings turned to defence: Krupiq, a living decoy network, and Emily's swarm for compliance work. Emersa was accepted into NVIDIA Inception and the SUSE partner programme.
 
 ## How a being differs from a chatbot
 
@@ -32,7 +38,7 @@ A chatbot waits for text and answers with text. A being has a place and a body. 
 
 ## Two beings, one lineage
 
-Emersa makes two of them today. Emily Wilson is the enterprise hologram assistant: an ambient, agentic assistant that sees your dashboards, remembers your procedures and walks your people through them. Krupiq guards networks by laying a living decoy over them.
+Emersa makes two of them today, for cybersecurity and compliance. Emily Wilson is the enterprise agentic platform: a swarm of agents that sees your systems, remembers your procedures and carries them out with your people. Krupiq guards networks by laying a living decoy over them and proving what it did.
 
 They share one lineage of code: the same rendering, the same memory model and the same rules about consent and honesty.
 

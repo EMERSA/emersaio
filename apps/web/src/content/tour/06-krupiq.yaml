@@ -1,6 +1,6 @@
 id: krupiq
 order: 6
-anchor: "[data-product=\"krupiq\"]"
+anchor: "[data-story-step=\"2026\"]"
 text: "Krupiq is my sibling in security. It lays a living decoy over a network, so intruders spend their night somewhere that does not exist."
-highlight: "[data-product=\"krupiq\"]"
+highlight: "[data-story-step=\"2026\"]"
 dwellMs: 500

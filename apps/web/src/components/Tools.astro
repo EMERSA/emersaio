@@ -1,0 +1,410 @@
+---
+/**
+ * One tool after the partners: the zero-knowledge QR code generator (scripts/qr.ts, loaded on the first focus or
+ * tap inside its card). Without JavaScript the form shows with a note; nothing typed here ever leaves the device.
+ * The script's status copy rides on data attributes so the chunk never imports site.ts. Colour inputs carry no
+ * value: tools-boot.ts fills them from the --qr-fg and --qr-bg tokens.
+ */
+import { site } from '../data/site.ts';
+
+const { tools } = site;
+const { qr } = tools;
+const modes = Object.entries(qr.modes) as [keyof typeof qr.modes, string][];
+---
+
+<section id="tools" class="section tools" aria-labelledby="tools-title" data-reveal>
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">{tools.eyebrow}</p>
+      <h2 id="tools-title">{tools.title}</h2>
+      <p class="lead">{tools.lead}</p>
+    </div>
+
+    <div class="tools-grid">
+      <article
+        id="qr"
+        class="card tool"
+        aria-labelledby="qr-title"
+        data-qr
+        data-qr-status-empty={qr.status.empty}
+        data-qr-status-ready={qr.status.ready}
+        data-qr-status-wiped={qr.status.wiped}
+        data-qr-status-too-long={qr.status.tooLong}
+      >
+        <h3 class="tool-title" id="qr-title">{qr.title}</h3>
+        <p class="tool-lead">{qr.lead}</p>
+
+        <form class="qr-form" data-qr-form autocomplete="off">
+          <fieldset class="modes">
+            <legend class="sr-only">{qr.modesLabel}</legend>
+            {
+              modes.map(([key, label], index) => (
+                <label class="mode">
+                  <input type="radio" name="qr-mode" value={key} data-qr-mode checked={index === 0} />
+                  <span>{label}</span>
+                </label>
+              ))
+            }
+          </fieldset>
+
+          <div class="panel" data-qr-panel="link">
+            <label class="field">
+              <span class="field-label">{qr.fields.url}</span>
+              <input type="url" inputmode="url" data-qr-field="url" placeholder={qr.fields.urlPlaceholder} />
+            </label>
+          </div>
+
+          <div class="panel" data-qr-panel="text" hidden>
+            <label class="field">
+              <span class="field-label">{qr.fields.text}</span>
+              <textarea rows="3" data-qr-field="text" placeholder={qr.fields.textPlaceholder}></textarea>
+            </label>
+          </div>
+
+          <div class="panel" data-qr-panel="wifi" hidden>
+            <label class="field">
+              <span class="field-label">{qr.fields.ssid}</span>
+              <input type="text" data-qr-field="ssid" />
+            </label>
+            <label class="field">
+              <span class="field-label">{qr.fields.password}</span>
+              <input type="text" data-qr-field="password" />
+            </label>
+            <div class="row">
+              <label class="field">
+                <span class="field-label">{qr.fields.security}</span>
+                <select data-qr-field="auth">
+                  <option value="WPA">{qr.fields.securityWpa}</option>
+                  <option value="WEP">{qr.fields.securityWep}</option>
+                  <option value="nopass">{qr.fields.securityNone}</option>
+                </select>
+              </label>
+              <label class="check">
+                <input type="checkbox" data-qr-field="hidden" />
+                <span>{qr.fields.hiddenNetwork}</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="panel" data-qr-panel="contact" hidden>
+            <div class="row">
+              <label class="field">
+                <span class="field-label">{qr.fields.firstName}</span>
+                <input type="text" data-qr-field="first" />
+              </label>
+              <label class="field">
+                <span class="field-label">{qr.fields.lastName}</span>
+                <input type="text" data-qr-field="last" />
+              </label>
+            </div>
+            <label class="field">
+              <span class="field-label">{qr.fields.organisation}</span>
+              <input type="text" data-qr-field="org" />
+            </label>
+            <div class="row">
+              <label class="field">
+                <span class="field-label">{qr.fields.phone}</span>
+                <input type="tel" data-qr-field="tel" />
+              </label>
+              <label class="field">
+                <span class="field-label">{qr.fields.email}</span>
+                <input type="email" data-qr-field="cemail" />
+              </label>
+            </div>
+            <label class="field">
+              <span class="field-label">{qr.fields.website}</span>
+              <input type="url" data-qr-field="curl" />
+            </label>
+          </div>
+
+          <div class="panel" data-qr-panel="email" hidden>
+            <label class="field">
+              <span class="field-label">{qr.fields.to}</span>
+              <input type="email" data-qr-field="to" placeholder={qr.fields.toPlaceholder} />
+            </label>
+            <label class="field">
+              <span class="field-label">{qr.fields.subject}</span>
+              <input type="text" data-qr-field="subject" />
+            </label>
+            <label class="field">
+              <span class="field-label">{qr.fields.message}</span>
+              <textarea rows="3" data-qr-field="body"></textarea>
+            </label>
+          </div>
+
+          <details class="options">
+            <summary>{qr.options.summary} <span class="muted">{qr.options.hint}</span></summary>
+            <div class="row">
+              <label class="field">
+                <span class="field-label">{qr.options.errorCorrection}</span>
+                <select data-qr-field="ec">
+                  <option value="L">{qr.options.ecLow}</option>
+                  <option value="M" selected>{qr.options.ecMedium}</option>
+                  <option value="Q">{qr.options.ecQuartile}</option>
+                  <option value="H">{qr.options.ecHigh}</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-label">{qr.options.size} <span class="num" data-qr-size-value></span></span>
+                <input type="range" min="256" max="1024" step="64" value="512" data-qr-field="size" />
+              </label>
+            </div>
+            <div class="row swatches">
+              <label class="swatch">
+                <input type="color" data-qr-color="fg" />
+                <span>{qr.options.foreground}</span>
+              </label>
+              <label class="swatch">
+                <input type="color" data-qr-color="bg" />
+                <span>{qr.options.background}</span>
+              </label>
+              <label class="check">
+                <input type="checkbox" data-qr-field="transparent" />
+                <span>{qr.options.transparent}</span>
+              </label>
+            </div>
+          </details>
+        </form>
+
+        <div class="output">
+          <canvas class="qr-canvas" data-qr-canvas width="256" height="256" role="img" aria-label={qr.canvasLabel}
+          ></canvas>
+          <p class="status small" data-qr-status role="status" aria-live="polite"></p>
+          <div class="actions">
+            <a class="btn btn-ghost btn-sm" data-qr-png download="qr-code.png" aria-disabled="true">{qr.downloadPng}</a>
+            <a class="btn btn-ghost btn-sm" data-qr-svg download="qr-code.svg" aria-disabled="true">{qr.downloadSvg}</a>
+            <button type="button" class="btn btn-ghost btn-sm" data-qr-wipe>{qr.wipe}</button>
+          </div>
+        </div>
+        <noscript><p class="note small">{qr.noScript}</p></noscript>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../scripts/tools-boot.ts';
+</script>
+
+<style>
+  .tools-grid {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .tool-title {
+    font-size: var(--text-title);
+  }
+
+  .tool-lead {
+    color: var(--ink-2);
+  }
+
+  .qr-form {
+    margin-top: 1.25rem;
+  }
+
+  .qr-form > * + * {
+    margin-top: 1rem;
+  }
+
+  /* The modes: radio pills, the native input kept for keyboards and assistive technology. */
+  .modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .mode input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .mode span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 1rem;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-button);
+    text-transform: uppercase;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-fast),
+      color var(--dur-fast);
+  }
+
+  .mode input:checked + span {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+  }
+
+  .mode input:focus-visible + span {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .panel > * + *,
+  .options > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .row {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 480px) {
+    .row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: end;
+    }
+  }
+
+  .field {
+    display: block;
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: var(--text-sm);
+    color: var(--ink-muted);
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius-sm);
+    background: var(--field-bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--text-base);
+  }
+
+  .field input[type='range'] {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .field textarea {
+    resize: vertical;
+  }
+
+  .field input:focus-visible,
+  .field select:focus-visible,
+  .field textarea:focus-visible,
+  .check input:focus-visible,
+  .swatch input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .check,
+  .swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+
+  .check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+  }
+
+  .swatch input {
+    width: 44px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius-sm);
+    background: var(--field-bg);
+  }
+
+  .swatches {
+    grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
+  }
+
+  .options summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+
+  .options summary:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  .output {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: center;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+
+  /* The preview keeps one size whatever the chosen download resolution (the script clears the encoder's inline size). */
+  .qr-canvas {
+    display: block;
+    width: min(100%, 240px);
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    background: var(--qr-bg);
+  }
+
+  .status {
+    min-height: 1.5em;
+    margin: 0;
+    text-align: center;
+    color: var(--ink-muted);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .actions a[aria-disabled='true'] {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .note {
+    color: var(--ink-muted);
+  }
+
+</style>

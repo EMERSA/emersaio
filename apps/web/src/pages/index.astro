@@ -1,7 +1,7 @@
 ---
 /**
  * The home page: the being's hero, then the sections in the order the scripted tour walks them: About, Products
- * (Emily first, Krupiq below her), Technology, Partners, the docs teaser and the tour transcript. Whitespace divides
+ * (Emily first, Krupiq below her), Stay safe, Technology, Partners, the docs teaser and the tour transcript. Whitespace divides
  * the page: no dividers and no bands.
  */
 import About from '../components/About.astro';
@@ -9,7 +9,9 @@ import DocsTeaser from '../components/DocsTeaser.astro';
 import Hero from '../components/Hero.astro';
 import Partners from '../components/Partners.astro';
 import Products from '../components/Products.astro';
+import StaySafe from '../components/StaySafe.astro';
 import Technology from '../components/Technology.astro';
+import Tools from '../components/Tools.astro';
 import TourTranscript from '../components/TourTranscript.astro';
 import Base from '../layouts/Base.astro';
 import { graph, organization } from '../lib/schema.ts';
@@ -21,8 +23,10 @@ const schema = graph(organization());
   <Hero />
   <About />
   <Products />
+  <StaySafe />
   <Technology />
   <Partners />
+  <Tools />
   <div class="teasers" data-reveal>
     <div class="container teasers-grid">
       <DocsTeaser />

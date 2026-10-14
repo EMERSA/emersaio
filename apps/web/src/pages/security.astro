@@ -4,7 +4,7 @@
  * Phase 1 build actually ships; keep it that way when the security posture changes.
  */
 import { legal } from '../data/legal';
-import { site } from '../data/site.ts';
+import { REPORT_MAILTO, site } from '../data/site.ts';
 import Base from '../layouts/Base.astro';
 
 const updated = '7 October 2026';
@@ -42,6 +42,10 @@ const measures = [
         Email <a href={`mailto:${legal.securityEmail}`}>{legal.securityEmail}</a>. A human reads it. Tell us what you
         found, where, how to reproduce it and what you think it could do. We will reply, keep you posted while we fix
         it, and credit you if you would like that.
+      </p>
+      <p>
+        Other incidents, such as a phishing email that uses our name or a problem with an Emersa product, go to
+        the same address; <a href={REPORT_MAILTO}>{site.report.long}</a> opens an email with a short template.
       </p>
       <p>
         Our machine-readable contact is published at{' '}

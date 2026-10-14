@@ -1,7 +1,7 @@
 ---
 /**
  * Sticky, solid top bar: the orange mark and the EMERSA wordmark, the primary navigation from site.nav inline from
- * 960 px, the theme toggle and, below 960 px, a CSS-only <details> menu sheet that works without JavaScript
+ * 960 px, the Talk and Report links, the theme toggle and, below 960 px, a CSS-only <details> menu sheet that works without JavaScript
  * (main.ts only adds closing on link tap and Escape). Flat --bg with a hairline: nothing to blur.
  */
 import { site } from '../data/site';
@@ -45,6 +45,9 @@ const isCurrent = (href: string): boolean => {
           </a>
         )
       }
+      <a class="nav-link talk-link report-link" href={site.report.href} title={site.report.hint}>
+        {site.report.label}
+      </a>
       <ThemeToggle />
       <details class="menu" data-menu>
         <summary class="menu-button" aria-label={site.a11y.menu}>
@@ -137,7 +140,12 @@ const isCurrent = (href: string): boolean => {
     color: var(--accent-text);
   }
 
-  /* On the narrowest phones the link would crowd the mark; the hero button and the menu still open Talk. */
+  .report-link {
+    color: var(--ink-2);
+  }
+
+  /* On the narrowest phones the links would crowd the mark; the hero button and the menu still open Talk, and
+     the Stay safe section and the footer still carry Report. */
   @media (max-width: 419.98px) {
     .talk-link {
       display: none;

@@ -36,6 +36,7 @@ Postmark as processors and has a cookies section.
 | Turnstile | Cloudflare's challenge signals | Protecting the paid session quota | Legitimate interests | Cloudflare | Per Cloudflare's Turnstile terms |
 | Daily quotas | Per-visitor turn, session and ASR-second counts | Abuse and cost control | Legitimate interests | Cloudflare D1 | 1 day |
 | File upload | The plain text of one PDF, .txt or .md file (at most 2 MB in, 20,000 characters kept), its name and size | Context the visitor asked Emily to read | Consent | Cloudflare (extraction in the Worker, D1 `document` row); the text reaches Convai as conversation context | Same as memory: 12 idle months or "Forget me". The file itself is never stored or forwarded |
+| QR code generator | Text typed into the generator | The tool the visitor chose | Strictly necessary for the chosen feature | None (never sent, never stored) | Not kept |
 
 Phase 2 additions, as built: consent version 2 (the Talk monitor notice) is recorded on the `visitor` row (`consent_version`, `last_seen`)
 by `POST /api/talk/session`; the cookie is `em_vid=<id>.<mac>; HttpOnly; Secure; SameSite=Lax; Path=/api`,

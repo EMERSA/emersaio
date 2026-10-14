@@ -50,6 +50,8 @@ const FORBIDDEN = [
 const TALK_BYTES = /convai|livekit|challenges\.cloudflare\.com|\/_astro\/talk[.-]|\/api\/(talk|memory|brain)/i;
 /** The renderer's chunk, which a touch device must not request before a tap (CONVENTIONS, Performance). */
 const THREE_CHUNK = /\/_astro\/three\./;
+/** The free tools' chunks (the QR encoder, qrcode itself, the game): nothing of them before an interaction. */
+const TOOL_CHUNKS = /\/_astro\/(?:qr|qrcode)[.-]/;
 const RADII = ['0px', '8px', '16px', '999px', '50%'];
 /** Slack between the page's own clock stamp of the mount and the request event reaching Node. */
 const MOUNT_SLACK_MS = 250;
@@ -122,7 +124,7 @@ try {
         page.on('request', (r) => {
           const url = new URL(r.url());
           if (url.pathname.startsWith('/api/')) apiRequests.push({ path: url.pathname, at: Date.now() });
-          if (TALK_BYTES.test(url.href)) talkRequests.push(url.href);
+          if (TALK_BYTES.test(url.href) || TOOL_CHUNKS.test(url.pathname)) talkRequests.push(url.href);
         });
         const issues = [];
         try {
@@ -243,7 +245,7 @@ try {
             else if (m.mount.kind !== 'ready')
               issues.push('the being fell back to the poster (is-fallback) with WebGL2 available');
           }
-          for (const href of talkRequests) issues.push(`talk bytes before any tap: ${href}`);
+          for (const href of talkRequests) issues.push(`talk or tool bytes before any tap: ${href}`);
           for (const r of apiRequests) {
             if (m.hasStage) {
               if (!m.mount) issues.push(`${r.path} requested but the being never mounted`);
@@ -293,7 +295,12 @@ try {
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
       page.on('request', (r) => {
         const url = new URL(r.url());
-        if (THREE_CHUNK.test(url.pathname) || url.pathname.startsWith('/api/') || TALK_BYTES.test(url.href))
+        if (
+          THREE_CHUNK.test(url.pathname) ||
+          TOOL_CHUNKS.test(url.pathname) ||
+          url.pathname.startsWith('/api/') ||
+          TALK_BYTES.test(url.href)
+        )
           early.push(url.pathname);
       });
       await page.goto(`${base}/`, { waitUntil: 'load', timeout: 60000 });

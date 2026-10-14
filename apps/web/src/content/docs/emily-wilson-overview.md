@@ -1,6 +1,6 @@
 ---
 title: Emily Wilson
-description: "The enterprise hologram assistant: what she does, how she deploys, and where the humans stay in charge."
+description: "The enterprise agentic platform: what she does, how her swarm deploys, and where the humans stay in charge."
 section: products
 order: 1
 tour: emily
@@ -9,7 +9,7 @@ updated: 2026-10-14
 
 ## What Emily is
 
-Emily Wilson is an ambient, agentic assistant for the enterprise. She sees your dashboards, remembers your procedures and walks your people through them, step by step. She is the same being that guides you around this site, with an enterprise persona and your organisation's knowledge behind her.
+Emily Wilson is an ambient, agentic platform for the enterprise. She sees your systems, remembers your procedures and carries them out with your people, step by step. She runs as a swarm of up to 100 agents, each with one job, on SUSE Linux Enterprise on your own machines. She is the same being that guides you around this site, with an enterprise persona and your organisation's knowledge behind her.
 
 "Ambient" means she is present in the room or on the screen without being summoned through a chat box. "Agentic" means she can take the next step herself, within a policy you set, instead of only describing it.
 
@@ -21,13 +21,13 @@ In practice this looks like a colleague who knows the runbook. She points at the
 
 ## Where she runs
 
-Emily deploys where your data lives: on-premises, in a sovereign cloud or fully air-gapped, with full observability in every case. Air-gapped means the whole stack, including the language models, runs inside your network with no path to the public internet. Nothing she hears, reads or remembers leaves your building unless you decide that it should.
+Emily deploys where your data lives: on-premises, in a sovereign cloud or fully air-gapped, with full observability in every case. The swarm runs on SUSE Linux Enterprise, up to 100 agents, each with one job. Air-gapped means the whole stack, including the language models, runs inside your network with no path to the public internet. Nothing she hears, reads or remembers leaves your building unless you decide that it should.
 
 Small, fast language models run close to your data on NVIDIA hardware, in your building or ours. Emersa was accepted into the NVIDIA Inception Program in February 2026 and is an approved SUSE partner at Innovate Sapphire tier, 2026.
 
 ## Humans in the loop
 
-Emily is built to assist, not to replace judgment. Sensitive actions wait for a human. Every step she takes is reversible, and every step is written to an immutable audit trail that your own people can read. You decide which actions she may take on her own, which need a confirmation and which she may only describe.
+Emily is built to assist, not to replace judgment. Sensitive actions wait for a human. Every step she takes is reversible, and every step is written to an immutable audit trail that your own people can read. That is what makes her fit for compliance work: every action is logged, reversible and attributable, so an audit is read, not reconstructed. You decide which actions she may take on her own, which need a confirmation and which she may only describe.
 
 ## Her knowledge
 

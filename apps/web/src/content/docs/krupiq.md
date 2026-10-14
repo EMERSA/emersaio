@@ -1,6 +1,6 @@
 ---
 title: Krupiq
-description: "A network that exists only for intruders. How Krupiq lays a living decoy over your real one."
+description: "Cybersecurity and compliance: how Krupiq lays a living decoy over your real network and proves what it did."
 section: products
 order: 2
 tour: krupiq
@@ -28,6 +28,17 @@ Krupiq overlays the network you already have. It is a separate thing that only a
 ## What it is not
 
 Krupiq is not a firewall and it is not an intrusion detection system that inspects your real traffic. It does not replace either. It adds a layer those tools do not have: a place for intruders to go that tells you they are there.
+
+## Cybersecurity and compliance
+
+Krupiq is a compliance tool that takes care of cybersecurity. Four things make that true:
+
+- Observe. Every packet the intruder sends is seen, from the first one. Nobody who belongs on your network touches the decoy, so there is no noise to filter.
+- Morph. Every five minutes the decoy takes a new shape. It looks like your network and contains nothing real.
+- Prove. Every change carries a signed proof, which can be checked offline, that the decoy was drawn exactly as published.
+- Comply. GDPR, NIS2, DORA and SEC duties are met by how it is built. A full audit of what was watched, what was touched and what was proved takes minutes and comes out as an immutable PDF.
+
+Krupiq runs on Windows, Linux and macOS, on your own machines. Nothing leaves your network.
 
 ## A being for security
 

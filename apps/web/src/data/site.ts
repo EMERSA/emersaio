@@ -3,6 +3,7 @@
  * carry copy of their own. Plain language, no jargon, no claims we cannot back.
  */
 import type { DocSection } from '../content.config.ts';
+import { legal } from './legal.ts';
 
 export interface NavItem {
   label: string;
@@ -26,18 +27,29 @@ const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'https://emersa.io').replace
 /** The one address for everything: demos, privacy requests and vulnerability reports. */
 export const CONTACT_MAILTO = 'mailto:4d@emersa.io?subject=Emily%20Wilson';
 
+/** Report an incident: the same inbox as vulnerability reports, with a short template in the body. */
+const REPORT_BODY = [
+  'What happened:',
+  'When (date, time and time zone):',
+  'What you saw (addresses, sender, screenshots attached):',
+  'Does it involve an Emersa product? (Emily, Krupiq, this site, no):',
+  'How to reach you:',
+].join('\n\n');
+export const REPORT_MAILTO = `mailto:${legal.securityEmail}?subject=${encodeURIComponent('Report to Emersa')}&body=${encodeURIComponent(REPORT_BODY)}`;
+
 export const site = {
   name: 'Emersa Labs',
   shortName: 'Emersa',
   url: siteUrl,
   tagline: 'We make synthetic beings.',
   description:
-    'Emersa Labs makes synthetic beings: intelligent characters that see, remember and act. Emily Wilson for the enterprise, Krupiq for security. London, since 2023.',
+    'Emersa Labs builds synthetic beings for compliance, machine learning, cybersecurity and resilience: ambient, agentic systems that see, remember and act on your behalf. Emily Wilson for the enterprise, Krupiq for the network. London, since 2023.',
   locale: 'en_GB',
 
   nav: [
     { label: 'About', href: '/#about' },
     { label: 'Products', href: '/#products' },
+    { label: 'Stay safe', href: '/#stay-safe' },
     { label: 'Technology', href: '/#technology' },
     { label: 'Docs', href: '/docs' },
   ] satisfies NavItem[],
@@ -45,7 +57,7 @@ export const site = {
   hero: {
     eyebrow: 'Emersa Labs · London · since 2023',
     title: 'We make synthetic beings.',
-    lead: 'Beings that see, remember and act. They were born in our games as intelligent characters. Now they guide people through work, learning and whole worlds.',
+    lead: 'Ambient, agentic beings for compliance, machine learning, cybersecurity and resilience: they see your systems, remember your procedures and act.',
     primary: { label: 'Start the tour', href: '#tour' },
     /** The href is the no-JavaScript fallback; with scripts the link opens the Talk monitor instead. */
     talk: { label: 'Talk to Emily', href: CONTACT_MAILTO, close: 'Close' },
@@ -81,7 +93,7 @@ export const site = {
         text: 'We delete everything 12 months after your last visit, or straight away when you tap Forget me.',
       },
     ],
-    freeMinutes: 'Five free minutes a day.',
+    freeMinutes: 'Five free minutes a day. More for your organisation: email 4d@emersa.io.',
     aiNotice: 'Emily is an AI and may make mistakes.',
     privacyLink: { label: 'Read the privacy policy', href: '/privacy#voice' },
     start: 'Start talking',
@@ -115,8 +127,8 @@ export const site = {
       checkPending: 'One moment: checking you are a person.',
       busy: 'Emily is talking with a lot of people right now. Please try again in a few minutes.',
       limit: 'That is all the talking for today. Please come back tomorrow.',
-      // Future: a paywall for more time attaches to this line.
-      minutesUp: 'That is your free five minutes for today. Come back tomorrow, or email 4d@emersa.io.',
+      minutesUp:
+        'That is your five free minutes for today. Come back tomorrow, or email 4d@emersa.io for Emily in your organisation.',
       micDenied: 'The microphone is off; you can keep typing.',
       timeUp: 'This conversation reached its time limit. Start again whenever you like.',
       failed: 'Something went wrong. Please try again.',
@@ -174,12 +186,17 @@ export const site = {
 
   about: {
     eyebrow: 'About',
-    title: 'From non-player characters to synthetic beings.',
+    title: 'From intelligent characters to beings that keep enterprises safe.',
     steps: [
+      {
+        year: '2021',
+        title: 'Inception',
+        text: 'The idea of a character that remembers and acts on its own. First research and prototypes.',
+      },
       {
         year: '2023',
         title: 'A games studio in London',
-        text: 'Emersa started as a gaming company. We were unhappy with how characters behaved: scripted, forgetful, lifeless. We set out to fix that.',
+        text: 'Emersa started as a games studio. We were unhappy with how characters behaved: scripted, forgetful, lifeless. We set out to fix that, and the fix turned out to matter far beyond games.',
       },
       {
         year: '2024',
@@ -189,27 +206,28 @@ export const site = {
       {
         year: '2025',
         title: 'Synthetic beings',
-        text: 'The characters outgrew the games. A being that can see, remember and act is useful wherever people need guidance. We gave the idea a name.',
+        text: 'The characters outgrew the games. A being that can see, remember and act is useful wherever people need guidance. We gave the idea a name. Emily Wilson took her first enterprise work.',
       },
       {
-        year: 'Now',
-        title: 'Beings at work',
-        text: 'Emily Wilson guides enterprises. Krupiq guards their networks. This site is guided by one of them.',
+        year: '2026',
+        title: 'The Krupiq platform',
+        text: 'The beings turned to defence: Krupiq, a living decoy network, and Emily’s swarm for compliance work. Emersa was accepted into NVIDIA Inception and the SUSE partner programme.',
       },
     ],
   },
 
   products: {
     eyebrow: 'Products',
-    title: 'Two beings, one lineage.',
+    title: 'Two beings, one job: keeping you secure and compliant.',
     emily: {
       name: 'Emily Wilson',
-      kicker: 'Enterprise hologram assistant',
-      lead: 'An ambient, agentic assistant that sees your dashboards, remembers your procedures and walks your people through them, step by step.',
+      kicker: 'Enterprise agentic platform',
+      lead: 'An ambient, agentic platform: a swarm of up to 100 agents, running on SUSE Linux Enterprise on your own machines, that sees your systems, remembers your procedures and carries them out with your people, step by step.',
       points: [
         'Digital-twin aware: she can see processes and data flows, then navigate and act with you.',
-        'Deploys on-premises, in a sovereign cloud or fully air-gapped, with full observability.',
+        'Runs as a swarm: up to 100 agents, each with one job, on SUSE Linux Enterprise, on-premises, in a sovereign cloud or air-gapped.',
         'Humans stay in the loop for sensitive actions, with reversible steps and immutable audit trails.',
+        'Built for compliance work: every action is logged, reversible and attributable, so audits are read, not reconstructed.',
         'Fine-tuned on your own corpus, with evaluation gates before every version ships.',
       ],
       video: {
@@ -221,10 +239,72 @@ export const site = {
     },
     krupiq: {
       name: 'Krupiq',
-      kicker: 'A network that exists only for intruders',
-      lead: 'Krupiq lays a living decoy over your network. An intruder sees a network that looks like yours and changes shape before they can map it. Your data stays where it is.',
+      kicker: 'Cybersecurity and compliance',
+      lead: 'A compliance tool that takes care of cybersecurity. Krupiq lays a living decoy over your network: an intruder sees a network that looks like yours and changes shape every five minutes, while your data stays where it is.',
+      points: [
+        { term: 'Observe', text: 'Every packet the intruder sends is seen, from the first one.' },
+        { term: 'Morph', text: 'Every five minutes the decoy takes a new shape; nothing real is inside it.' },
+        { term: 'Prove', text: 'A signed proof for every change, checkable offline.' },
+        {
+          term: 'Comply',
+          text: 'GDPR, NIS2, DORA and SEC duties are met by how it is built. A full audit in minutes, as an immutable PDF.',
+        },
+      ],
+      deployment: 'Windows, Linux and macOS, on your own machines. Nothing leaves your network.',
       cta: { label: 'Visit krupiq.com', href: 'https://krupiq.com' },
     },
+  },
+
+  /** Free advice for people and small teams: the checks that stop most attacks, and where to report one. */
+  staySafe: {
+    eyebrow: 'Free advice',
+    title: 'Eight checks that stop most attacks.',
+    lead: 'None of these needs a product; they take an afternoon and protect you for years.',
+    items: [
+      {
+        title: 'Long, unique passwords in a manager',
+        text: 'One long password for each account, kept in a password manager so you never have to remember or reuse one.',
+      },
+      {
+        title: 'Two-factor sign-in everywhere it is offered',
+        text: 'A code or a key on top of the password. A stolen password alone then opens nothing.',
+      },
+      {
+        title: 'Updates on the day they arrive',
+        text: 'Most break-ins use a hole that was fixed weeks before. Turn automatic updates on and let them run.',
+      },
+      {
+        title: 'A pause before any link or attachment you did not expect',
+        text: 'If a message pushes you to act now, stop. Check the sender through a channel you already trust.',
+      },
+      {
+        title: 'Backups kept offline and tested',
+        text: 'A copy that no attacker on your network can reach, and a restore you have actually tried.',
+      },
+      {
+        title: 'Least privilege at work',
+        text: 'Nobody needs admin for email. Give each account only what its job needs, and the damage of one mistake stays small.',
+      },
+      {
+        title: 'A second channel before paying an invoice or changing bank details',
+        text: 'Call the number you already have, not the one in the message. Confirm with a person, then pay.',
+      },
+      {
+        title: 'Report it early',
+        text: 'An early report stops the next victim. Tell your bank, your IT team or the police as soon as you suspect something.',
+      },
+    ],
+    closing:
+      'Do these eight and most attacks pass you by. The full guide explains each one and what to do if something already happened.',
+    guide: { label: 'Read the full guide', href: '/docs/stay-safe' },
+  },
+
+  /** The report button: one email, one template, the same inbox as vulnerability reports. */
+  report: {
+    label: 'Report',
+    long: 'Report an incident',
+    hint: 'Opens an email to 4d@emersa.io with a short template.',
+    href: REPORT_MAILTO,
   },
 
   technology: {
@@ -242,7 +322,11 @@ export const site = {
       },
       {
         title: 'The posture',
-        text: 'Every part gets only the access it needs, data is encrypted by default, and the whole system can run with no connection to the internet.',
+        text: 'Every part gets only the access it needs, data is encrypted by default, and the whole system can run with no connection to the internet. Every action lands in a signed audit trail that can be checked offline. When a link or a service fails, a being degrades to captions and checklists, never to silence.',
+      },
+      {
+        title: 'The learning',
+        text: 'Models are fine-tuned on your own corpus and evaluated before every release. Every prediction a being acts on is logged with what it saw, so a decision can be audited, not guessed at.',
       },
     ],
   },
@@ -263,7 +347,7 @@ export const site = {
   },
 
   footer: {
-    tagline: 'Synthetic beings, made in London since 2023.',
+    tagline: 'Synthetic beings for compliance, machine learning, cybersecurity and resilience. London, since 2023.',
     columns: [
       {
         title: 'Products',
@@ -278,6 +362,7 @@ export const site = {
           { label: 'About', href: '/#about' },
           { label: 'Docs', href: '/docs' },
           { label: 'Email us', href: 'mailto:4d@emersa.io' },
+          { label: 'Report an incident', href: REPORT_MAILTO },
         ],
       },
     ],
@@ -323,6 +408,72 @@ export const site = {
   },
 
   /** Names for controls and landmarks that carry no visible copy of their own. */
+  /** The zero-knowledge QR code generator. Everything runs in the visitor's browser. */
+  tools: {
+    eyebrow: 'On your device',
+    title: 'A QR code generator that keeps your data where it is.',
+    lead: 'Everything happens in your browser: no server, no counter, no copy of what you type. Close the tab and it is gone.',
+    qr: {
+      title: 'Zero-knowledge QR code generator',
+      lead: 'Static, permanent QR codes built on your device. Nothing you type is uploaded, stored or logged. There is no server in the loop.',
+      modes: {
+        link: 'Link',
+        text: 'Text',
+        wifi: 'Wi-Fi',
+        contact: 'Contact',
+        email: 'Email',
+      },
+      modesLabel: 'What the code holds',
+      fields: {
+        url: 'Website or link',
+        urlPlaceholder: 'emersa.io',
+        text: 'Plain text',
+        textPlaceholder: 'Any text you want in the code',
+        ssid: 'Network name (SSID)',
+        password: 'Password',
+        security: 'Security',
+        securityWpa: 'WPA, WPA2 or WPA3',
+        securityWep: 'WEP',
+        securityNone: 'None (open)',
+        hiddenNetwork: 'Hidden network',
+        firstName: 'First name',
+        lastName: 'Last name',
+        organisation: 'Organisation',
+        phone: 'Phone',
+        email: 'Email',
+        website: 'Website',
+        to: 'To',
+        toPlaceholder: 'name@example.com',
+        subject: 'Subject',
+        message: 'Message',
+      },
+      options: {
+        summary: 'Customise',
+        hint: 'colour, size, error level',
+        errorCorrection: 'Error correction',
+        ecLow: 'Low (7%)',
+        ecMedium: 'Medium (15%)',
+        ecQuartile: 'Quartile (25%)',
+        ecHigh: 'High (30%)',
+        size: 'Download size',
+        foreground: 'Foreground',
+        background: 'Background',
+        transparent: 'Transparent background',
+      },
+      canvasLabel: 'Your generated QR code',
+      downloadPng: 'Download PNG',
+      downloadSvg: 'Download SVG',
+      wipe: 'Wipe',
+      status: {
+        empty: 'Fill in the fields to generate a QR code.',
+        ready: 'Ready. {n} characters encoded and nothing left your device.',
+        wiped: 'Wiped. Nothing was ever stored.',
+        tooLong: 'That is too much data for one QR code. Try shortening it.',
+      },
+      noScript: 'The generator needs JavaScript to draw the code. With it on, nothing you type leaves your device.',
+    },
+  },
+
   a11y: {
     skip: 'Skip to content',
     primaryNav: 'Primary',

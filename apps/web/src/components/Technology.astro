@@ -1,16 +1,17 @@
 ---
 /**
- * Three plain columns on how a being is built, each under a hairline: a 24px wire icon drawn inline (stroke 1.25,
+ * Four plain columns on how a being is built, each under a hairline: a 24px wire icon drawn inline (stroke 1.25,
  * no glow), an H3 and the text. The section costs no image requests; the paths are geometry only.
  */
 import { site } from '../data/site.ts';
 
 // 24 x 24 icons, one per column: a wire pyramid (the structure), a triangle that subdivides (the brain),
-// a triangle inside its guard (the posture).
+// a triangle inside its guard (the posture), a triangle with the point it learned from (the learning).
 const icons: ReadonlyArray<readonly string[]> = [
   ['M12 3.5 20.5 19.5h-17z', 'M12 3.5v9.3', 'M12 12.8 3.5 19.5', 'M12 12.8l8.5 6.7'],
   ['M12 3.5 20.5 19.5h-17z', 'M7.75 11.5h8.5L12 19.5z'],
   ['M12 3.5 20.5 19.5h-17z', 'M12 9.5 15.8 16.5H8.2z'],
+  ['M12 3.5 20.5 19.5h-17z', 'M12 8v8', 'M8.5 14.5h7', 'M12 13.2a1 1 0 1 0 .01 0'],
 ];
 
 const cards = site.technology.cards.map((card, index) => ({ ...card, paths: icons[index] ?? icons[0] ?? [] }));
@@ -59,9 +60,15 @@ const cards = site.technology.cards.map((card, index) => ({ ...card, paths: icon
     margin-top: 1rem;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 640px) {
     .grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 </style>

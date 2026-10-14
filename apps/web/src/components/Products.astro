@@ -2,7 +2,8 @@
 /**
  * The two beings, one above the other. Emily's card is the page's single gloss (global.css .gloss, the bottle-glass
  * recipe) with the points list, the video panel and the orange call to action that opens the Talk monitor; Krupiq
- * follows below her as a flat, compact row with an outline link, reached by scrolling. The tour highlights each
+ * follows below her as a flat, compact card: the words and an outline link on the left, the four points (observe,
+ * morph, prove, comply) in a second column from 768 px. The tour highlights each
  * through data-product.
  */
 import { site } from '../data/site.ts';
@@ -44,7 +45,17 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
           <p class="eyebrow">{krupiq.kicker}</p>
           <h3 class="name name-compact">{krupiq.name}</h3>
           <p class="text">{krupiq.lead}</p>
+          <p class="text small">{krupiq.deployment}</p>
         </div>
+        <ul class="points compact-points">
+          {
+            krupiq.points.map((point) => (
+              <li>
+                <strong class="point-term">{point.term}</strong> {point.text}
+              </li>
+            ))
+          }
+        </ul>
         <p class="cta compact-cta">
           <a class="btn btn-ghost" href={krupiq.cta.href} rel={external(krupiq.cta.href) ? 'noopener' : undefined}>
             {krupiq.cta.label}
@@ -150,18 +161,33 @@ const external = (href: string): boolean => /^https?:\/\//.test(href);
     padding-top: 0;
   }
 
+  .point-term {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
   @media (min-width: 768px) {
     .product {
       padding: 2.5rem;
     }
 
-    /* Krupiq: one row, the words on the left and the link at the right edge. */
+    /* Krupiq: the words in the left column, the four points in the right, the link under the words. */
     .product.compact {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 1rem 2rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: start;
+      gap: 1rem 2.5rem;
       padding: 1.5rem 2rem;
+    }
+
+    .compact-points {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+
+    .compact-cta {
+      grid-column: 1;
     }
   }
 

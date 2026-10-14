@@ -66,7 +66,9 @@ const CREDENTIALS = [
   ['private key block', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
   ['AWS access key', /\bAKIA[0-9A-Z]{16}\b/],
   ['AWS secret name', /aws_secret_access_key|aws_access_key_id/i],
-  ['Stripe-style live key', /\b[sr]k_(live|test)_[0-9A-Za-z]{8,}/],
+  ['Stripe secret or restricted key', /\b[sr]k_(live|test)_[0-9A-Za-z]{8,}/],
+  ['Stripe live key', /\b(sk|rk)_live_[0-9A-Za-z]{8,}/],
+  ['Stripe webhook signing secret', /\bwhsec_[0-9A-Za-z]{8,}/],
   ['Cloudflare API token assignment', /CLOUDFLARE_API_TOKEN\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}/],
 ];
 /**
