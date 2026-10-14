@@ -6,6 +6,13 @@
     // npm test runs these files under Node's type stripping, which erases types and nothing else.
     "erasableSyntaxOnly": true
   },
-  "include": ["index.ts", "scheduled.ts", "lib/**/*.ts", "routes/**/*.ts", "worker-configuration.d.ts"],
+  "include": [
+    "index.ts",
+    "scheduled.ts",
+    "lib/**/*.ts",
+    "routes/**/*.ts",
+    "../tools/policy.ts",
+    "worker-configuration.d.ts"
+  ],
   "exclude": ["**/*.test.ts"]
 }

@@ -11,6 +11,7 @@
  */
 import { compose, hostCheck, quota, rateLimit, readBody, sameSiteOnly, traversalGuard } from './lib/compose.ts';
 import type { Env } from './lib/env.ts';
+import { HOME_PATHS, home } from './lib/home.ts';
 import { dispatch, looksLikeTraversal, notFound, type Route } from './lib/http.ts';
 import { TALK_SESSIONS } from './lib/quota.ts';
 import { brain, MAX_BRAIN_BYTES } from './routes/brain.ts';
@@ -87,6 +88,11 @@ export default {
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       const path = url.pathname.slice('/api/'.length).replace(/\/$/, '');
       return dispatch(lookup(path), request, env, ctx);
+    }
+    // The home page carries the Talk policy; lib/home.ts makes sure it is the only one (run_worker_first in
+    // wrangler.jsonc sends these paths here).
+    if (HOME_PATHS.has(url.pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
+      return home(request, env.ASSETS);
     }
     return env.ASSETS.fetch(request);
   },
