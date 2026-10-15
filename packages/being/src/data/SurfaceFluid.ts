@@ -69,6 +69,10 @@ export class SurfaceFluid {
   private readonly scene = new Scene();
   private readonly camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
   private readonly random: () => number;
+  /** The three brushes the step shader reads: centre in sensor uv, this step's push, radius. */
+  private readonly voice = new Vector4(0.5, 0.5, 0, VOICE_BRUSH.radius);
+  private readonly stir = new Vector4(0.5, 0.5, 0, STIR_BRUSH.radius);
+  private readonly drop = new Vector4(0.5, 0.5, 0, DROP_BRUSH.radius);
   private carry = 0;
   private clock = 0;
   private nextDrop = 1;
@@ -106,9 +110,9 @@ export class SurfaceFluid {
         uLimit: { value: FLUID_LIMIT },
         uAspect: { value: FLUID_GRID.cols / FLUID_GRID.rows },
         uReset: { value: 1 },
-        uVoice: { value: new Vector4(0.5, 0.5, 0, VOICE_BRUSH.radius) },
-        uStir: { value: new Vector4(0.5, 0.5, 0, STIR_BRUSH.radius) },
-        uDrop: { value: new Vector4(0.5, 0.5, 0, DROP_BRUSH.radius) },
+        uVoice: { value: this.voice },
+        uStir: { value: this.stir },
+        uDrop: { value: this.drop },
       },
       vertexShader: fluidVert,
       fragmentShader: fluidFrag,
@@ -162,14 +166,9 @@ export class SurfaceFluid {
       this.carry -= FLUID_STEP_S;
       steps += 1;
       this.clock += FLUID_STEP_S;
-      (u.uVoice?.value as Vector4).set(
-        drive.voiceU,
-        drive.voiceV,
-        voicePush(drive.voice, this.clock),
-        VOICE_BRUSH.radius,
-      );
-      (u.uStir?.value as Vector4).set(drive.stirU, drive.stirV, stirPush(drive.stir), STIR_BRUSH.radius);
-      const drop = u.uDrop?.value as Vector4;
+      this.voice.set(drive.voiceU, drive.voiceV, voicePush(drive.voice, this.clock), VOICE_BRUSH.radius);
+      this.stir.set(drive.stirU, drive.stirV, stirPush(drive.stir), STIR_BRUSH.radius);
+      const drop = this.drop;
       if (this.clock >= this.nextDrop) {
         this.nextDrop = this.clock + dropGap(this.random());
         const du = DROP_AREA.u[0] + (DROP_AREA.u[1] - DROP_AREA.u[0]) * this.random();
