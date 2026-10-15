@@ -6,7 +6,9 @@
  * crisp barycentric edge about one pixel wide in the near (wire) colour, and a fresnel shimmer from the lattice
  * normal, each shard on its own slow phase. In the dark theme (additive) the core is a deep azure from --glow and the
  * light gathers cyan-white where the surface turns from the sensor, along the silhouette and at depth steps, so the
- * outline glows like three's kinect demo; on cream it keeps the token ramp with normal blending.
+ * outline glows like three's kinect demo; on cream it keeps the token ramp with normal blending. Every shard is a
+ * touch brighter or darker than its neighbour (its seed), and the key light leaves a sharp glint on the facets that
+ * face it: as the liquid skin's rings pass, the glints run across the face like light on water.
  */
 export const kinectGridFrag = /* glsl */ `
 uniform float uMode;
@@ -32,6 +34,7 @@ varying float vDepthT;
 varying float vSil;
 varying float vFacing;
 varying float vRecess;
+varying vec3 vSmooth;
 uniform vec3 uGlow;
 
 void main() {
@@ -54,6 +57,10 @@ void main() {
     float fresnel = pow(1.0 - facing, 2.5);
     float lambert = max(dot(n, normalize(vec3(-0.45, 0.55, 0.7))), 0.0);
     float shimmer = 0.5 + 0.5 * sin(uTime * 1.3 + vSeed * 6.2832);
+    // Each facet its own shade, and the key light's glint (Blinn-Phong, tight) on the facets turned toward it.
+    float tint = 0.86 + 0.28 * fract(vSeed * 7.31);
+    vec3 halfway = normalize(normalize(vec3(-0.45, 0.55, 0.7)) + normalize(vView));
+    float glint = pow(max(dot(normalize(vSmooth), halfway), 0.0), 48.0);
     // A key light at the upper left: the face keeps its relief even seen straight on, at a few pixels a shard.
     if (uIsLight > 0.5) {
       // Cream, normal blending: ink (the wire token) near the sensor through azure (glow) behind, shaded by the key
@@ -61,7 +68,8 @@ void main() {
       float turn = pow(1.0 - vFacing, 2.2);
       colour = mix(uWire, uGlow, smoothstep(0.05, 0.85, vDepthT)) * (0.75 + 0.35 * lambert);
       colour = mix(colour, uWire, clamp(turn * 1.5 + vSil * 0.8, 0.0, 0.8) * (1.0 - vRecess));
-      colour = mix(colour, vec3(1.0), edge * 0.12 + 0.12 * vRecess);
+      colour = mix(colour, vec3(1.0), edge * 0.12 + 0.12 * vRecess) * tint;
+      colour = mix(colour, vec3(1.0), glint * 0.2 * (1.0 - vRecess));
       colour = max((colour - 0.5) * uContrast + 0.5 + uBrightness, 0.0);
       alpha = mix(0.92, 0.55, vRecess) * (0.85 + 0.15 * shimmer);
     } else {
@@ -79,7 +87,8 @@ void main() {
       // The inner shell seen through the eyes and the mouth lies far behind the face: it stays a dim, recessed blue.
       float recess = 1.0 - vRecess;
       float hot = clamp(turn * 4.5 + vSil * 2.0 + lambert * lambert * lambert * 0.25, 0.0, 2.2) * (0.75 + 0.25 * shimmer) * recess;
-      colour = core + cyan * hot * (0.5 + 0.4 * near) + uWire * (edge * 0.05 + 0.02 * near * lambert * lambert);
+      colour = (core + cyan * hot * (0.5 + 0.4 * near)) * tint + uWire * (edge * 0.05 + 0.02 * near * lambert * lambert);
+      colour += mix(cyan, vec3(1.0), 0.35) * glint * 0.6 * recess;
       colour = mix(colour, vec3(1.0), smoothstep(1.6, 2.2, hot) * 0.2) * mix(1.0, 0.45, vRecess);
       colour = max((colour - 0.5) * uContrast + 0.5 + uBrightness, 0.0);
       alpha = 1.0;

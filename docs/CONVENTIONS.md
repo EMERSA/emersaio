@@ -88,12 +88,17 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
 - three.js is loaded with dynamic `import()` after LCP + idle on hover-capable desktops and only on tap on touch.
 - Pixel ratio ≤ 1.5 on touch, ≤ 2 on desktop; bloom never runs on touch devices. The tiers (`stage/Quality.ts`):
   `full` draws the 320 x 240 cloud, the ribbon, the reflection and the rim light; `balanced` (where touch starts)
-  the 160 x 120 cloud, the ribbon and the rim; `lite` the small cloud alone; `poster` nothing.
+  the 160 x 120 cloud, the ribbon and the rim; `lite` the small cloud alone; `poster` nothing. The kinect-demo
+  bust is sized from the screen instead (`bustGrid` in `stage/Quality.ts`: one lattice cell about 2 CSS px), up to a
+  ceiling per tier (720 x 540 full, 400 x 300 balanced, 160 x 120 lite, 240 x 180 on touch), and its shards ride a
+  liquid skin simulated on the GPU (`data/SurfaceFluid.ts`, the CPU twin in `data/fluidMath.ts`): voice rings from
+  the lips, the pointer stirs it through `being.stir(x, y)`, the odd drop lands. Nothing moves under reduced motion.
 
 ## Tests
 
 - `npm test` runs `node --test` over `worker/**/*.test.ts`, `packages/being/test/**/*.test.ts`, `tools/**/*.test.ts`.
 - Browser checks live in `tests/browser/*.mjs` and use `playwright-core` with the installed Microsoft Edge
   (`channel: 'msedge'`, headless, `--use-angle=swiftshader`). `gpu-look.mjs` (D3D11, screenshots to `out/gpu`)
-  and `pixels.mjs` (the stage box within 2 levels of the page colour, both themes) run on the real GPU: use them
+  and `pixels.mjs` (the stage box within 2 levels of the page colour, both themes) run on the real GPU, as does
+  `perf.mjs` (frames per second and any quality step at four window sizes and pixel ratios): use them
   after any shader change, because a GLSL error shows only when the program compiles in a browser.

@@ -5,10 +5,18 @@
  * one spanning a relative depth jump of more than 4 percent of its distance (scaled by the displacement), is parked
  * outside the clip volume whole. The decode of the three encodings is the point cloud's (kinect.vert.glsl.ts).
  *
- * Shards mode (uMode 2) draws the same cells as separate facets: each triangle pulled uShrink of the way toward its
- * centroid, so hairline gaps part the lattice into tiny glowing shards, and a per-shard seed for the shimmer. A
- * cell below uMinY (world metres) is not drawn: the head-and-shoulders crop. Shards also hand the fragment stage the
- * depth share, the cell's facing toward the sensor and a silhouette term (a missing or jumping neighbour) for the glow.
+ * Every odd row of cells takes the other diagonal (data/kinectGrid.ts), and in shards mode (uMode 2) every odd
+ * lattice row also stands half a cell to the right and every lattice point is nudged by its own hash, so each cell
+ * cuts into two near-equilateral triangles, each a little different: the shards read as tiny triangles, not as a
+ * grid of squares. Each triangle is pulled uShrink of the way toward its centroid, so hairline gaps part the lattice
+ * into separate glowing facets, with a per-shard seed for the shimmer. A cell below uMinY (world metres) is not
+ * drawn: the head-and-shoulders crop. Shards also hand the fragment stage the depth share, the cell's facing toward
+ * the sensor and a silhouette term (a missing or jumping neighbour) for the glow.
+ *
+ * The shards ride a liquid skin: uFluid is SurfaceFluid's state (height, last height, slope). Every lattice point
+ * moves along the sensor ray by its height (uFluidAmp metres per unit), shared by the cells that meet there, so the
+ * sheet rolls with the waves without cracking; the slope tilts the light (uFluidTilt), and each facet keeps a share
+ * of its own normal, so the triangles catch the light one by one as a ring passes.
  */
 export const kinectGridVert = /* glsl */ `
 #include <packing>
@@ -37,6 +45,9 @@ uniform float uMinY;
 uniform float uIsLight;
 uniform float uTime;
 uniform float uRipple;
+uniform sampler2D uFluid;
+uniform float uFluidAmp;
+uniform float uFluidTilt;
 
 varying vec3 vBary;
 varying vec3 vColor;
@@ -48,8 +59,14 @@ varying float vDepthT;
 varying float vSil;
 varying float vFacing;
 varying float vRecess;
+varying vec3 vSmooth;
 
 const float JUMP_SHARE = 0.04;
+// data/kinectGrid.ts STAGGER and JITTER: odd rows half a cell right; each point nudged within 0.3 of a cell.
+const float STAGGER = 0.5;
+const float JITTER = 0.3;
+// How much of a facet's own normal its light keeps: enough that neighbours differ, not so much that the face is noise.
+const float FACET_SHARE = 0.25;
 const float CROP_FADE_FROM_M = 0.04;
 const float CROP_FADE_M = 0.3;
 
@@ -95,6 +112,20 @@ float distanceAt(vec2 uv) {
   return base + ripple(uv, base);
 }
 
+// A lattice point's uv. The shards stagger and jitter their lattice (the same nudge for every cell sharing the
+// point, so the sheet never cracks); the wire and mesh modes keep the square one.
+vec2 pointUv(vec2 ij, vec2 texel) {
+  if (uMode < 1.5) return (ij + 0.5) * texel;
+  uint pid = uint(ij.y) * 8192u + uint(ij.x);
+  vec2 jitter = (vec2(hash01(pid, 11u), hash01(pid, 12u)) - 0.5) * JITTER;
+  return (ij + vec2(STAGGER * mod(ij.y, 2.0), 0.0) + 0.5 + jitter) * texel;
+}
+
+// The liquid's height at a lattice point, in metres along the sensor ray; a miss stays a miss.
+float withFluid(vec2 uv, float d) {
+  return d < 0.0 ? d : d + uFluidAmp * texture2D(uFluid, uv).r;
+}
+
 vec3 backProject(vec2 uv, float d) {
   return vec3((uv.x - 0.5) * d * uTangents.x, (uv.y - 0.5) * d * uTangents.y, -d + uZOffset);
 }
@@ -104,31 +135,40 @@ void main() {
   int c = gl_VertexID - cellId * 6;
   float cols = uLattice.x - 1.0;
   vec2 cell = vec2(mod(float(cellId), cols), floor(float(cellId) / cols));
-  vec2 corner = c == 0 ? vec2(0.0) : c == 1 ? vec2(1.0, 0.0) : c == 2 ? vec2(0.0, 1.0)
-    : c == 3 ? vec2(1.0, 0.0) : c == 4 ? vec2(1.0) : vec2(0.0, 1.0);
+  // Even rows: (0,0) (1,0) (0,1) and (1,0) (1,1) (0,1). Odd rows take the other diagonal: (0,0) (1,0) (1,1) and
+  // (0,0) (1,1) (0,1). With the shards' stagger both are near-equilateral.
+  bool odd = mod(cell.y, 2.0) > 0.5;
+  vec2 corner = odd
+    ? (c == 0 || c == 3 ? vec2(0.0) : c == 1 ? vec2(1.0, 0.0) : c == 5 ? vec2(0.0, 1.0) : vec2(1.0))
+    : (c == 0 ? vec2(0.0) : c == 1 || c == 3 ? vec2(1.0, 0.0) : c == 4 ? vec2(1.0) : vec2(0.0, 1.0));
   int b = c - 3 * (c / 3);
   vBary = vec3(b == 0 ? 1.0 : 0.0, b == 1 ? 1.0 : 0.0, b == 2 ? 1.0 : 0.0);
 
   vec2 texel = 1.0 / uLattice;
-  vec2 uv00 = (cell + 0.5) * texel;
-  float d00 = distanceAt(uv00);
-  float d10 = distanceAt(uv00 + vec2(texel.x, 0.0));
-  float d01 = distanceAt(uv00 + vec2(0.0, texel.y));
-  float d11 = distanceAt(uv00 + texel);
+  vec2 uv00 = pointUv(cell, texel);
+  vec2 uv10 = pointUv(cell + vec2(1.0, 0.0), texel);
+  vec2 uv01 = pointUv(cell + vec2(0.0, 1.0), texel);
+  vec2 uv11 = pointUv(cell + vec2(1.0), texel);
+  float d00 = withFluid(uv00, distanceAt(uv00));
+  float d10 = withFluid(uv10, distanceAt(uv10));
+  float d01 = withFluid(uv01, distanceAt(uv01));
+  float d11 = withFluid(uv11, distanceAt(uv11));
   float lo = min(min(d00, d10), min(d01, d11));
   float hi = max(max(d00, d10), max(d01, d11));
   float ok = step(0.0, lo) * step(hi - lo, JUMP_SHARE * lo * uDisplacement);
 
   float d = corner.x < 0.5 ? (corner.y < 0.5 ? d00 : d01) : (corner.y < 0.5 ? d10 : d11);
-  vec3 pos = backProject(uv00 + corner * texel, d);
   vec3 p00 = backProject(uv00, d00);
-  vec3 p10 = backProject(uv00 + vec2(texel.x, 0.0), d10);
-  vec3 p01 = backProject(uv00 + vec2(0.0, texel.y), d01);
-  if (uMode > 1.5) {
-    vec3 p11 = backProject(uv00 + texel, d11);
-    vec3 corners = (c < 3 ? p00 : p11) + p10 + p01;
-    pos = mix(pos, corners / 3.0, uShrink);
-  }
+  vec3 p10 = backProject(uv10, d10);
+  vec3 p01 = backProject(uv01, d01);
+  vec3 p11 = backProject(uv11, d11);
+  vec3 pos = corner.x < 0.5 ? (corner.y < 0.5 ? p00 : p01) : (corner.y < 0.5 ? p10 : p11);
+  // This vertex's triangle, for the shards' shrink and their own facet normal.
+  bool second = c >= 3;
+  vec3 ta = odd || !second ? p00 : p10;
+  vec3 tb = second ? p11 : p10;
+  vec3 tc = odd ? (second ? p01 : p11) : p01;
+  if (uMode > 1.5) pos = mix(pos, (ta + tb + tc) / 3.0, uShrink);
 
   uint id = uint(cellId);
   float h1 = hash01(id, 5u);
@@ -146,7 +186,7 @@ void main() {
   vRecess = 0.0;
   if (uMode > 1.5) {
     // Shards light from a wider normal (three cells across) so the depth steps of one cell do not band the face.
-    vec2 mid = uv00 + 0.5 * texel;
+    vec2 mid = 0.25 * (uv00 + uv10 + uv01 + uv11);
     vec2 span = 1.5 * texel;
     float dl = distanceAt(mid - vec2(span.x, 0.0));
     float dr = distanceAt(mid + vec2(span.x, 0.0));
@@ -179,10 +219,22 @@ void main() {
       vSil = 1.0;
     }
   }
+  vec3 lit = lattice;
+  if (uMode > 1.5) {
+    // The liquid's slope tilts the light (the surface is z = -(d + h), so its normal leans along the slope), and
+    // each facet keeps a share of its own normal.
+    vec2 slope = texture2D(uFluid, 0.25 * (uv00 + uv10 + uv01 + uv11)).ba;
+    lattice = normalize(normalize(lattice) + uFluidTilt * vec3(slope, 0.0));
+    vec3 facet = cross(tb - ta, tc - ta);
+    facet *= dot(facet, lattice) < 0.0 ? -1.0 : 1.0;
+    lit = normalize(mix(lattice, normalize(facet + 1e-6), FACET_SHARE));
+  }
   // How squarely the cell faces the sensor: the lattice is in the sensor's frame, looking down -Z (the lens is
   // narrow, so the axis stands in for each ray).
   vFacing = abs(normalize(lattice).z);
-  vNormal = normalize(mat3(modelMatrix) * lattice);
+  vNormal = normalize(mat3(modelMatrix) * lit);
+  // The surface without the facets: the liquid's own sheen is lit from this, so it ripples instead of sparkling.
+  vSmooth = normalize(mat3(modelMatrix) * lattice);
   vView = cameraPosition - world.xyz;
   float above = mix(world.y - uMirrorPlane, uMirrorPlane - world.y, uMirror);
   float mirrorFade = mix(1.0, 0.35 * (1.0 - smoothstep(0.0, 0.9, above)) * step(0.0, above), uMirror);

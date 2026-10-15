@@ -302,7 +302,11 @@ function wireBeing(m: Mount, being: BeingHandle): void {
     (event) => {
       const r = stage.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) return;
-      being.lookAt(((event.clientX - r.left) / r.width) * 2 - 1, 1 - ((event.clientY - r.top) / r.height) * 2);
+      const x = ((event.clientX - r.left) / r.width) * 2 - 1;
+      const y = 1 - ((event.clientY - r.top) / r.height) * 2;
+      being.lookAt(x, y);
+      // Over the face, the pointer also stirs the shards' liquid skin.
+      being.stir(x, y);
     },
     { passive: true },
   );
@@ -689,6 +693,7 @@ function createCaptionBeing(): BeingHandle {
     tokens: (n) => emitTokens(n),
     pose: noop,
     lookAt: noop,
+    stir: noop,
     setListening: noop,
     setLook: noop,
     getLook: () => 'wire',

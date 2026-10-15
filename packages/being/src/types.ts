@@ -12,7 +12,9 @@ export type Theme = 'dark' | 'light';
  * 'hybrid' keeps the head as wire and draws the body as the cloud with its wire hidden, and 'face' hides the body
  * and frames the head alone, large, as wire over a dense Kinect-style depth cloud of the head. 'kinect-demo' is
  * three's webgl_video_kinect done in tiny triangles: head and shoulders, no wire, a dense lattice of glowing shards
- * from a fixed sensor, seen by a view camera that orbits with the pointer.
+ * from a fixed sensor, seen by a view camera that orbits with the pointer. The lattice is sized from the frame on
+ * screen (a shard about two pixels across), and the shards ride a simulated liquid skin that her voice, the pointer
+ * and the odd drop set rippling.
  */
 export type Look = 'wire' | 'kinect' | 'hybrid' | 'face' | 'kinect-demo';
 /** What the shell may ask for: the looks, plus the shared contract's name for the face, 'kinect-face'. */
@@ -20,8 +22,8 @@ export type LookRequest = Look | 'kinect-face';
 
 /**
  * How the kinect cloud draws its depth grid: points (the default), wire triangles, a solid metallic surface, or
- * shards: every lattice cell as two small separate triangles shrunk toward their centroids, glowing facets with a
- * crisp edge (the kinect-demo look's default).
+ * shards: a staggered, jittered lattice whose cells cut into two near-equilateral triangles, each shrunk toward its
+ * centroid, glowing facets with a crisp edge (the kinect-demo look's default).
  */
 export type KinectMode = 'points' | 'wire' | 'mesh' | 'shards';
 
@@ -118,6 +120,11 @@ export interface BeingHandle {
   pose(action: TourAction): void;
   /** Pointer position in -1..1 (x right, y up); the head follows it gently. */
   lookAt(x: number, y: number): void;
+  /**
+   * The pointer moving over the stage, in -1..1 (x right, y up): in the kinect-demo look it stirs the shards' liquid
+   * skin where it crosses the face, in proportion to its speed. Nothing happens in other looks or under reduced motion.
+   */
+  stir(x: number, y: number): void;
   setListening(on: boolean): void;
   /** Switch between the wire, the kinect cloud, the hybrid of the two and the face; the small docked stage always draws wire. */
   setLook(look: LookRequest): void;
@@ -166,8 +173,8 @@ export interface BeingHandle {
     /** Stroke width of the wire mode in CSS pixels. */
     setLineWidth(px: number): void;
     /**
-     * Amplitude of the shards' slow liquid ripple, in metres along the sensor ray (0 to 0.02; 4 mm by default,
-     * 0 under reduced motion). 0 stills the surface.
+     * Amplitude of the shards' slow swell, in metres along the sensor ray (0 to 0.02; 2 mm by default, 0 under
+     * reduced motion). 0 stills it; the ripples of the liquid skin are separate.
      */
     setRipple(metres: number): void;
   };

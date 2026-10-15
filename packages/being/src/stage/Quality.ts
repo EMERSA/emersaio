@@ -17,7 +17,10 @@ export interface QualityCaps {
  * look, where the cloud is the head alone and the lite tier still draws it.
  */
 export const CLOUD_GRIDS: Readonly<
-  Record<'full' | 'reduced' | 'head' | 'headReduced' | 'headLite' | 'bust' | 'bustReduced' | 'bustLite', CloudGrid>
+  Record<
+    'full' | 'reduced' | 'head' | 'headReduced' | 'headLite' | 'bust' | 'bustReduced' | 'bustLite' | 'bustTouch',
+    CloudGrid
+  >
 > = {
   full: { cols: 320, rows: 240 },
   reduced: { cols: 160, rows: 120 },
@@ -25,11 +28,33 @@ export const CLOUD_GRIDS: Readonly<
   head: { cols: 320, rows: 240 },
   headReduced: { cols: 200, rows: 150 },
   headLite: { cols: 120, rows: 90 },
-  // The kinect-demo look's head and shoulders as tiny shards: two per cell, so 400 x 300 is about 240k triangles.
-  bust: { cols: 400, rows: 300 },
-  bustReduced: { cols: 200, rows: 150 },
-  bustLite: { cols: 128, rows: 96 },
+  // The kinect-demo look's head and shoulders as tiny shards. These are ceilings: bustGrid() sizes the lattice from
+  // the frame on screen, so a shard stays about BUST_CELL_PX across however large the hero is. Two shards per cell,
+  // so the full ceiling is about 775k triangles.
+  bust: { cols: 720, rows: 540 },
+  bustReduced: { cols: 400, rows: 300 },
+  bustLite: { cols: 160, rows: 120 },
+  // Touch devices, whatever the tier above lite.
+  bustTouch: { cols: 240, rows: 180 },
 };
+
+/** The kinect-demo shards' target size: one lattice cell this many CSS pixels across on screen. */
+export const BUST_CELL_PX = 2;
+/** The smallest bust lattice, in rows, whatever the frame. */
+const BUST_MIN_ROWS = 96;
+/** Rows come in steps of this many (and columns of four thirds of it), so a resize does not rebuild every frame. */
+const BUST_ROW_STEP = 12;
+
+/**
+ * The bust lattice for a sensor frame that is `framePx` CSS pixels tall on screen: one cell per BUST_CELL_PX, in
+ * steps of BUST_ROW_STEP rows, at least BUST_MIN_ROWS, at most the ceiling; 4:3 like the sensor.
+ */
+export function bustGrid(framePx: number, ceiling: CloudGrid): CloudGrid {
+  const wanted = Number.isFinite(framePx) && framePx > 0 ? framePx / BUST_CELL_PX : BUST_MIN_ROWS;
+  const stepped = Math.round(wanted / BUST_ROW_STEP) * BUST_ROW_STEP;
+  const rows = Math.min(ceiling.rows, Math.max(BUST_MIN_ROWS, stepped));
+  return { cols: Math.round((rows * 4) / 3), rows };
+}
 
 export interface QualityProfile {
   /** False for the poster tier: the loop stops and the shell shows the SVG poster. */
@@ -38,7 +63,7 @@ export interface QualityProfile {
   cloud: CloudGrid | null;
   /** The head cloud's grid in the face look. */
   headCloud: CloudGrid | null;
-  /** The head-and-shoulders lattice of the kinect-demo look (touch devices take bustLite whatever the tier). */
+  /** The ceiling of the kinect-demo look's head-and-shoulders lattice (bustGrid sizes it; touch takes bustTouch at most). */
   bustCloud: CloudGrid | null;
   /** The data fan of the face look. */
   fan: boolean;

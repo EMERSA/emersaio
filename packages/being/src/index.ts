@@ -14,9 +14,10 @@ import { AudioBands } from './data/AudioBands.ts';
 import { DataFan } from './data/DataFan.ts';
 import { BeingDepthSource } from './data/depth/BeingDepthSource.ts';
 import type { DepthSource } from './data/depth/DepthSource.ts';
-import { EYE_LINE_SHARE, scatterFor } from './data/depth/depthMath.ts';
+import { EYE_LINE_SHARE, SENSOR_BUST, scatterFor, sensorFrameHeight } from './data/depth/depthMath.ts';
 import { FAN_LINES, FAN_PLANE_M } from './data/fanMath.ts';
 import { type KeepZone, KINECT_DEFAULTS, KinectCloud } from './data/KinectCloud.ts';
+import { SurfaceFluid } from './data/SurfaceFluid.ts';
 import { TokenMeter } from './data/TokenMeter.ts';
 import { FaceDriver } from './face/FaceDriver.ts';
 import type { FaceSource } from './face/source.ts';
@@ -27,7 +28,14 @@ import { VisemeTimelineSource } from './face/sources/VisemeTimeline.ts';
 import { getAudioOutput, unlock } from './speech/audioUnlock.ts';
 import { RIM_HEIGHT_M, RIM_RADIUS_SHARE, RIM_RIGHT_SHARE } from './stage/Backdrop.ts';
 import { bustBounds, type HeadBounds } from './stage/framing.ts';
-import { CLOUD_GRIDS, type QualityCaps, QualityMonitor, qualityProfile, startingQuality } from './stage/Quality.ts';
+import {
+  bustGrid,
+  CLOUD_GRIDS,
+  type QualityCaps,
+  QualityMonitor,
+  qualityProfile,
+  startingQuality,
+} from './stage/Quality.ts';
 import { ORBIT_PITCH_DEG, ORBIT_YAW_DEG, PARALLAX_PITCH_DEG, PARALLAX_YAW_DEG, Stage } from './stage/Stage.ts';
 import { ThemeUniforms } from './stage/ThemeUniforms.ts';
 import type {
@@ -421,6 +429,14 @@ const clampUnit = (value: number): number => (Number.isFinite(value) ? Math.min(
 /** The shared contract's 'kinect-face' is the face look. */
 const normaliseLook = (look: LookRequest | undefined): Look => (look === 'kinect-face' ? 'face' : (look ?? 'hybrid'));
 
+/** The shards' liquid skin: metres along the sensor ray per unit of height, and how far its slope tilts the light. */
+const FLUID_AMP_M = 0.005;
+const FLUID_TILT = 20;
+/** The pointer stirs the front of the face, this far ahead of the head's centre. */
+const FACE_FRONT_M = 0.08;
+/** Once the pointer stops, its stir fades over about this time. */
+const STIR_EASE_S = 0.12;
+
 export function createBeing(options: BeingOptions): BeingHandle {
   const canvas = options.canvas;
   const touch = isCoarsePointer();
@@ -490,6 +506,14 @@ export function createBeing(options: BeingOptions): BeingHandle {
     pixelRatio: caps.maxPixelRatio,
     reducedMotion,
   });
+  // The kinect-demo shards ride a liquid skin simulated on the GPU (data/SurfaceFluid.ts): Emily's voice rings out
+  // from her lips, the pointer stirs the surface, and a drop lands now and then. Nothing moves under reduced motion.
+  const fluid = new SurfaceFluid(stage.renderer, { reducedMotion });
+  /** The pointer over the face in sensor uv, when it last moved and how fast (sensor frames a second, eased). */
+  const stirred = { u: 0.5, v: 0.5, at: Number.NEGATIVE_INFINITY, speed: 0 };
+  const stirRay = new Vector3();
+  const stirPoint = new Vector3();
+  const lips = new Vector3();
   // The grid material follows the theme's blending in wire mode and blends normally as a solid mesh (KinectCloud).
   theme.register(cloud.material);
   stage.scene.add(cloud.points, cloud.mesh);
@@ -584,7 +608,15 @@ export function createBeing(options: BeingOptions): BeingHandle {
     // With a sensor or a video the cloud is theirs, and the being's own depth pass has nothing to add.
     beingSource.setMeshes(external ? [] : casters);
     cloud.setSource(external ?? beingSource);
-    const demoGrid = touch && profile.bustCloud ? CLOUD_GRIDS.bustLite : profile.bustCloud;
+    // The bust lattice follows the sensor frame's size on screen, so a shard stays a couple of pixels across however
+    // large the hero is (touch devices at most bustTouch).
+    const ceiling =
+      touch && profile.bustCloud && profile.bustCloud.rows > CLOUD_GRIDS.bustTouch.rows
+        ? CLOUD_GRIDS.bustTouch
+        : profile.bustCloud;
+    const frameM = stage.frameSize().height;
+    const framePx = frameM > 0 ? (stage.size().height / frameM) * sensorFrameHeight(SENSOR_BUST) : 0;
+    const demoGrid = ceiling ? bustGrid(framePx, ceiling) : null;
     const grid = (isDemo ? demoGrid : isFace ? profile.headCloud : profile.cloud) ?? CLOUD_GRIDS.reduced;
     cloud.setGrid(grid.cols, grid.rows);
     beingSource.setSize(grid.cols, grid.rows);
@@ -729,6 +761,24 @@ export function createBeing(options: BeingOptions): BeingHandle {
       cloud.setKeepZones(null, null);
     }
     (external ?? beingSource).update(dt);
+    // The liquid skin, for the kinect-demo shards cast from the being's own depth.
+    if (demo && !external && fluid.supported && cloud.showing()) {
+      const sensor = beingSource.camera;
+      lips.set(mouthZone.x, mouthZone.y, mouthZone.z).project(sensor);
+      stirred.speed *= Math.exp(-dt / STIR_EASE_S);
+      fluid.setDepth(beingSource.texture, 'perspective', sensor.near, sensor.far);
+      fluid.update(dt, {
+        voiceU: 0.5 * (lips.x + 1),
+        voiceV: 0.5 * (lips.y + 1),
+        voice: shared.uAudioLevel.value,
+        stirU: stirred.u,
+        stirV: stirred.v,
+        stir: stirred.speed,
+      });
+      cloud.setFluid(fluid.texture, FLUID_AMP_M, FLUID_TILT);
+    } else {
+      cloud.setFluid(null, 0, 0);
+    }
     cloud.update(stage.camera, stage.distance(), dt, elapsed);
     // Packets flow only while a line plays (or when the page asks); the fan is otherwise still.
     fan.update(stage.camera, headBone, (head?.bounds.centreZ ?? 0) + FAN_PLANE_M, speaking ? SPEAKING_FLOW : 0, dt);
@@ -932,6 +982,27 @@ export function createBeing(options: BeingOptions): BeingHandle {
       // On touch the demo's view only drifts: a finger dragging the orbit about would fight the page's scroll.
       if (!reducedMotion && !(touch && effective === 'kinect-demo')) stage.setParallax(clampUnit(x), clampUnit(y));
     },
+    stir(x: number, y: number): void {
+      if (reducedMotion || !fluid.supported || !headBust || effective !== 'kinect-demo') return;
+      // The pointer's ray from the view camera meets the front of the face; the sensor sees that point at (u, v).
+      const camera = stage.camera;
+      stirRay.set(clampUnit(x), clampUnit(y), 0.5).unproject(camera).sub(camera.position).normalize();
+      if (Math.abs(stirRay.z) < 1e-4) return;
+      const along = (headBust.centreZ + FACE_FRONT_M - camera.position.z) / stirRay.z;
+      if (!(along > 0)) return;
+      stirPoint.copy(camera.position).addScaledVector(stirRay, along).project(beingSource.camera);
+      const u = 0.5 * (stirPoint.x + 1);
+      const v = 0.5 * (stirPoint.y + 1);
+      const now = performance.now();
+      const seconds = (now - stirred.at) / 1000;
+      // A pause longer than a quarter second starts a new stroke rather than a leap across the face.
+      if (seconds > 0 && seconds < 0.25) {
+        stirred.speed = Math.max(stirred.speed, Math.hypot(u - stirred.u, v - stirred.v) / seconds);
+      }
+      stirred.u = u;
+      stirred.v = v;
+      stirred.at = now;
+    },
     setListening(on: boolean): void {
       ring?.setListening(on);
     },
@@ -1010,6 +1081,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
       ring?.dispose();
       ribbon?.dispose();
       cloud.dispose();
+      fluid.dispose();
       // An external source belongs to whoever made it.
       beingSource.dispose();
       stage.dispose();

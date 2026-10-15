@@ -2,6 +2,7 @@ import {
   type Blending,
   BufferAttribute,
   BufferGeometry,
+  DataTexture,
   type IUniform,
   Mesh,
   NormalBlending,
@@ -92,6 +93,9 @@ type CloudUniforms = {
   uShrink: IUniform<number>;
   uMinY: IUniform<number>;
   uRipple: IUniform<number>;
+  uFluid: IUniform<Texture>;
+  uFluidAmp: IUniform<number>;
+  uFluidTilt: IUniform<number>;
   uMirrorPlane: SharedUniforms['uMirrorPlane'];
   uViewport: SharedUniforms['uViewport'];
   uDot: SharedUniforms['uDot'];
@@ -121,8 +125,11 @@ const NO_ZONE = new Vector4(0, -1000, 0, 0);
 const NO_CROP = -1000;
 /** How far each shard is pulled toward its centroid: the hairline gaps that part the lattice into facets. */
 export const SHARD_SHRINK = 0.2;
-/** The shards' liquid ripple: how far the surface breathes along the sensor ray, in metres (none under reduced motion). */
-const RIPPLE_M = 0.004;
+/**
+ * The shards' slow swell: how far the surface breathes along the sensor ray, in metres (none under reduced motion).
+ * The ripples on top of it are the liquid simulation's (SurfaceFluid).
+ */
+const RIPPLE_M = 0.002;
 /** The most setRipple() allows, in metres. */
 const MAX_RIPPLE_M = 0.02;
 
@@ -155,6 +162,8 @@ export class KinectCloud {
   private enabled = true;
   /** Every cell a miss: what the cloud samples until its source has a frame. */
   private readonly blank = blankDepthTexture();
+  /** A flat liquid: what the shards read while no simulation runs. */
+  private readonly still = stillFluidTexture();
   /** What the sensor looks at: the ramp's centre until the probe has measured the figure. */
   private readonly subject = new Vector3(0, 1, 0);
 
@@ -166,6 +175,9 @@ export class KinectCloud {
     this.pixelRatio = options.pixelRatio ?? 1;
     this.uniforms = {
       uDepth: { value: this.blank },
+      uFluid: { value: this.still },
+      uFluidAmp: { value: 0 },
+      uFluidTilt: { value: 0 },
       uGrid: { value: new Vector2(this.cols, this.rows) },
       uLattice: { value: new Vector2(GRID_LATTICE.cols, GRID_LATTICE.rows) },
       uNear: { value: 0.1 },
@@ -295,7 +307,18 @@ export class KinectCloud {
     this.uniforms.uMinY.value = minY !== null && Number.isFinite(minY) ? minY : NO_CROP;
   }
 
-  /** Amplitude of the shards' liquid ripple in metres, 0 to 0.02; 0 stills the surface. */
+  /**
+   * The liquid skin the shards ride (SurfaceFluid's state), with its height in metres per unit along the sensor ray
+   * and how far its slope tilts their light; null flattens it.
+   */
+  setFluid(texture: Texture | null, metres: number, tilt: number): void {
+    const u = this.uniforms;
+    u.uFluid.value = texture ?? this.still;
+    u.uFluidAmp.value = texture && Number.isFinite(metres) ? metres : 0;
+    u.uFluidTilt.value = texture && Number.isFinite(tilt) ? tilt : 0;
+  }
+
+  /** Amplitude of the shards' slow swell in metres, 0 to 0.02; 0 stills it. */
   setRipple(metres: number): void {
     if (Number.isFinite(metres)) this.uniforms.uRipple.value = Math.min(MAX_RIPPLE_M, Math.max(0, metres));
   }
@@ -462,8 +485,16 @@ export class KinectCloud {
       object.removeFromParent();
     }
     this.blank.dispose();
+    this.still.dispose();
     this.source = null;
   }
+}
+
+/** A 1 x 1 texture of zeros: no height, no slope. */
+function stillFluidTexture(): DataTexture {
+  const texture = new DataTexture(new Uint8Array(4), 1, 1);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 /**

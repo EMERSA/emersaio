@@ -78,6 +78,11 @@ export const SENSOR_FACE = { distanceM: 1.05, belowEyeDeg: 7, fovDeg: 18 } as co
  * lens about 0.62 m tall there, so the bust (0.5 m) fills the frame with a little air, as in three's recording.
  */
 export const SENSOR_BUST = { distanceM: 1.6, belowDeg: 4, fovDeg: 22 } as const;
+
+/** The height in metres a sensor's frame takes in at its subject: 2 d tan(fov / 2). */
+export function sensorFrameHeight(sensor: { distanceM: number; fovDeg: number }): number {
+  return 2 * sensor.distanceM * Math.tan((sensor.fovDeg * Math.PI) / 360);
+}
 /** The same sensor for the whole figure (the hybrid and kinect looks): on a tripod, level with the chest. */
 export const SENSOR_FIGURE = { distanceM: 3.2, heightM: 1, lookAtY: 0.9, fovDeg: 36 } as const;
 /** The eye line as a share of the head's height above the chin. */

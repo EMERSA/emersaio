@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  BUST_CELL_PX,
+  bustGrid,
   CLOUD_GRIDS,
   POSTER_FLOOR_FPS,
   QualityMonitor,
@@ -133,13 +135,28 @@ test('the face look: full draws the 320 x 240 head cloud with the fan, balanced 
   assert.equal(poster.fan, false);
 });
 
-test('the kinect-demo lattice: 400 x 300 full, 200 x 150 balanced, 128 x 96 lite, none for the poster', () => {
+test('the kinect-demo lattice ceilings: 720 x 540 full, 400 x 300 balanced, 160 x 120 lite, none for the poster', () => {
   const caps = { bloom: false, ribbon: false, reflection: false, maxPixelRatio: 2 };
-  assert.deepEqual(qualityProfile('full', caps).bustCloud, { cols: 400, rows: 300 });
-  assert.deepEqual(qualityProfile('balanced', caps).bustCloud, { cols: 200, rows: 150 });
+  assert.deepEqual(qualityProfile('full', caps).bustCloud, { cols: 720, rows: 540 });
+  assert.deepEqual(qualityProfile('balanced', caps).bustCloud, { cols: 400, rows: 300 });
   assert.deepEqual(qualityProfile('lite', caps).bustCloud, CLOUD_GRIDS.bustLite);
-  assert.deepEqual(CLOUD_GRIDS.bustLite, { cols: 128, rows: 96 });
+  assert.deepEqual(CLOUD_GRIDS.bustLite, { cols: 160, rows: 120 });
+  assert.deepEqual(CLOUD_GRIDS.bustTouch, { cols: 240, rows: 180 });
   assert.equal(qualityProfile('poster', caps).bustCloud, null);
-  // Two shards per cell: the full tier draws about 150k triangles.
-  assert.ok(2 * 319 * 239 > 150_000);
+});
+
+test('bustGrid keeps a shard about BUST_CELL_PX across: rows follow the frame, in steps, between a floor and the ceiling', () => {
+  const full = CLOUD_GRIDS.bust;
+  // A 750 px frame (a 1440 x 900 window) is 375 rows, stepped to 372, and 4:3.
+  assert.deepEqual(bustGrid(750, full), { cols: 496, rows: 372 });
+  assert.equal(bustGrid(750, full).rows * BUST_CELL_PX >= 700, true);
+  // A taller hero grows the lattice, so the shards stay the same size on screen.
+  assert.ok(bustGrid(950, full).rows > bustGrid(750, full).rows);
+  // Never past the ceiling, never under the floor, and a nonsense size falls back to the floor.
+  assert.deepEqual(bustGrid(4000, full), full);
+  assert.deepEqual(bustGrid(4000, CLOUD_GRIDS.bustReduced), CLOUD_GRIDS.bustReduced);
+  assert.deepEqual(bustGrid(50, full), { cols: 128, rows: 96 });
+  assert.deepEqual(bustGrid(Number.NaN, full), { cols: 128, rows: 96 });
+  // A few pixels of resize land on the same step: no rebuild.
+  assert.deepEqual(bustGrid(752, full), bustGrid(748, full));
 });

@@ -37,6 +37,7 @@ const fakeBeing = (options: { fail?: boolean } = {}) => {
     tokens: () => undefined,
     pose: () => undefined,
     lookAt: () => undefined,
+    stir: () => undefined,
     setListening: () => undefined,
     setLook: () => undefined,
     getLook: () => 'hybrid',

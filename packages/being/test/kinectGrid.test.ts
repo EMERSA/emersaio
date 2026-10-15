@@ -4,12 +4,16 @@ import { test } from 'node:test';
 import {
   brightnessContrast,
   CELL_CORNERS,
+  CELL_CORNERS_ODD,
   cellDrawn,
   DISCONTINUITY_SHARE,
   displace,
   GRID_LATTICE,
   gridVertex,
   gridVertexCount,
+  JITTER,
+  latticePoint,
+  STAGGER,
   VERTICES_PER_CELL,
 } from '../src/data/kinectGrid.ts';
 
@@ -34,12 +38,38 @@ test('the index-free grid has six vertices per cell and decodes like the shader'
     [0, 1, 2, 0, 1, 2],
   );
   for (const v of first) assert.deepEqual(v.cell, { x: 0, y: 0 });
-  // Cell 4 of a 3-wide grid is (1, 1); its fifth vertex is the far corner of the second triangle.
+  // Cell 4 of a 3-wide grid is (1, 1), on an odd row: the other diagonal, so its triangles are (0,0) (1,0) (1,1)
+  // and (0,0) (1,1) (0,1), and its fifth vertex is the far corner of the second.
+  const odd = [0, 1, 2, 3, 4, 5].map((id) => gridVertex(4 * VERTICES_PER_CELL + id, lattice));
+  assert.deepEqual(
+    odd.map((v) => [...v.corner]),
+    CELL_CORNERS_ODD.map((c) => [...c]),
+  );
   const v = gridVertex(4 * VERTICES_PER_CELL + 4, lattice);
   assert.deepEqual(v.cell, { x: 1, y: 1 });
   assert.deepEqual([...v.corner], [1, 1]);
   assert.equal(v.bary, 1);
   assert.deepEqual(gridVertex(gridVertexCount(lattice) - 1, lattice).cell, { x: 2, y: 1 });
+});
+
+test('the staggered lattice cuts every cell into two near-equilateral triangles', () => {
+  // Odd rows stand half a cell to the right.
+  assert.deepEqual(latticePoint(3, 0), { x: 3, y: 0 });
+  assert.deepEqual(latticePoint(3, 1), { x: 3 + STAGGER, y: 1 });
+  const side = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+  for (const row of [0, 1]) {
+    const corners = row === 1 ? CELL_CORNERS_ODD : CELL_CORNERS;
+    for (const tri of [corners.slice(0, 3), corners.slice(3)]) {
+      const p = tri.map(([cx, cy]) => latticePoint(5 + cx, row + cy));
+      const [a, b, c] = p as [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+      const sides = [side(a, b), side(b, c), side(c, a)].sort((m, n) => m - n);
+      // Base 1 and two sides of sqrt(1.25): an isosceles triangle, never the long diagonal of a square (1.414).
+      close(sides[0] ?? 0, 1);
+      close(sides[2] ?? 0, Math.sqrt(1.25));
+    }
+  }
+  // The jitter stays well inside a cell, so no facet folds over its neighbour.
+  assert.ok(JITTER > 0 && JITTER < 0.5);
 });
 
 test('the discontinuity rule parks cells with a miss or a relative depth jump, scaled by the displacement', () => {

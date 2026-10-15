@@ -14,7 +14,11 @@ export const VERTICES_PER_CELL = 6;
  * a cell a depth jump, which is not drawn: a sensor sees about 4 cm of silhouette at 1 m, not a fixed 12 cm.
  */
 export const DISCONTINUITY_SHARE = 0.04;
-/** The six corners of a cell in draw order: two triangles, (0,0) (1,0) (0,1) and (1,0) (1,1) (0,1). */
+/**
+ * The six corners of a cell in draw order on an even row: two triangles, (0,0) (1,0) (0,1) and (1,0) (1,1) (0,1).
+ * Every odd lattice row stands half a cell to the right (STAGGER), so a cell on an even row leans right and this
+ * diagonal cuts it into two near-equilateral triangles.
+ */
 export const CELL_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [0, 0],
   [1, 0],
@@ -23,6 +27,27 @@ export const CELL_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [1, 1],
   [0, 1],
 ];
+/** The corners on an odd row, whose cell leans left: the other diagonal, (0,0) (1,0) (1,1) and (0,0) (1,1) (0,1). */
+export const CELL_CORNERS_ODD: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [1, 0],
+  [1, 1],
+  [0, 0],
+  [1, 1],
+  [0, 1],
+];
+/** How far every odd lattice row is shifted to the right, in cells: the stagger that makes the cells triangles. */
+export const STAGGER = 0.5;
+/**
+ * How far each lattice point may be nudged from its place, in cells (the full span, centred). Every cell that
+ * shares the point sees the same nudge, so the sheet never cracks; the facets come out each a little different.
+ */
+export const JITTER = 0.3;
+
+/** A lattice point's place in cells before the jitter: odd rows half a cell to the right. */
+export function latticePoint(x: number, y: number): { x: number; y: number } {
+  return { x: x + (y % 2 === 1 ? STAGGER : 0), y };
+}
 
 export interface GridVertex {
   /** The cell's lower-left lattice point. */
@@ -43,9 +68,10 @@ export function gridVertex(id: number, lattice: CloudGrid): GridVertex {
   const cellId = Math.floor(id / VERTICES_PER_CELL);
   const c = id - cellId * VERTICES_PER_CELL;
   const cols = Math.max(1, lattice.cols - 1);
+  const cellY = Math.floor(cellId / cols);
   return {
-    cell: { x: cellId % cols, y: Math.floor(cellId / cols) },
-    corner: CELL_CORNERS[c] ?? [0, 0],
+    cell: { x: cellId % cols, y: cellY },
+    corner: ((cellY % 2 === 1 ? CELL_CORNERS_ODD : CELL_CORNERS)[c] ?? [0, 0]) as readonly [number, number],
     bary: (c % 3) as 0 | 1 | 2,
   };
 }
