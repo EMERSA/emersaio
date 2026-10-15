@@ -17,6 +17,13 @@
  * moves along the sensor ray by its height (uFluidAmp metres per unit), shared by the cells that meet there, so the
  * sheet rolls with the waves without cracking; the slope tilts the light (uFluidTilt), and each facet keeps a share
  * of its own normal, so the triangles catch the light one by one as a ring passes.
+ *
+ * The scan (uScan, kinect-demo): like three's Kinect video seen in depth, one band of rows in every SCAN_ROWS burns
+ * bright and the rows between are dim, so the face reads as glowing scanlines of tiny triangles. The band follows the
+ * liquid's height, so a ripple bends the lines, and drifts slowly up the face. The dark theme colours by depth as the
+ * video does: white nearest, then cyan, azure and navy, fading into the page. The dust (uDissolve): a share of the
+ * silhouette's shards stream away to the sides and up, accelerating and fading, then start again; the face's edge
+ * always dissolving a little, as in the moodboard.
  */
 export const kinectGridVert = /* glsl */ `
 #include <packing>
@@ -48,6 +55,8 @@ uniform float uRipple;
 uniform sampler2D uFluid;
 uniform float uFluidAmp;
 uniform float uFluidTilt;
+uniform float uScan;
+uniform float uDissolve;
 
 varying vec3 vBary;
 varying vec3 vColor;
@@ -60,6 +69,7 @@ varying float vSil;
 varying float vFacing;
 varying float vRecess;
 varying vec3 vSmooth;
+varying float vScan;
 
 const float JUMP_SHARE = 0.04;
 // data/kinectGrid.ts STAGGER and JITTER: odd rows half a cell right; each point nudged within 0.3 of a cell.
@@ -67,6 +77,15 @@ const float STAGGER = 0.5;
 const float JITTER = 0.3;
 // How much of a facet's own normal its light keeps: enough that neighbours differ, not so much that the face is noise.
 const float FACET_SHARE = 0.25;
+// The scan: a band every 3 rows, a third of it bright, edges soft; bent by the liquid, drifting up the face.
+const float SCAN_ROWS = 3.0;
+const float SCAN_WIDTH = 0.42;
+const float SCAN_SOFT = 0.3;
+const float SCAN_BEND = 6.0;
+const float SCAN_DRIFT = 0.5;
+// The dust: how far a streaming shard travels (metres) and how often it starts again (per second).
+const float DUST_M = 0.09;
+const float DUST_RATE = 0.14;
 const float CROP_FADE_FROM_M = 0.04;
 const float CROP_FADE_M = 0.3;
 
@@ -235,6 +254,21 @@ void main() {
   vNormal = normalize(mat3(modelMatrix) * lit);
   // The surface without the facets: the liquid's own sheen is lit from this, so it ripples instead of sparkling.
   vSmooth = normalize(mat3(modelMatrix) * lattice);
+  vScan = 1.0;
+  float dust = 1.0;
+  if (uMode > 1.5) {
+    vec2 centre = 0.25 * (uv00 + uv10 + uv01 + uv11);
+    // A still surface (reduced motion, or setRipple(0)) holds the scan still too.
+    float rowAt = cell.y + 0.5 + SCAN_BEND * texture2D(uFluid, centre).r - SCAN_DRIFT * uTime * step(1e-6, uRipple);
+    float band = abs(fract(rowAt / SCAN_ROWS) - 0.5) * 2.0;
+    vScan = mix(1.0, 1.0 - smoothstep(SCAN_WIDTH, SCAN_WIDTH + SCAN_SOFT, band), uScan);
+    // Silhouette shards picked by their hash stream outward from the centre line and up, faster as they go.
+    float streams = step(1.0 - uDissolve, hash01(id, 13u)) * smoothstep(0.5, 0.9, vSil);
+    float phase = fract(uTime * DUST_RATE + hash01(id, 14u));
+    vec3 away = vec3(sign(p00.x + 1e-4), 0.35, 0.0) * (DUST_M * phase * phase * streams);
+    world.xyz += mat3(modelMatrix) * away;
+    dust = 1.0 - phase * streams;
+  }
   vView = cameraPosition - world.xyz;
   float above = mix(world.y - uMirrorPlane, uMirrorPlane - world.y, uMirror);
   float mirrorFade = mix(1.0, 0.35 * (1.0 - smoothstep(0.0, 0.9, above)) * step(0.0, above), uMirror);
@@ -244,15 +278,21 @@ void main() {
   vec3 royal = mix(uGlow, uBg, 0.68);
   vec3 colour = depthT < 0.5 ? mix(uWire, uGlow, depthT * 2.0) : mix(uGlow, royal, depthT * 2.0 - 1.0);
   if (uMode > 1.5 && uIsLight < 0.5) {
-    // The demo's ramp (dark theme; cream keeps the token ramp, whose near end is ink), ice-white at the nearest surface, the wire and glow tokens through the middle, navy far.
-    colour = depthT < 0.12 ? mix(vec3(1.0), uWire, depthT / 0.12)
-      : depthT < 0.55 ? mix(uWire, uGlow, (depthT - 0.12) / 0.43) : mix(uGlow, royal, (depthT - 0.55) / 0.45);
+    // The Kinect video's ramp from the tokens (cream keeps the token ramp, whose near end is ink): white touched with
+    // the wire token at the nearest ridges, a cyan lifted from the glow token, the glow token pushed to a saturated
+    // azure, and navy behind.
+    float luma = dot(uGlow, vec3(0.2126, 0.7152, 0.0722));
+    vec3 azure = max(uGlow + (uGlow - luma) * 0.6, 0.0);
+    vec3 cyan = mix(uGlow, uWire, 0.4);
+    cyan = max(cyan + (cyan - dot(cyan, vec3(0.2126, 0.7152, 0.0722))) * 0.9, 0.0);
+    colour = depthT < 0.12 ? mix(mix(vec3(1.0), uWire, 0.5), cyan, depthT / 0.12)
+      : depthT < 0.5 ? mix(cyan, azure, (depthT - 0.12) / 0.38) : mix(azure, azure * 0.3, (depthT - 0.5) / 0.5);
   }
   vColor = max((colour - 0.5) * uContrast + 0.5 + uBrightness, 0.0);
   // The crop fades in from CROP_FADE_FROM_M to CROP_FADE_M above uMinY (cubed, so the chest has all but gone where
   // the headline's label sits and the shoulders still read at the sides).
   float cropFade = smoothstep(uMinY + CROP_FADE_FROM_M, uMinY + CROP_FADE_M, world.y);
-  vAlpha = ok * mix(1.0, 0.6, depthT) * scatterFade * mirrorFade
+  vAlpha = ok * mix(1.0, 0.6, depthT) * scatterFade * mirrorFade * dust
     * mix(1.0, cropFade * cropFade * cropFade, step(-999.0, uMinY));
   gl_Position = mix(vec4(2.0, 2.0, 2.0, 1.0), projectionMatrix * viewMatrix * world, ok);
 }

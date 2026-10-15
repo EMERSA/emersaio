@@ -4,6 +4,36 @@ import { defineConfig } from 'astro/config';
 
 const site = (process.env.PUBLIC_SITE_URL || 'https://emersa.io').replace(/\/$/, '');
 
+/**
+ * The being's shaders are GLSL in template strings tagged with a glsl comment, and a minifier leaves strings alone,
+ * so every comment explaining the maths would ship. In a build this strips the GLSL comments, the indentation and the
+ * blank lines from those strings (none of them interpolates), before TypeScript is compiled. `astro dev` keeps the
+ * readable source, so a shader error there still points at a line someone can find.
+ */
+function glslComments() {
+  const tagged = /\/\* glsl \*\/ `([^`]*)`/g;
+  /** @param {string} body */
+  const strip = (body) =>
+    body
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n');
+  return {
+    name: 'emersa:glsl-comments',
+    apply: /** @type {const} */ ('build'),
+    enforce: /** @type {const} */ ('pre'),
+    /** @param {string} code @param {string} id */
+    transform(code, id) {
+      if (!id.endsWith('.ts') || !code.includes('/* glsl */')) return null;
+      const out = code.replace(tagged, (_, body) => `\`\n${strip(body)}\n\``);
+      return out === code ? null : { code: out, map: null };
+    },
+  };
+}
+
 export default defineConfig({
   site,
   output: 'static',
@@ -25,6 +55,7 @@ export default defineConfig({
     assets: '_astro',
   },
   vite: {
+    plugins: [glslComments()],
     build: {
       // Never inline small assets as data: URIs.
       assetsInlineLimit: 0,

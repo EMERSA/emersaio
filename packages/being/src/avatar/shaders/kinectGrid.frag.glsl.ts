@@ -8,7 +8,10 @@
  * light gathers cyan-white where the surface turns from the sensor, along the silhouette and at depth steps, so the
  * outline glows like three's kinect demo; on cream it keeps the token ramp with normal blending. Every shard is a
  * touch brighter or darker than its neighbour (its seed), and the key light leaves a sharp glint on the facets that
- * face it: as the liquid skin's rings pass, the glints run across the face like light on water.
+ * face it: as the liquid skin's rings pass, the glints run across the face like light on water. In the dark theme
+ * the body is the depth ramp of three's Kinect video (vColor: white, cyan, azure, navy) shaded by the key light, with
+ * the glowing rim at the silhouette and where the surface turns; the scan (vScan) burns its bands bright and leaves
+ * the rows between them faint.
  */
 export const kinectGridFrag = /* glsl */ `
 uniform float uMode;
@@ -35,6 +38,7 @@ varying float vSil;
 varying float vFacing;
 varying float vRecess;
 varying vec3 vSmooth;
+varying float vScan;
 uniform vec3 uGlow;
 
 void main() {
@@ -71,7 +75,7 @@ void main() {
       colour = mix(colour, vec3(1.0), edge * 0.12 + 0.12 * vRecess) * tint;
       colour = mix(colour, vec3(1.0), glint * 0.2 * (1.0 - vRecess));
       colour = max((colour - 0.5) * uContrast + 0.5 + uBrightness, 0.0);
-      alpha = mix(0.92, 0.55, vRecess) * (0.85 + 0.15 * shimmer);
+      alpha = mix(0.92, 0.55, vRecess) * (0.85 + 0.15 * shimmer) * mix(0.3, 1.0, vScan);
     } else {
       // Dark theme, added onto the page: a deep, saturated azure core (the glow token, darker with depth), cyan-white
       // where the surface turns away from the sensor and along the silhouette and depth steps (the wire token is the
@@ -87,10 +91,11 @@ void main() {
       // The inner shell seen through the eyes and the mouth lies far behind the face: it stays a dim, recessed blue.
       float recess = 1.0 - vRecess;
       float hot = clamp(turn * 4.5 + vSil * 2.0 + lambert * lambert * lambert * 0.25, 0.0, 2.2) * (0.75 + 0.25 * shimmer) * recess;
-      colour = (core + cyan * hot * (0.5 + 0.4 * near)) * tint + uWire * (edge * 0.05 + 0.02 * near * lambert * lambert);
+      // The depth ramp, lit: the key light models the face, each facet its own shade.
+      vec3 body = vColor * (0.32 + 0.62 * lambert) * tint;
+      colour = body + cyan * hot * 0.32 + uWire * edge * 0.04;
       colour += mix(cyan, vec3(1.0), 0.35) * glint * 0.6 * recess;
-      colour = mix(colour, vec3(1.0), smoothstep(1.6, 2.2, hot) * 0.2) * mix(1.0, 0.45, vRecess);
-      colour = max((colour - 0.5) * uContrast + 0.5 + uBrightness, 0.0);
+      colour *= mix(1.0, 0.45, vRecess) * mix(0.18, 1.0, vScan);
       alpha = 1.0;
     }
   } else {

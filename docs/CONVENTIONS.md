@@ -92,7 +92,11 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
   bust is sized from the screen instead (`bustGrid` in `stage/Quality.ts`: one lattice cell about 2 CSS px), up to a
   ceiling per tier (720 x 540 full, 400 x 300 balanced, 160 x 120 lite, 240 x 180 on touch), and its shards ride a
   liquid skin simulated on the GPU (`data/SurfaceFluid.ts`, the CPU twin in `data/fluidMath.ts`): voice rings from
-  the lips, the pointer stirs it through `being.stir(x, y)`, the odd drop lands. Nothing moves under reduced motion.
+  the lips, the pointer stirs it through `being.stir(x, y)`, the odd drop lands. It is drawn like three's Kinect
+  video in depth: one bright scan band every three rows, bent by the liquid and drifting up, a white-cyan-azure-navy
+  depth ramp from the tokens, and silhouette shards streaming off as dust. Nothing moves under reduced motion.
+- Shader sources are GLSL template strings tagged `/* glsl */` with no interpolation: the build strips their comments
+  and indentation (`glslComments` in `apps/web/astro.config.mjs`), so explain freely in them.
 
 ## Tests
 

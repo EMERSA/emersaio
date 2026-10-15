@@ -96,6 +96,8 @@ type CloudUniforms = {
   uFluid: IUniform<Texture>;
   uFluidAmp: IUniform<number>;
   uFluidTilt: IUniform<number>;
+  uScan: IUniform<number>;
+  uDissolve: IUniform<number>;
   uMirrorPlane: SharedUniforms['uMirrorPlane'];
   uViewport: SharedUniforms['uViewport'];
   uDot: SharedUniforms['uDot'];
@@ -130,6 +132,8 @@ export const SHARD_SHRINK = 0.2;
  * The ripples on top of it are the liquid simulation's (SurfaceFluid).
  */
 const RIPPLE_M = 0.002;
+/** The share of the silhouette's shards that stream away as dust (none under reduced motion). */
+const DUST_SHARE = 0.35;
 /** The most setRipple() allows, in metres. */
 const MAX_RIPPLE_M = 0.02;
 
@@ -178,6 +182,8 @@ export class KinectCloud {
       uFluid: { value: this.still },
       uFluidAmp: { value: 0 },
       uFluidTilt: { value: 0 },
+      uScan: { value: 1 },
+      uDissolve: { value: this.reducedMotion ? 0 : DUST_SHARE },
       uGrid: { value: new Vector2(this.cols, this.rows) },
       uLattice: { value: new Vector2(GRID_LATTICE.cols, GRID_LATTICE.rows) },
       uNear: { value: 0.1 },

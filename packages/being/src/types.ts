@@ -14,7 +14,9 @@ export type Theme = 'dark' | 'light';
  * three's webgl_video_kinect done in tiny triangles: head and shoulders, no wire, a dense lattice of glowing shards
  * from a fixed sensor, seen by a view camera that orbits with the pointer. The lattice is sized from the frame on
  * screen (a shard about two pixels across), and the shards ride a simulated liquid skin that her voice, the pointer
- * and the odd drop set rippling.
+ * and the odd drop set rippling. They are drawn like three's Kinect video seen in depth: bright scan bands of tiny
+ * triangles that the liquid bends, coloured white nearest through cyan and azure to navy, the silhouette dissolving
+ * into dust.
  */
 export type Look = 'wire' | 'kinect' | 'hybrid' | 'face' | 'kinect-demo';
 /** What the shell may ask for: the looks, plus the shared contract's name for the face, 'kinect-face'. */
