@@ -108,7 +108,11 @@ export const site = {
     howTo: 'Type your message and press Send, or hold the microphone button or Emily herself and speak.',
     listening: 'Listening. Release to send.',
     upload: 'Add a file',
-    uploadHint: 'PDF, .txt or .md, up to 2 MB.',
+    /** Shown when the paperclip is pressed, before the file picker opens. */
+    fileNote:
+      'Emily reads plain text (.txt) files up to 2 MB and takes in the first 6,000 characters. The text is kept with what she remembers about you, for 12 months after your last visit, and Forget me deletes it. Please add nothing confidential and no one else’s personal data.',
+    fileChoose: 'Choose a .txt file',
+    fileCancel: 'Cancel',
     uploaded: 'Emily has read',
     typeLabel: 'Type to Emily',
     typePlaceholder: 'Type your message here',
@@ -122,7 +126,7 @@ export const site = {
     memoryFiles: 'Files',
     memoryEmpty: 'Nothing yet.',
     forget: 'Forget me',
-    /** The disclosure in the conversation's head row that holds Add a file, What Emily remembers and End. */
+    /** The disclosure in the conversation's head row that holds What Emily remembers and End. */
     more: 'More',
     forgotten: 'Done. Emily has forgotten everything about you.',
     notices: {
@@ -146,7 +150,8 @@ export const site = {
         'Emily’s voice could not connect from this browser. A content blocker or a strict network may be stopping it.',
       policyBlocked: 'This page’s security policy blocked the voice service. Please reload the page and try again.',
       fileTooBig: 'That file is over 2 MB.',
-      fileType: 'Please choose a PDF, .txt or .md file.',
+      fileType:
+        'Emily reads .txt files only. Save your document as plain text first (in Word: File, Save As, Plain Text; from a PDF, copy the text into Notepad and save it), then add it again.',
       fileFailed: 'Emily could not read that file.',
       reconnecting: 'Reconnecting',
     },

@@ -248,20 +248,28 @@ try {
       check(`${tag} chat: the guide line shows when the chat opens`, guideShown);
       await page.screenshot({ path: join(shots, `phone-${tag}-chat-guide.png`) });
 
-      // More holds the three choices; Escape and a tap outside close it.
+      // Add a file is beside the microphone, a 44 px target.
+      const attach = await page.evaluate(() => {
+        const r = document.querySelector('.talk-attach')?.getBoundingClientRect();
+        return r ? [Math.round(r.width), Math.round(r.height), r.right <= innerWidth] : null;
+      });
+      check(
+        `${tag} chat: Add a file beside the microphone`,
+        !!attach && attach[0] >= 44 && attach[1] >= 44 && attach[2],
+        JSON.stringify(attach),
+      );
+      // More holds the two choices; Escape and a tap outside close it.
       await page.locator('[data-talk-more] > summary').tap();
       const items = await page.evaluate(
         () =>
           [
-            ...document.querySelectorAll(
-              '[data-talk-more] .talk-upload, [data-talk-more] [data-talk-memory-open], [data-talk-more] [data-talk-end]',
-            ),
+            ...document.querySelectorAll('[data-talk-more] [data-talk-memory-open], [data-talk-more] [data-talk-end]'),
           ].filter((el) => {
             const r = el.getBoundingClientRect();
             return r.width > 0 && r.height >= 44 - 0.5;
           }).length,
       );
-      check(`${tag} chat: More holds Add a file, What Emily remembers and End`, items === 3, `${items} item(s)`);
+      check(`${tag} chat: More holds What Emily remembers and End`, items === 2, `${items} item(s)`);
       await page.screenshot({ path: join(shots, `phone-${tag}-chat-more.png`) });
       await page.keyboard.press('Escape');
       const closedByEscape = await page.evaluate(() => !document.querySelector('[data-talk-more]')?.open);

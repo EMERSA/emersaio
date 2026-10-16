@@ -19,6 +19,7 @@ import '../styles/hud.css';
 import { TURNSTILE_SITEKEY } from '../lib/talk-config.ts';
 import BeingStage from './BeingStage.astro';
 import Captions from './Captions.astro';
+import FileIcon from './FileIcon.astro';
 import MicIcon from './MicIcon.astro';
 
 // The avatar pipeline produces these files and a fresh checkout may lack them. Whatever exists reaches the scripts
@@ -53,16 +54,6 @@ const { hero, tour, talk, a11y } = site;
       <details class="talk-more" data-talk-more hidden>
         <summary class="monitor-btn">{talk.more}</summary>
         <div class="talk-more-menu">
-          <label class="monitor-btn talk-upload">
-            {talk.upload}
-            <input
-              class="sr-only"
-              type="file"
-              accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
-              data-talk-file
-            />
-          </label>
-          <p class="monitor-note">{talk.uploadHint}</p>
           <button type="button" class="monitor-btn" data-talk-memory-open aria-expanded="false">
             {talk.memoryOpen}
           </button>
@@ -130,6 +121,16 @@ const { hero, tour, talk, a11y } = site;
       </section>
       <ol class="talk-log" data-talk-log aria-live="polite" aria-label={talk.title}></ol>
       <p class="monitor-label talk-state" data-talk-state aria-live="polite"></p>
+      <div class="talk-file-note" id="talk-file-note" data-talk-file-note hidden>
+        <p class="monitor-note">{talk.fileNote}</p>
+        <p class="talk-file-actions">
+          <label class="monitor-btn talk-file-choose">
+            {talk.fileChoose}
+            <input class="sr-only" type="file" accept=".txt,text/plain" data-talk-file />
+          </label>
+          <button type="button" class="monitor-btn" data-talk-file-cancel>{talk.fileCancel}</button>
+        </p>
+      </div>
       <form class="talk-type" data-talk-form>
         <label class="sr-only" for="talk-input">{talk.typeLabel}</label>
         <span class="monitor-prompt" aria-hidden="true">&gt;</span>
@@ -146,6 +147,16 @@ const { hero, tour, talk, a11y } = site;
           <span class="monitor-caret" aria-hidden="true"></span>
         </span>
         <button type="submit" class="monitor-btn">{talk.send}</button>
+        <button
+          type="button"
+          class="talk-attach"
+          title={talk.upload}
+          aria-expanded="false"
+          aria-controls="talk-file-note"
+          data-talk-attach>
+          <FileIcon class="talk-attach-icon" />
+          <span class="sr-only">{talk.upload}</span>
+        </button>
         <span class="talk-voice">
           <button type="button" class="talk-mic" data-talk-mic aria-pressed="false">
             <MicIcon class="talk-mic-icon" />
@@ -314,6 +325,13 @@ const { hero, tour, talk, a11y } = site;
     .hero {
       justify-content: flex-end;
       min-height: max(calc(100svh - var(--header-h)), 780px);
+    }
+
+    /* Talking, the copy is hidden, so the hero is exactly one window tall: Emily, her bust and the conversation all
+       in view on a short laptop screen too, and the page still scrolls on below. */
+    :global(html.is-talking) .hero {
+      min-height: calc(100svh - var(--header-h));
+      height: calc(100svh - var(--header-h));
     }
 
     /* The dock is the whole hero (hud.css); the copy is anchored 48px above the hero's foot. */

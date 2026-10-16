@@ -380,7 +380,7 @@ html.is-talking .being-stage {
   display: none;
 }
 
-/* ---------- More: Add a file, What Emily remembers and End, under one control in the head row ---------- */
+/* ---------- More: What Emily remembers and End, under one control in the head row ---------- */
 .talk-more {
   position: relative;
   flex: none;
@@ -404,15 +404,6 @@ html.is-talking .being-stage {
   margin: -0.5rem 0 0.25rem;
   padding-inline: 0.25rem;
   white-space: normal;
-}
-
-.talk-upload {
-  cursor: pointer;
-}
-
-.talk-upload:focus-within {
-  outline: 2px solid var(--phos);
-  outline-offset: 0;
 }
 
 /* ---------- The conversation ---------- */
@@ -596,6 +587,71 @@ html.is-talking .being-stage {
 .talk-voice {
   display: flex;
   flex: none;
+}
+
+/* Add a file: a round paperclip beside the microphone, smaller, so the microphone stays the main control. */
+.talk-attach {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--phos-dim);
+  border-radius: 50%;
+  color: var(--phos);
+  cursor: pointer;
+}
+
+.talk-attach svg {
+  width: 20px;
+  height: 20px;
+}
+
+.talk-attach:hover {
+  border-color: var(--phos);
+}
+
+.talk-attach {
+  padding: 0;
+  background: transparent;
+}
+
+.talk-attach:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.talk-attach[aria-expanded="true"] {
+  border-color: var(--phos);
+}
+
+/* The note before a file is chosen: what Emily reads and keeps, then Choose or Cancel. */
+.talk-file-note {
+  display: grid;
+  flex: none;
+  gap: 0.5rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--phos-dim);
+}
+
+.talk-file-note .monitor-note {
+  color: var(--phos);
+}
+
+.talk-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.talk-file-choose {
+  cursor: pointer;
+}
+
+.talk-file-choose:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .talk-mic {

@@ -25,7 +25,7 @@ const TURNSTILE_WAIT_MS = 15000;
 /** The consent text version the Worker records with the visitor row. Bump it when the consent copy changes. */
 export const CONSENT_VERSION = 3;
 const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
-const UPLOAD_TYPES = /\.(pdf|txt|md)$/i;
+const UPLOAD_TYPES = /\.txt$/i;
 /** The Worker keeps 20,000 characters of a document; the session hands Emily the first 6,000 of them. */
 const DOCUMENT_MAX_CHARS = 20000;
 
@@ -135,6 +135,9 @@ interface Ui {
   more: HTMLDetailsElement;
   moreButton: HTMLElement;
   file: HTMLInputElement;
+  attach: HTMLButtonElement;
+  fileNote: HTMLElement;
+  fileCancel: HTMLButtonElement;
   memoryOpen: HTMLButtonElement;
   memory: HTMLElement;
   facts: HTMLElement;
@@ -188,6 +191,9 @@ function collect(panel: HTMLElement): Ui | null {
     more: q('[data-talk-more]', HTMLDetailsElement),
     moreButton: q('[data-talk-more] > summary', HTMLElement),
     file: q('[data-talk-file]', HTMLInputElement),
+    attach: q('[data-talk-attach]', HTMLButtonElement),
+    fileNote: q('[data-talk-file-note]', HTMLElement),
+    fileCancel: q('[data-talk-file-cancel]', HTMLButtonElement),
     memoryOpen: q('[data-talk-memory-open]', HTMLButtonElement),
     memory: q('[data-talk-memory]', HTMLElement),
     facts: q('[data-memory-facts]', HTMLElement),
@@ -371,12 +377,23 @@ class Controller {
       },
       { capture: true },
     );
-    // More: Add a file, What Emily remembers and End. It closes on a choice, on Escape and on a tap outside it.
+    // Add a file sits beside the microphone; More holds What Emily remembers and End, and closes on a choice, on
+    // Escape and on a tap outside it.
+    // The paperclip opens the file note (what Emily reads and keeps) with Choose and Cancel; the picker opens from
+    // Choose.
+    const fileNote = (open: boolean): void => {
+      ui.fileNote.hidden = !open;
+      ui.attach.setAttribute('aria-expanded', String(open));
+    };
+    ui.attach.addEventListener('click', () => fileNote(ui.fileNote.hidden));
+    ui.fileCancel.addEventListener('click', () => {
+      fileNote(false);
+      ui.attach.focus();
+    });
     ui.file.addEventListener('change', () => {
-      this.closeMore();
+      fileNote(false);
       void this.upload();
     });
-    ui.file.addEventListener('cancel', () => this.closeMore());
     ui.memoryOpen.addEventListener('click', () => {
       this.closeMore();
       void this.setMemory(ui.memory.hidden);
@@ -439,7 +456,10 @@ class Controller {
     root.classList.add('is-talking');
     this.requestBeing();
     this.trackViewport(true);
+    // Phones open the conversation as a sheet over a locked page; from 720px it stays in the page, the hero one
+    // window tall (Hero.astro), and the page scrolls on as usual.
     this.lockPage(PHONE.matches);
+    if (!PHONE.matches) document.querySelector('.hero')?.scrollIntoView({ block: 'start' });
     if (this.session) {
       this.focusInput();
       return;
@@ -708,9 +728,8 @@ class Controller {
       if (response.status === 429) return this.notice('limit');
       if (!response.ok) return this.notice('fileFailed');
       const doc = (await response.json()) as { id: string; name: string; chars: number; text?: string };
-      // Text files are read here, so Emily gets the words without a second round trip; a PDF's words come from the
-      // Worker's extraction when it returns them.
-      const text = doc.text ?? (/\.pdf$/i.test(file.name) ? '' : (await file.text()).slice(0, DOCUMENT_MAX_CHARS));
+      // The file is read here, so Emily gets the words without a second round trip.
+      const text = doc.text ?? (await file.text()).slice(0, DOCUMENT_MAX_CHARS);
       if (text) this.session?.addDocument(doc.name, text);
       this.status(`${copy.uploaded} ${doc.name}`);
     } catch {
