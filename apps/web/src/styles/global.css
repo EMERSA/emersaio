@@ -379,6 +379,13 @@ summary::-webkit-details-marker {
   font-size: var(--text-xs);
 }
 
+/* The large button: the one that opens the conversation with Emily. */
+.btn-lg {
+  min-height: 56px;
+  padding: 1rem 1.75rem;
+  font-size: var(--text-sm);
+}
+
 /* ---------- 5. Cards ---------- */
 /* Raised: flat --bg-2 (white in light), a 1px hairline, radius 16, no motion. */
 .card {

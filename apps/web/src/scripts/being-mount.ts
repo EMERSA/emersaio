@@ -1,11 +1,12 @@
 /**
  * Mounts the being on documents whose <main data-being> asks for it. Three.js loads only when the device can carry
- * it: after the LCP and an idle moment on hover-capable desktops, on the first tap elsewhere, never under reduced
- * motion or without WebGL2. Every other path keeps the poster and runs the tour with captions alone, and no failure
- * here is allowed to escape: each one ends in that captions-only mode, or, when not even the tour could be built,
- * in the transcript that "Start the tour" points at without JavaScript.
+ * it: after the LCP and an idle moment on hover-capable desktops, on the first tap elsewhere (the tap that opens
+ * Talk included), never without WebGL2, and under reduced motion only for Talk, which draws her still. Every other
+ * path keeps the poster and runs the tour with captions alone, and no failure here is allowed to escape: each one
+ * ends in that captions-only mode, or, when not even the tour could be built, in the transcript that "Start the
+ * tour" points at without JavaScript.
  */
-import type { BeingHandle, BeingOptions, Capabilities, SpeakRequest, TourScript } from '@emersa/being';
+import type { BeingHandle, BeingOptions, Capabilities, Quality, SpeakRequest, TourScript } from '@emersa/being';
 import { primeAudio } from '@emersa/being/audio';
 import type { PageAdapter, TourController, TourState } from '@emersa/being/tour';
 import type { TourUi, VoiceAbsence } from './tour-ui.ts';
@@ -13,6 +14,10 @@ import type { TourUi, VoiceAbsence } from './tour-ui.ts';
 type Mode = 'tour' | 'talk';
 type Theme = 'dark' | 'light';
 type TourModule = typeof import('@emersa/being/tour');
+/** How the being frames Emily: the hero's bust, or the portrait of a phone's chat (talk.ts asks, em:talk-layout). */
+type Framing = 'bust' | 'portrait';
+/** setFraming arrives with the runtime's portrait framing; until then the call is optional. */
+type FramingHandle = BeingHandle & { setFraming?: (mode: Framing) => void };
 
 interface Elements {
   stage: HTMLElement;
@@ -34,6 +39,8 @@ interface Device {
   hoverFine: boolean;
   saveData: boolean;
   lowEnd: boolean;
+  /** 2 GB or less (navigator.deviceMemory): the one hint, besides saving data, that sends a phone the lite figure. */
+  memoryLow: boolean;
 }
 
 interface Mount {
@@ -42,6 +49,10 @@ interface Mount {
   device: Device;
   being: BeingHandle | null;
   loading: Promise<BeingHandle | null> | null;
+  /** The load has finished, with a being or without one. */
+  settled: boolean;
+  /** The framing Talk asked for last; a being that arrives later takes it on. */
+  framing: Framing;
   /** The tour started without the being; one that arrives afterwards is disposed rather than shown mute. */
   abandoned: boolean;
   /** The being's WebGL context went away; the poster stays whatever the quality ladder reports afterwards. */
@@ -89,6 +100,8 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
     device: probeDevice(),
     being: null,
     loading: null,
+    settled: false,
+    framing: 'bust',
     abandoned: false,
     contextLost: false,
     noVoice: null,
@@ -117,21 +130,29 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
     if (!m.loading && !m.device.reducedMotion) void loadBeing(m);
   });
   document.addEventListener('keydown', (event) => onKey(m, event));
-  // Talk (scripts/talk.ts) asks for the being here rather than making a second one: the detail is a callback that
-  // receives the handle, or null when this device shows the poster.
   // Opening the conversation ends a running tour: the monitor is one panel and the being speaks for one at a time.
+  // The tap that opens it is a gesture, so the being starts loading in it (on touch, the first chance there is).
   document.addEventListener('em:talk-open', () => {
     try {
       m.tour?.stop();
     } catch {
       setTouring(m, false);
     }
+    void loadForTalk(m);
   });
+  // Talk (scripts/talk.ts) asks for the being here rather than making a second one: the detail is a callback that
+  // receives the handle, or null when this device shows the poster.
   document.addEventListener('em:being-request', (event) => {
     const reply = (event as CustomEvent<unknown>).detail;
     if (typeof reply !== 'function') return;
-    const loading = m.device.reducedMotion ? Promise.resolve(null) : loadBeing(m);
-    void loading.then((handle) => (reply as (being: BeingHandle | null) => void)(handle));
+    void loadForTalk(m).then((handle) => (reply as (being: BeingHandle | null) => void)(handle));
+  });
+  // Talk frames Emily as a portrait while a phone shows the chat, and as the hero's bust again afterwards.
+  document.addEventListener('em:talk-layout', (event) => {
+    const framing = (event as CustomEvent<unknown>).detail;
+    if (framing !== 'bust' && framing !== 'portrait') return;
+    m.framing = framing;
+    if (m.being) applyFraming(m.being, framing);
   });
 
   if (m.device.reducedMotion) {
@@ -185,6 +206,7 @@ function probeDevice(): Device {
     hoverFine: matchMedia('(hover: hover) and (pointer: fine)').matches,
     saveData: nav.connection?.saveData === true,
     lowEnd: (nav.hardwareConcurrency || 4) <= 2 || (nav.deviceMemory ?? 4) <= 2,
+    memoryLow: (nav.deviceMemory ?? 4) <= 2,
   };
 }
 
@@ -223,7 +245,26 @@ function primeVoice(m: Mount): void {
 
 /* Loading the being ------------------------------------------------------------------------------------------ */
 
-function loadBeing(m: Mount): Promise<BeingHandle | null> {
+/**
+ * The being for Talk. Talk opening stopped any tour, so a being the tour gave up on (it began captions-only, or under
+ * reduced motion never asked) is wanted again: one still arriving is kept, and one that was dropped is loaded anew.
+ */
+function loadForTalk(m: Mount): Promise<BeingHandle | null> {
+  if (m.abandoned) {
+    m.abandoned = false;
+    if (m.settled && !m.being && !m.contextLost) {
+      m.loading = null;
+      m.settled = false;
+    }
+  }
+  return loadBeing(m, true);
+}
+
+/**
+ * Loads and wires the being once. `talk` is the conversation's request: under reduced motion it still loads, with
+ * the runtime's reducedMotion (no intro, no drift, no idle motion), where the hero and the tour keep the poster.
+ */
+function loadBeing(m: Mount, talk = false): Promise<BeingHandle | null> {
   if (m.loading) return m.loading;
   m.loading = (async (): Promise<BeingHandle | null> => {
     const { stage, canvas } = m.el;
@@ -233,8 +274,9 @@ function loadBeing(m: Mount): Promise<BeingHandle | null> {
     try {
       const being = await import('@emersa/being');
       const caps = being.detectCapabilities();
-      if (!caps.webgl2 || caps.reducedMotion) return fail(m, 'still');
-      const assetUrl = pickAsset(stage, caps);
+      if (!caps.webgl2 || (caps.reducedMotion && !talk)) return fail(m, 'still');
+      const quality = startQuality(caps);
+      const assetUrl = pickAsset(stage, caps, m.device, quality);
       if (!assetUrl) return fail(m, 'still');
       // The look is kinect-demo: head and shoulders as a dense field of tiny glowing shards from a fixed sensor,
       // seen by a view that orbits with the pointer, assembling from pieces on its first frame (at most 1.2 s).
@@ -243,14 +285,14 @@ function loadBeing(m: Mount): Promise<BeingHandle | null> {
         canvas,
         assetUrl,
         theme: currentTheme(),
-        quality: caps.suggestedQuality,
+        quality,
         bloom: false,
         look: 'kinect-demo',
-        intro: true,
+        intro: !caps.reducedMotion,
         ribbon: false,
         reflection: false,
         ring: false,
-        reducedMotion: false,
+        reducedMotion: caps.reducedMotion,
         maxPixelRatio: caps.maxPixelRatio,
         onReady: () => {
           // A being that arrives after the tour gave it up, or after its context was lost, is disposed below;
@@ -281,17 +323,44 @@ function loadBeing(m: Mount): Promise<BeingHandle | null> {
       // A failed load must not leave a WebGL context, observers and listeners behind on the canvas.
       handle?.dispose();
       return fail(m, 'connection');
+    } finally {
+      m.settled = true;
     }
   })();
   return m.loading;
 }
 
-function pickAsset(stage: HTMLElement, caps: Capabilities): string {
+/**
+ * The tier to start at. Reduced motion makes the runtime suggest the poster; Talk draws the being still instead,
+ * so there the tier comes from the device as it would without reduced motion.
+ */
+function startQuality(caps: Capabilities): Quality {
+  if (!caps.reducedMotion || caps.suggestedQuality !== 'poster') return caps.suggestedQuality;
+  if (caps.lowEnd || caps.saveData) return 'lite';
+  return caps.touch ? 'balanced' : 'full';
+}
+
+/**
+ * The full figure, whose face carries the detail a phone's portrait shows up close, everywhere but where the visitor
+ * saves data or a phone has 2 GB or less (the core count says little about a phone's GPU). Desktops keep the lite
+ * figure on weak hardware and at the lite tier.
+ */
+function pickAsset(stage: HTMLElement, caps: Capabilities, device: Device, quality: Quality): string {
   const full = stage.dataset.assetUrl ?? '';
   const lite = stage.dataset.assetLiteUrl ?? '';
-  const preferLite =
-    caps.touch || caps.lowEnd || caps.suggestedQuality === 'lite' || caps.suggestedQuality === 'poster';
+  const preferLite = caps.touch
+    ? device.saveData || device.memoryLow
+    : caps.lowEnd || quality === 'lite' || quality === 'poster';
   return preferLite ? lite || full : full || lite;
+}
+
+/** The framing Talk asked for, on a runtime that has it. */
+function applyFraming(being: BeingHandle, framing: Framing): void {
+  try {
+    (being as FramingHandle).setFraming?.(framing);
+  } catch {
+    // The being keeps the framing it has.
+  }
 }
 
 function wireBeing(m: Mount, being: BeingHandle): void {
@@ -326,6 +395,8 @@ function wireBeing(m: Mount, being: BeingHandle): void {
   } catch {
     // The head renders without its data lines.
   }
+  // A phone's chat may have asked for the portrait before she arrived.
+  if (m.framing !== 'bust') applyFraming(being, m.framing);
   watchVoice(m, being);
 }
 
@@ -645,7 +716,7 @@ function createCaptionBeing(): BeingHandle {
     cancel = null;
   };
   const noop = (): void => undefined;
-  return {
+  const handle: FramingHandle = {
     ready: Promise.resolve(),
     speak(request: SpeakRequest): Promise<void> {
       stopSpeaking();
@@ -695,6 +766,7 @@ function createCaptionBeing(): BeingHandle {
     lookAt: noop,
     stir: noop,
     setListening: noop,
+    setFraming: noop,
     setLook: noop,
     getLook: () => 'wire',
     setShatter: noop,
@@ -726,6 +798,7 @@ function createCaptionBeing(): BeingHandle {
     }),
     dispose: stopSpeaking,
   };
+  return handle;
 }
 
 /* Helpers ---------------------------------------------------------------------------------------------------- */

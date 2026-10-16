@@ -3,11 +3,14 @@
    phosphor-green terminal text with no box, beneath her face. Imported by Hero.astro. Colours come from tokens.css
    only (--phos, --phos-dim and the --phos-halo text-shadow in the page colour that keeps the letters readable over
    the shards); the type is the system mono stack, so no font file is added. No blur, no fill, no border: at rest
-   the stage is no box either. On phones the stage is a 46svh full-bleed block and the text sits under it over the
-   shoulders; from 720px the stage fills the hero and the text starts under the chin, over the chest, replies
-   rising from the input line and dissolving before they reach her mouth. The monitor is hidden until the tour or
-   Talk starts; the tour pins it to the bottom edge of the viewport as a flat band on the page colour (the page
-   scrolls under it, so it needs a floor) and the page keeps that much room at its foot (--dock-h).
+   the stage is no box either. On phones the stage is a 46svh full-bleed block above the hero copy; from 720px the
+   stage fills the hero and the conversation starts under her neck (--talk-top, from talkTextTop in the runtime's
+   framing.ts), replies rising from the prompt. The monitor is hidden until the tour or Talk starts. The tour pins it
+   to the bottom edge of the viewport as a flat band on the page colour (the page scrolls under it, so it needs a
+   floor) and the page keeps that much room at its foot (--dock-h). On a phone the conversation is a sheet under the
+   header sized to the visible viewport (--vv-h, --vv-top from talk.ts): Emily on top, never covered, and the
+   consent or the chat under her; html.is-chatting marks the chat, html.is-keyboard a keyboard (or a screen as short
+   as one with it up) that leaves the chat less room.
    ========================================================================== */
 
 .being-dock {
@@ -21,6 +24,13 @@
   width: 100%;
 }
 
+/* A short phone keeps the Talk button on its first screen: the stage gives up a little height. */
+@media (max-width: 719.98px) and (max-height: 620px) {
+  .being-dock {
+    --stage-h: 40svh;
+  }
+}
+
 /* ---------- The stage ---------- */
 .being-slot {
   position: relative;
@@ -28,9 +38,20 @@
   overflow: hidden;
 }
 
+/* The runtime turns Emily under a drag and listens under a press held on her (talk.ts maps its em:being-hold to the
+   microphone): the page still scrolls and zooms past her, and a long press selects nothing and opens no callout.
+   While the conversation is open every touch on her is hers. */
 .being-stage {
   position: absolute;
   inset: 0;
+  touch-action: pan-y pinch-zoom;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+html.is-talking .being-stage {
+  touch-action: none;
 }
 
 /* The canvas starts invisible so the heading stays the LCP element. */
@@ -60,6 +81,11 @@
 
 .being-stage.is-ready .being-canvas {
   opacity: 1;
+  cursor: grab;
+}
+
+.being-stage.is-ready .being-canvas:active {
+  cursor: grabbing;
 }
 
 .being-stage.is-ready .being-poster {
@@ -88,9 +114,10 @@
   gap: 0.75rem;
   box-sizing: border-box;
   width: min(44rem, 100% - 2 * var(--gutter));
-  /* The hero is a flex column: the overlay centres itself as an item, and the top margin pulls it over the shoulders. */
-  align-self: center;
-  margin: calc(-0.28 * var(--stage-h)) auto 0;
+  /* Never in the flow under the stage while it shows: the tour pins it, the conversation lays it over the being
+     (from 720px) or opens it as a sheet (phones). Centred by its margins; no align-self, which on an absolutely
+     placed box would size it to its content and centre that across its top and bottom instead of filling them. */
+  margin: 0 auto;
   padding: 0;
   color: var(--phos);
   font-family: var(--font-mono);
@@ -107,8 +134,18 @@
 .monitor-head {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem 0.75rem;
   min-height: 1.5rem;
+}
+
+/* The state label and, while a voice plays, the "AI-generated voice" line stacked under it, so the row keeps its
+   height when the disclosure comes and goes. */
+.monitor-labels {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
 }
 
 .monitor-label {
@@ -122,7 +159,7 @@
 }
 
 .monitor-close {
-  margin-inline-start: auto;
+  flex: none;
 }
 
 .monitor-view {
@@ -141,7 +178,7 @@
   color: var(--phos);
 }
 
-/* The one line that says how to talk: type, or hold the microphone. */
+/* The one line that says how to talk: type, or hold the microphone or Emily. */
 .monitor-howto {
   margin: 0;
   font-size: var(--text-sm);
@@ -213,10 +250,11 @@
   text-decoration: none;
 }
 
-/* Inverse video, the terminal's way of marking the selected item: the primary action, and a toggle that is on
-   (Mute, the held microphone). */
+/* Inverse video, the terminal's way of marking the selected item: the primary action, a toggle that is on (Mute)
+   and the open More menu. */
 .monitor-btn[aria-pressed="true"],
-.monitor-btn-primary {
+.monitor-btn-primary,
+.talk-more[open] > .monitor-btn {
   padding-inline: 0.5rem;
   background: var(--phos);
   color: var(--bg);
@@ -226,7 +264,9 @@
 .monitor-btn[aria-pressed="true"]::before,
 .monitor-btn[aria-pressed="true"]::after,
 .monitor-btn-primary::before,
-.monitor-btn-primary::after {
+.monitor-btn-primary::after,
+.talk-more[open] > .monitor-btn::before,
+.talk-more[open] > .monitor-btn::after {
   color: var(--bg);
 }
 
@@ -282,7 +322,29 @@
   border-radius: var(--radius);
 }
 
-/* ---------- The Talk views ---------- */
+/* ---------- The consent view: the notice scrolls, Turnstile and Start stay at its foot ---------- */
+.talk-consent-body {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* More of the notice below: its foot fades (talk.ts sets the class), so the clipped line reads as "scroll on". An
+   alpha mask, not a colour. */
+.talk-consent-body.is-overflowing {
+  mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent);
+}
+
+.talk-consent-foot {
+  display: grid;
+  flex: none;
+  gap: 0.5rem;
+}
+
 .talk-terms {
   display: grid;
   gap: 0.5rem;
@@ -316,12 +378,65 @@
   display: none;
 }
 
-/* The log: a terminal. New lines arrive at the foot (talk.ts scrolls it); the oldest dissolve at the top. */
-.talk-log {
+/* ---------- More: Add a file, What Emily remembers and End, under one control in the head row ---------- */
+.talk-more {
+  position: relative;
+  flex: none;
+}
+
+.talk-more-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 5;
   display: grid;
+  justify-items: start;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--gutter));
+  padding: 0.25rem 0.75rem 0.5rem;
+  border: 1px solid var(--phos-dim);
+  background: var(--bg);
+}
+
+.talk-more-menu .monitor-note {
+  margin: -0.5rem 0 0.25rem;
+  padding-inline: 0.25rem;
+  white-space: normal;
+}
+
+.talk-upload {
+  cursor: pointer;
+}
+
+.talk-upload:focus-within {
+  outline: 2px solid var(--phos);
+  outline-offset: 0;
+}
+
+/* ---------- The conversation ---------- */
+/* The guide line shows once, when the chat opens, and fades after ten seconds. The fade lasts GUIDE_FADE_MS of
+   scripts/talk-guide.ts (its test reads this rule); talk.ts hides the line when the fade is over. Where room is
+   short it gives way before the prompt does. */
+.talk-guide {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  transition: opacity 600ms var(--ease-out);
+}
+
+.talk-guide.is-fading {
+  opacity: 0;
+}
+
+/* The log: a terminal. The newest line sits on the prompt and older ones rise above it, dissolving at the top;
+   once they fill the space the log scrolls (talk.ts keeps the foot in view). */
+.talk-log {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
   gap: 0.375rem;
-  max-height: 9rem;
-  margin: auto 0 0;
+  min-height: 0;
+  margin: 0;
   padding: 0;
   overflow-y: auto;
   list-style: none;
@@ -329,6 +444,10 @@
   scroll-behavior: smooth;
   /* An alpha mask, not a colour: the keywords are deliberate (scripts/preflight.mjs looks for colour literals). */
   mask-image: linear-gradient(to bottom, transparent, black 2.5rem);
+}
+
+.talk-log > :first-child {
+  margin-top: auto;
 }
 
 .talk-log li {
@@ -356,10 +475,50 @@
   color: var(--phos-dim);
 }
 
-/* The prompt line: a ">" sign, the typed text on an underline, and a blinking block cursor until the field takes
-   the focus. */
+/* What Emily remembers takes the log's place while it is open. */
+.talk-memory {
+  display: grid;
+  align-content: start;
+  gap: 0.375rem;
+  min-height: 0;
+  padding-top: 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.talk-memory:not([hidden]) {
+  flex: 1 1 0;
+}
+
+.talk-session:has(> .talk-memory:not([hidden])) > .talk-log {
+  display: none;
+}
+
+.talk-memory[hidden] {
+  display: none;
+}
+
+.talk-memory ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+}
+
+.talk-memory p {
+  margin: 0;
+}
+
+/* The state line ("Connecting", "Listening") takes no room while it is empty. */
+.talk-state:empty {
+  margin-top: -0.5rem;
+}
+
+/* The prompt: a ">" sign, the field on an underline with a blinking block cursor at the start of the text until
+   the field takes the focus or holds a word, Send, and the round microphone at the end of the line. */
 .talk-type {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 0.5rem;
 }
@@ -368,16 +527,27 @@
   color: var(--phos-dim);
 }
 
+.talk-field {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 16px text at least: iOS zooms the page into a field with smaller type. The left padding leaves the cursor its
+   cell, so the placeholder starts where the typing will. */
 .talk-input {
   flex: 1;
   min-width: 0;
-  padding: 0.5rem 0;
+  min-height: 44px;
+  padding: 0.5rem 0 0.5rem 1.4ch;
   border: 0;
   border-bottom: 1px solid var(--phos-dim);
   border-radius: 0;
   background: transparent;
   color: var(--phos);
   font: inherit;
+  font-size: max(16px, 1rem);
   caret-color: var(--phos);
   text-shadow: inherit;
 }
@@ -395,14 +565,20 @@
 }
 
 .monitor-caret {
-  display: inline-block;
+  position: absolute;
+  top: 50%;
+  left: 0;
   width: 0.6ch;
   height: 1.1em;
+  margin-top: -0.55em;
   background: var(--phos);
+  font-size: max(16px, 1rem);
+  pointer-events: none;
   animation: monitor-caret 1.1s steps(1, end) infinite;
 }
 
-.talk-type:focus-within .monitor-caret {
+.talk-field:focus-within .monitor-caret,
+.talk-input:not(:placeholder-shown) + .monitor-caret {
   display: none;
 }
 
@@ -412,40 +588,86 @@
   }
 }
 
-.talk-actions {
+/* The microphone: a round button at the end of the prompt, held to speak. Held open, it turns to inverse video and
+   a ring pulses out of it (transform and opacity only). Pointer capture (talk.ts) keeps a finger that drifts off it
+   holding; it never scrolls the page or opens a callout. */
+.talk-voice {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.5rem;
+  flex: none;
 }
 
-.talk-upload {
+.talk-mic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 1px solid var(--phos);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--phos);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   cursor: pointer;
 }
 
-.talk-upload:focus-within {
+.talk-mic svg {
+  position: relative;
+  width: 30px;
+  height: 30px;
+}
+
+/* The press itself shows at once, before the browser has opened the microphone. */
+.talk-mic::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--phos);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.talk-mic:active::before {
+  opacity: 0.2;
+}
+
+.talk-mic::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--phos);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.talk-mic[aria-pressed="true"] {
+  background: var(--phos);
+  color: var(--bg);
+}
+
+.talk-mic[aria-pressed="true"]::after {
+  animation: talk-mic-ring 1.2s var(--ease-out) infinite;
+}
+
+.talk-mic:focus-visible {
   outline: 2px solid var(--phos);
-  outline-offset: 0;
+  outline-offset: 3px;
 }
 
-.talk-memory {
-  display: grid;
-  gap: 0.375rem;
-  padding-top: 0.5rem;
-}
-
-.talk-memory[hidden] {
-  display: none;
-}
-
-.talk-memory ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-xs);
-}
-
-.talk-memory p {
-  margin: 0;
+@keyframes talk-mic-ring {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
 }
 
 .talk-notice {
@@ -480,7 +702,95 @@ html.is-touring body {
   padding-bottom: var(--dock-h, 0px);
 }
 
-/* ---------- From 720px: the stage fills the hero and the text sits under the chin, over the chest ---------- */
+/* ---------- Phones: the conversation as a sheet under the header, Emily on top ---------- */
+@media (max-width: 719.98px) {
+  /* The sheet starts under the header, or at the top of the visible viewport once the keyboard has panned the
+     header away, and ends at the visible viewport's foot. The page behind is locked and inert (talk.ts). */
+  html.is-talking {
+    --overlay-top: max(var(--vv-top, 0px), var(--header-h));
+    --overlay-h: calc(var(--vv-top, 0px) + var(--vv-h, 100dvh) - var(--overlay-top));
+    --talk-stage: clamp(160px, 34svh, 300px);
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  html.is-talking.is-chatting {
+    --talk-stage: clamp(180px, calc(var(--overlay-h) - 17rem), 56svh);
+  }
+
+  html.is-talking.is-chatting.is-keyboard {
+    --talk-stage: clamp(96px, calc(var(--overlay-h) - 13rem), 34svh);
+  }
+
+  /* The hero keeps its height under the sheet, so nothing on the page moves when the sheet opens or closes. */
+  html.is-talking .being-dock {
+    min-height: var(--stage-h);
+  }
+
+  html.is-talking .being-slot {
+    position: fixed;
+    top: var(--overlay-top);
+    right: 0;
+    left: 0;
+    z-index: 50;
+    height: var(--talk-stage);
+    background: var(--bg);
+  }
+
+  html.is-talking .monitor {
+    position: fixed;
+    top: calc(var(--overlay-top) + var(--talk-stage));
+    right: 0;
+    left: 0;
+    z-index: 50;
+    width: auto;
+    height: calc(var(--overlay-h) - var(--talk-stage));
+    margin: 0;
+    padding: 0.25rem var(--gutter) calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.5rem;
+    background: var(--bg);
+  }
+
+  html.is-talking .monitor-view:not([hidden]) {
+    flex: 1 1 0;
+    gap: 0.5rem;
+  }
+
+  html.is-talking .monitor-head .monitor-label {
+    letter-spacing: var(--tracking-button);
+  }
+
+  html.is-talking .talk-log {
+    mask-image: linear-gradient(to bottom, transparent, black 1.25rem);
+  }
+
+  /* While the field is empty Send gives its width to the placeholder; it comes back with the first letter. */
+  html.is-talking .talk-type:has(> .talk-field .talk-input:placeholder-shown) > [type="submit"] {
+    display: none;
+  }
+
+  /* The keyboard is up, or the screen is as short as one with it: Emily gives up height, the guide line goes and
+     the microphone shrinks, so the prompt stays in view. */
+  html.is-talking.is-keyboard .monitor {
+    padding-bottom: 0.5rem;
+  }
+
+  html.is-talking.is-keyboard .talk-guide {
+    display: none;
+  }
+
+  html.is-talking.is-keyboard .talk-mic {
+    width: 48px;
+    height: 48px;
+  }
+
+  html.is-talking.is-keyboard .talk-mic svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* ---------- From 720px: the stage fills the hero and the text starts under her neck ---------- */
 @media (min-width: 720px) {
   .being-dock {
     --poster-top: 12.5%;
@@ -496,12 +806,12 @@ html.is-touring body {
     height: auto;
   }
 
-  /* The chin sits at 42% of the hero at 1440 x 900 and 46% at 1024 x 768 (framing.ts: the bust band lifted on a
-     landscape stage), so the text starts just under it and the log fills upward from the input line, dissolving
-     before it reaches her mouth. */
+  /* The top follows the foot of her neck (talk.ts publishes --talk-top from talkTextTop for the stage's aspect:
+     48% of a landscape hero, up to 56% of a squarer one), so head and neck stay above the text and the log fills
+     upward from the prompt. */
   .monitor {
     position: absolute;
-    top: 48%;
+    top: var(--talk-top, 48%);
     bottom: 3rem;
     inset-inline: 0;
     margin: 0 auto;
@@ -511,12 +821,7 @@ html.is-touring body {
     flex: 1;
   }
 
-  .talk-log {
-    max-height: none;
-    min-height: 0;
-  }
-
-  /* The notice fits under the chin without scrolling: two columns of terms, in the small size. */
+  /* The notice fits under the neck: two columns of terms, in the small size, scrolling if the hero is short. */
   .talk-terms {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem 1.5rem;
@@ -526,22 +831,27 @@ html.is-touring body {
     font-size: var(--text-xs);
   }
 
+  .talk-mic {
+    width: 64px;
+    height: 64px;
+  }
+
+  .talk-mic svg {
+    width: 26px;
+    height: 26px;
+  }
+
   html.is-touring .monitor {
     top: auto;
     inset-inline: 0;
   }
 }
 
-@media (min-width: 1280px) {
-  .monitor {
-    top: 46%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .being-canvas,
   .being-poster,
-  .captions {
+  .captions,
+  .talk-guide {
     transition: none;
     animation: none;
   }
@@ -549,6 +859,13 @@ html.is-touring body {
   .monitor-caret,
   .talk-log li {
     animation: none;
+  }
+
+  /* No pulse: the held microphone keeps a still ring. */
+  .talk-mic[aria-pressed="true"]::after {
+    animation: none;
+    opacity: 0.6;
+    transform: scale(1.15);
   }
 
   .talk-log {

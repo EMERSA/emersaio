@@ -1,8 +1,11 @@
 /**
- * Talk to Emily against a running Worker: the monitor's consent view, Turnstile with Cloudflare's always-pass test
- * keys when the build carries a site key (skipped otherwise), the session mint against a mocked Convai, the visitor cookie, a typed turn posted to memory, the memory
- * read, and Forget me clearing it all. The voice itself is not exercised: Convai and LiveKit requests from the
- * page are aborted, so the test proves the shell and the Worker contract, not the SDK.
+ * Talk to Emily against a running Worker: the Talk button (the large one, at least 56 px), the monitor's consent
+ * view starting under Emily's neck (talkTextTop of the runtime's framing), Turnstile with Cloudflare's always-pass
+ * test keys when the build carries a site key (skipped otherwise), the session mint against a mocked Convai, made
+ * without waiting for the being (three.js is held back 6 s and the mint must leave within 1.5 s of Start), the
+ * visitor cookie, a typed turn posted to memory, the memory read, and Forget me clearing it all. The voice itself is
+ * not exercised: Convai and LiveKit requests from the page are aborted, so the test proves the shell and the Worker
+ * contract, not the SDK.
  *
  * Setup (three terminals, or background jobs that are stopped afterwards):
  *   PUBLIC_TURNSTILE_SITEKEY=1x00000000000000000000AA npm run build   (or plain npm run build: no person check)
@@ -15,11 +18,16 @@
  * then point CONVAI_API_BASE at it.
  */
 import { createServer } from 'node:http';
+import { talkTextTop } from '../../packages/being/src/stage/framing.ts';
 import { launch, newPage, parseArgs, report, withBase } from './lib.mjs';
 
 const args = parseArgs();
 const rows = [];
 const check = (name, ok, detail = '') => rows.push([name, ok ? 'PASS' : 'FAIL', detail]);
+/** three.js is held back this long, so a session that waited for the being would leave far too late. */
+const THREE_DELAY_MS = 6000;
+/** From the Start tap to the mint leaving the page (no site key: no person check in between). */
+const START_TO_MINT_MS = 1500;
 
 /** The Convai endpoints the Worker calls, answered the way the real API does (fact sheet A.5). */
 function startMock(port) {
@@ -59,12 +67,21 @@ if (args.mock) {
     const { ctx, page } = await newPage(browser, { width: 1280, height: 1000 });
     // The voice is out of scope: no request leaves for Convai or LiveKit from the page.
     await ctx.route(/convai\.com|livekit\.cloud/, (route) => route.abort());
+    // The being arrives late on purpose: the conversation must not wait for it.
+    let threeReleasedAt = 0;
+    await ctx.route(/\/_astro\/three\./, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, THREE_DELAY_MS));
+      threeReleasedAt = Date.now();
+      await route.continue().catch(() => undefined);
+    });
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
 
     const talkBytes = [];
+    let mintAt = 0;
     page.on('request', (r) => {
       if (/challenges\.cloudflare\.com|\/api\/talk|convai/.test(r.url())) talkBytes.push(r.url());
+      if (!mintAt && r.url().endsWith('/api/talk/session')) mintAt = Date.now();
     });
     await page.goto(`${base}/`, { waitUntil: 'load' });
     await page.waitForTimeout(1500);
@@ -72,6 +89,8 @@ if (args.mock) {
 
     const cta = page.locator('.hero-ctas [data-talk-open]');
     check('Talk CTA visible on /', await cta.isVisible());
+    const ctaBox = await cta.boundingBox();
+    check('Talk CTA at least 56 px tall', (ctaBox?.height ?? 0) >= 56 - 0.5, `${Math.round(ctaBox?.height ?? 0)} px`);
     check('header Talk link on /', (await page.locator('header [data-talk-open]').count()) === 1);
     await cta.click();
     const panel = page.locator('[data-monitor]');
@@ -81,6 +100,21 @@ if (args.mock) {
       await page.evaluate(() => document.documentElement.classList.contains('is-talking')),
     );
     check('microphone button present', (await page.locator('[data-talk-mic]').count()) === 1);
+    // From 720px the text starts under Emily's neck: the monitor's top at or below talkTextTop of the stage.
+    await page.waitForTimeout(300);
+    const box = await page.evaluate(() => {
+      const stage = document.querySelector('[data-being-stage]')?.getBoundingClientRect();
+      const monitor = document.querySelector('[data-monitor]')?.getBoundingClientRect();
+      return stage && monitor
+        ? { top: stage.top, width: stage.width, height: stage.height, monitor: monitor.top }
+        : null;
+    });
+    const neck = box ? box.top + talkTextTop(box.width / box.height) * box.height : Number.NaN;
+    check(
+      'monitor starts at or below the neck (talkTextTop x hero height)',
+      Boolean(box) && box.monitor >= neck - 1,
+      box ? `monitor ${Math.round(box.monitor)} px, neck ${Math.round(neck)} px` : 'no stage or monitor',
+    );
     const consent = (await page.locator('[data-talk-consent]').textContent()) ?? '';
     for (const phrase of [
       'Convai Technologies',
@@ -108,8 +142,19 @@ if (args.mock) {
     }
 
     const minted = page.waitForResponse((r) => r.url().endsWith('/api/talk/session'), { timeout: 30000 });
+    const startAt = Date.now();
     await page.locator('[data-talk-start]').click();
     const session = await minted.catch(() => null);
+    const mintDelay = mintAt ? mintAt - startAt : null;
+    check(
+      'the mint does not wait for the being (three.js held 6 s)',
+      sitekey
+        ? mintAt > 0 && (threeReleasedAt === 0 || mintAt < threeReleasedAt)
+        : mintDelay !== null && mintDelay <= START_TO_MINT_MS && (threeReleasedAt === 0 || mintAt < threeReleasedAt),
+      mintDelay === null
+        ? 'no mint'
+        : `${mintDelay} ms after Start${threeReleasedAt ? `, three.js released ${threeReleasedAt - mintAt} ms later` : ', three.js still held'}`,
+    );
     const grant = session ? await session.json().catch(() => null) : null;
     check('session minted', session?.status() === 200 && grant?.ok === true, `status ${session?.status()}`);
     check('grant carries the mocked token', grant?.token === 'mock-token-123');

@@ -20,7 +20,7 @@
     "check:tools": "tsc -p tools",
     "lint": "biome ci .",
     "format": "biome format --write .",
-    "test": "node --test \"worker/**/*.test.ts\" \"packages/being/test/**/*.test.ts\" \"tools/**/*.test.ts\"",
+    "test": "node --test \"worker/**/*.test.ts\" \"packages/being/test/**/*.test.ts\" \"tools/**/*.test.ts\" \"apps/web/test/**/*.test.ts\"",
     "headers": "node tools/headers.ts --emit apps/web/dist/_headers",
     "preflight": "node scripts/preflight.mjs",
     "budget": "node scripts/bundle-budget.mjs",

@@ -4,7 +4,7 @@ description: "The scripted tour behind the home page: stops, captions, voice cli
 section: beings
 order: 2
 tour: welcome
-updated: 2026-10-14
+updated: 2026-10-16
 ---
 
 ## A tour, not a conversation
@@ -35,7 +35,7 @@ If your system asks for reduced motion, the site listens. The page moves between
 
 ## Talking with Emily
 
-The Talk to Emily button opens a green monitor over her that says what happens before anything does: who handles the conversation, when the microphone is used, what Emily remembers and for how long. Start talking asks the site's edge program for a session; the voice service's key never reaches your browser. You type to Emily; she answers in her own voice and her face moves with every sound she makes. Or hold the microphone button and speak, and the microphone is open only while you hold it. You can add a file for her to read. What you remember shows what is kept, Forget me erases it, and End closes the conversation. Talking is free for five minutes a day, and a conversation lasts at most 20 minutes.
+The Talk to Emily button opens a green monitor over her that says what happens before anything does: who handles the conversation, when the microphone is used, what Emily remembers and for how long. Start talking asks the site's edge program for a session; the voice service's key never reaches your browser. You type to Emily; she answers in her own voice and her face moves with every sound she makes. Or hold the microphone button, or Emily herself, and speak: the microphone is open only while you hold it. You can add a file for her to read. What Emily remembers shows what is kept, Forget me erases it, and End closes the conversation. Talking is free for five minutes a day, and a conversation lasts at most 20 minutes.
 
 ## Without JavaScript or WebGL
 

@@ -2,7 +2,8 @@
 /**
  * Sticky, solid top bar: the orange mark and the EMERSA wordmark, the primary navigation from site.nav inline from
  * 960 px, the Talk and Report links, the theme toggle and, below 960 px, a CSS-only <details> menu sheet that works without JavaScript
- * (main.ts only adds closing on link tap and Escape). Flat --bg with a hairline: nothing to blur.
+ * (main.ts only adds closing on link tap and Escape). Flat --bg with a hairline: nothing to blur. Every link is at
+ * least 44 px tall; under 480 px Report gives way and under 420 px the Talk link shortens to "Talk".
  */
 import { site } from '../data/site';
 import LogoSlot from './LogoSlot.astro';
@@ -41,11 +42,12 @@ const isCurrent = (href: string): boolean => {
       {
         isHome && (
           <a class="nav-link talk-link" href={site.hero.talk.href} data-talk-open>
-            {site.talk.headerLink}
+            <span class="talk-link-long">{site.talk.headerLink}</span>
+            <span class="talk-link-short">{site.talk.headerLinkShort}</span>
           </a>
         )
       }
-      <a class="nav-link talk-link report-link" href={site.report.href} title={site.report.hint}>
+      <a class="nav-link report-link" href={site.report.href} title={site.report.hint}>
         {site.report.label}
       </a>
       <ThemeToggle />
@@ -110,6 +112,9 @@ const isCurrent = (href: string): boolean => {
 
   .nav-link {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     padding: 0.75rem 0;
     font-size: var(--text-xs);
     font-weight: 500;
@@ -134,9 +139,15 @@ const isCurrent = (href: string): boolean => {
     background: currentColor;
   }
 
-  .talk-link {
+  .talk-link,
+  .report-link {
+    justify-content: center;
+    min-width: 44px;
     margin-right: 0.75rem;
     white-space: nowrap;
+  }
+
+  .talk-link {
     color: var(--accent-text);
   }
 
@@ -144,11 +155,25 @@ const isCurrent = (href: string): boolean => {
     color: var(--ink-2);
   }
 
-  /* On the narrowest phones the links would crowd the mark; the hero button and the menu still open Talk, and
-     the Stay safe section and the footer still carry Report. */
-  @media (max-width: 419.98px) {
-    .talk-link {
+  .talk-link-short {
+    display: none;
+  }
+
+  /* Narrow phones: Report gives way first (the Stay safe section and the footer still carry it), and on the
+     narrowest Talk shortens to one word rather than going. */
+  @media (max-width: 479.98px) {
+    .report-link {
       display: none;
+    }
+  }
+
+  @media (max-width: 419.98px) {
+    .talk-link-long {
+      display: none;
+    }
+
+    .talk-link-short {
+      display: inline;
     }
   }
 

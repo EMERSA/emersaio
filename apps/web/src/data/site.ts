@@ -61,7 +61,6 @@ export const site = {
     primary: { label: 'Start the tour', href: '#tour' },
     /** The href is the no-JavaScript fallback; with scripts the link opens the Talk monitor instead. */
     talk: { label: 'Talk to Emily', href: CONTACT_MAILTO, close: 'Close' },
-    secondary: { label: 'Meet Emily Wilson', href: '/#products' },
     guideLabel: 'Emily Wilson, rendered as the structure beneath the skin',
     voiceLabel: 'AI-generated voice',
   },
@@ -69,6 +68,8 @@ export const site = {
   /** The Talk monitor: consent first, then the conversation. Every line a visitor reads before they start. */
   talk: {
     headerLink: 'Talk to Emily',
+    /** The header link on the narrowest phones, where the full label would crowd the mark. */
+    headerLinkShort: 'Talk',
     title: 'Talk to Emily',
     monitorLabel: 'Emily · live',
     monitorSpeaking: 'Emily · speaking',
@@ -82,7 +83,7 @@ export const site = {
       },
       {
         term: 'Your microphone',
-        text: 'Used only while you hold the microphone button, and never otherwise. Typing needs no microphone at all.',
+        text: 'Used only while you hold the microphone button or hold Emily herself, and never otherwise. Typing needs no microphone at all.',
       },
       {
         term: 'What Emily remembers',
@@ -103,7 +104,8 @@ export const site = {
     speak: 'Hold to speak',
     retry: 'Retry',
     speakHold: 'Hold to speak',
-    howTo: 'Type your message and press Send, or hold the microphone button and speak.',
+    /** The guide line: shown once when the conversation opens, for ten seconds (scripts/talk-guide.ts). */
+    howTo: 'Type your message and press Send, or hold the microphone button or Emily herself and speak.',
     listening: 'Listening. Release to send.',
     upload: 'Add a file',
     uploadHint: 'PDF, .txt or .md, up to 2 MB.',
@@ -113,13 +115,15 @@ export const site = {
     send: 'Send',
     you: 'You',
     emily: 'Emily',
-    memoryOpen: 'What you remember',
+    memoryOpen: 'What Emily remembers',
     memoryTitle: 'What Emily remembers about you',
     memoryFacts: 'Facts',
     memoryTurns: 'Recent conversation',
     memoryFiles: 'Files',
     memoryEmpty: 'Nothing yet.',
     forget: 'Forget me',
+    /** The disclosure in the conversation's head row that holds Add a file, What Emily remembers and End. */
+    more: 'More',
     forgotten: 'Done. Emily has forgotten everything about you.',
     notices: {
       unavailable: 'Voice is not connected yet. Please try again later.',

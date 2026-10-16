@@ -8,7 +8,7 @@ import { legal } from '../data/legal';
 import { site } from '../data/site.ts';
 import Base from '../layouts/Base.astro';
 
-const updated = '14 October 2026';
+const updated = '16 October 2026';
 const browserKeys = [
   { key: 'em-theme', where: 'local storage', what: 'whether you chose the dark or the light theme.' },
   {
@@ -91,12 +91,13 @@ const browserKeys = [
       <h2 id="voice">Talking with Emily</h2>
       <p>
         On the home page you can talk with Emily. You type by default; your microphone is used only while you hold
-        the microphone button. Nothing starts until you read what happens and tap Start talking.
+        the microphone button, or hold Emily herself, and it closes the moment you let go. Nothing starts until you
+        read what happens and tap Start talking.
       </p>
       <h3>What is collected</h3>
       <ul>
         <li>
-          <strong>Your voice</strong>, only while you hold the microphone button. It is turned into words to answer you
+          <strong>Your voice</strong>, only while you hold the microphone button or Emily. It is turned into words to answer you
           and is not kept as a recording by us.
         </li>
         <li>
@@ -140,8 +141,8 @@ const browserKeys = [
       </p>
       <h3>Seeing and erasing it</h3>
       <p>
-        In the Talk panel, What you remember shows everything held about you. Forget me deletes all of it at once,
-        including the copy at Convai, and removes the cookie.
+        In the Talk panel, What Emily remembers (under More) shows everything held about you. Forget me deletes all
+        of it at once, including the copy at Convai, and removes the cookie.
       </p>
       <p>Emily is an AI and may make mistakes.</p>
 

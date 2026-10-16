@@ -134,3 +134,51 @@ export function bustFramingFor(aspect: number, bust: HeadBounds): Framing {
     targetZ: bust.centreZ,
   };
 }
+
+/**
+ * The foot of the neck in the bust, as a share of the bust's height above its lower edge: where the neck widens into
+ * the shoulders, 1.46 m on the 1.75 m guide (the bust runs from 1.25 m to the crown; the body is 0.17 m wide at
+ * 1.48 m and 0.32 m at 1.46 m).
+ */
+export const BUST_NECK_SHARE = 0.42;
+
+/**
+ * Where the Talk text may start over a bust framed by bustFramingFor, as a share of the stage's height from its top:
+ * the foot of the neck, so the head and the neck stay above the text. The bust always fills BUST_SHARE of the height,
+ * so the share depends on the aspect alone: 0.56 on a portrait or square stage, 0.48 on a landscape one (lifted by
+ * BUST_LIFT), smooth in between.
+ */
+export function talkTextTop(aspect: number): number {
+  return 0.5 + (0.5 - BUST_NECK_SHARE) * BUST_SHARE - BUST_LIFT * faceLayoutT(aspect);
+}
+
+/**
+ * The portrait (the phone conversation, where nothing covers the stage): the band from the shoulders' line to the
+ * crown, starting this share of the bust's height above its lower edge (1.40 m, where the crop has all but faded
+ * the chest away)...
+ */
+export const PORTRAIT_FLOOR_SHARE = 0.3;
+/** ...fills this share of the stage's height, centred and never lifted... */
+export const PORTRAIT_SHARE = 0.86;
+/** ...and the camera pulls back on a narrow stage until shoulders this wide (a share of the bust's height) fit across. */
+export const PORTRAIT_WIDTH_SHARE = 0.9;
+
+/**
+ * The portrait framing: Emily's head, neck and shoulders as large as the stage allows, in the face look's lens. A
+ * phone's chat stage (about 390 x 180 to 390 x 470) shows her face about 1.2 to 1.7 times as large as bustFramingFor
+ * does there, with the shoulders inside the edges.
+ */
+export function portraitFramingFor(aspect: number, bust: HeadBounds): Framing {
+  const height = Math.max(0.05, bust.maxY - bust.minY);
+  const floor = bust.minY + PORTRAIT_FLOOR_SHARE * height;
+  const tall = (bust.maxY - floor) / PORTRAIT_SHARE;
+  const wide = (PORTRAIT_WIDTH_SHARE * height) / Math.max(0.1, aspect);
+  const visible = Math.max(tall, wide);
+  return {
+    t: faceLayoutT(aspect),
+    fov: FACE_FOV,
+    distance: distanceFor(FACE_FOV, visible),
+    targetY: (floor + bust.maxY) / 2,
+    targetZ: bust.centreZ,
+  };
+}

@@ -64,7 +64,7 @@ export const COOKIE_NAME = 'em_vid';
 export const COOKIE_MAX_AGE = 34_164_000;
 
 /** The consent copy the Talk sheet shows; a visitor who agreed to an older one is asked again. */
-export const CONSENT_VERSION = 2;
+export const CONSENT_VERSION = 3;
 
 /** One cookie's value from a Cookie header, or null. */
 export function readCookie(request: Request, name = COOKIE_NAME): string | null {

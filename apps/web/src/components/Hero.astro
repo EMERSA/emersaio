@@ -3,20 +3,23 @@
  * The hero like the bottle's label: the face is the emblem, the H1 the wordmark, the label line the small print,
  * everything centred on a flat page. Two canvases share the stage: the raw WebGL hero cloud that paints the head
  * once the page is idle, and the three.js being (the kinect-demo look: the bust as tiny navy shards) that replaces
- * it when the device can carry it. On phones the stage is a 46svh block above the copy; from 720px it fills the
- * hero and the copy sits 48px above the hero's foot.
+ * it when the device can carry it. On phones the stage is a 46svh block above the copy, which runs label, heading,
+ * Talk, tour, lead so the Talk button is on the first screen; from 720px the stage fills the hero and the copy sits
+ * 48px above the hero's foot. Talk to Emily is the one large orange button; the tour is the ghost one beside it.
  *
- * The monitor is the one HUD drawn over the being: phosphor-green terminal text floating beneath her face, with no
- * box, that carries the tour's captions and controls while the tour runs and the Talk conversation (consent, then
- * the typed log with the hold-to-speak microphone button) when the visitor opens it. It is hidden until either
- * starts. While the tour scrolls the page it pins to the bottom edge as a flat band (hud.css). Copy comes from site.ts; the scripts
- * find everything through data attributes, never ids.
+ * The monitor is the one HUD drawn over the being: phosphor-green terminal text with no box, that carries the
+ * tour's captions and controls while the tour runs and the Talk conversation (consent, then the log, the typed
+ * prompt and the round hold-to-speak microphone, with Add a file, What Emily remembers and End under More) when the
+ * visitor opens it. It is hidden until either starts. While the tour scrolls the page it pins to the bottom edge as
+ * a flat band; on a phone the conversation is a sheet under the header with Emily on top (hud.css). Copy comes from
+ * site.ts; the scripts find everything through data attributes, never ids.
  */
 import { site } from '../data/site.ts';
 import '../styles/hud.css';
 import { TURNSTILE_SITEKEY } from '../lib/talk-config.ts';
 import BeingStage from './BeingStage.astro';
 import Captions from './Captions.astro';
+import MicIcon from './MicIcon.astro';
 
 // The avatar pipeline produces these files and a fresh checkout may lack them. Whatever exists reaches the scripts
 // through data attributes; a missing attribute means the procedural cloud and the poster stand in.
@@ -43,8 +46,29 @@ const { hero, tour, talk, a11y } = site;
 
   <div class="monitor" data-monitor hidden role="region" aria-label={a11y.talkPanel}>
     <div class="monitor-head">
-      <span class="monitor-label" data-monitor-label data-tour-label={talk.tourLabel}>{talk.monitorConsentLabel}</span>
-      <span class="monitor-label voice-label" data-voice-label hidden>{hero.voiceLabel}</span>
+      <div class="monitor-labels">
+        <span class="monitor-label" data-monitor-label data-tour-label={talk.tourLabel}>{talk.monitorConsentLabel}</span>
+        <span class="monitor-label voice-label" data-voice-label hidden>{hero.voiceLabel}</span>
+      </div>
+      <details class="talk-more" data-talk-more hidden>
+        <summary class="monitor-btn">{talk.more}</summary>
+        <div class="talk-more-menu">
+          <label class="monitor-btn talk-upload">
+            {talk.upload}
+            <input
+              class="sr-only"
+              type="file"
+              accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+              data-talk-file
+            />
+          </label>
+          <p class="monitor-note">{talk.uploadHint}</p>
+          <button type="button" class="monitor-btn" data-talk-memory-open aria-expanded="false">
+            {talk.memoryOpen}
+          </button>
+          <button type="button" class="monitor-btn" data-talk-end>{talk.end}</button>
+        </div>
+      </details>
       <button type="button" class="monitor-btn monitor-close" data-talk-close hidden>{talk.close}</button>
     </div>
 
@@ -67,63 +91,33 @@ const { hero, tour, talk, a11y } = site;
     </div>
 
     <div class="monitor-view talk-consent" data-talk-consent hidden>
-      <p class="monitor-copy">{talk.intro}</p>
-      <dl class="talk-terms">
-        {
-          talk.consent.map((item) => (
-            <div class="talk-term">
-              <dt>{item.term}</dt>
-              <dd>{item.text}</dd>
-            </div>
-          ))
-        }
-      </dl>
-      <p class="monitor-note">
-        {talk.freeMinutes} {talk.aiNotice}
-        <a href={talk.privacyLink.href}>{talk.privacyLink.label}</a>
-      </p>
-      <div class="talk-turnstile" data-talk-turnstile data-sitekey={TURNSTILE_SITEKEY}></div>
-      <p class="talk-start">
-        <button type="button" class="monitor-btn monitor-btn-primary" data-talk-start>{talk.start}</button>
-      </p>
+      <div class="talk-consent-body" data-talk-consent-body>
+        <p class="monitor-copy">{talk.intro}</p>
+        <dl class="talk-terms">
+          {
+            talk.consent.map((item) => (
+              <div class="talk-term">
+                <dt>{item.term}</dt>
+                <dd>{item.text}</dd>
+              </div>
+            ))
+          }
+        </dl>
+        <p class="monitor-note">
+          {talk.freeMinutes} {talk.aiNotice}
+          <a href={talk.privacyLink.href}>{talk.privacyLink.label}</a>
+        </p>
+      </div>
+      <div class="talk-consent-foot">
+        <div class="talk-turnstile" data-talk-turnstile data-sitekey={TURNSTILE_SITEKEY}></div>
+        <p class="talk-start">
+          <button type="button" class="monitor-btn monitor-btn-primary" data-talk-start>{talk.start}</button>
+        </p>
+      </div>
     </div>
 
     <div class="monitor-view talk-session" data-talk-session hidden>
-      <p class="monitor-label talk-state" data-talk-state aria-live="polite"></p>
-      <p class="monitor-howto">{talk.howTo}</p>
-      <ol class="talk-log" data-talk-log aria-live="polite" aria-label={talk.title}></ol>
-      <form class="talk-type" data-talk-form>
-        <label class="sr-only" for="talk-input">{talk.typeLabel}</label>
-        <span class="monitor-prompt" aria-hidden="true">&gt;</span>
-        <input
-          id="talk-input"
-          class="talk-input"
-          type="text"
-          autocomplete="off"
-          enterkeyhint="send"
-          placeholder={talk.typePlaceholder}
-          data-talk-input
-        />
-        <span class="monitor-caret" aria-hidden="true"></span>
-        <button type="submit" class="monitor-btn">{talk.send}</button>
-      </form>
-      <div class="talk-actions">
-        <button type="button" class="monitor-btn" data-talk-mic aria-pressed="false">{talk.speak}</button>
-        <label class="monitor-btn talk-upload">
-          {talk.upload}
-          <input
-            class="sr-only"
-            type="file"
-            accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
-            data-talk-file
-          />
-        </label>
-        <button type="button" class="monitor-btn" data-talk-memory-open aria-expanded="false">
-          {talk.memoryOpen}
-        </button>
-        <button type="button" class="monitor-btn" data-talk-end>{talk.end}</button>
-      </div>
-      <p class="monitor-note">{talk.uploadHint}</p>
+      <p class="monitor-howto talk-guide" data-talk-guide hidden>{talk.howTo}</p>
       <section class="talk-memory" data-talk-memory hidden aria-labelledby="talk-memory-title">
         <h3 id="talk-memory-title" class="monitor-label">{talk.memoryTitle}</h3>
         <h4 class="monitor-label">{talk.memoryFacts}</h4>
@@ -134,6 +128,31 @@ const { hero, tour, talk, a11y } = site;
         <ul data-memory-turns></ul>
         <p><button type="button" class="monitor-btn" data-talk-forget>{talk.forget}</button></p>
       </section>
+      <ol class="talk-log" data-talk-log aria-live="polite" aria-label={talk.title}></ol>
+      <p class="monitor-label talk-state" data-talk-state aria-live="polite"></p>
+      <form class="talk-type" data-talk-form>
+        <label class="sr-only" for="talk-input">{talk.typeLabel}</label>
+        <span class="monitor-prompt" aria-hidden="true">&gt;</span>
+        <span class="talk-field">
+          <input
+            id="talk-input"
+            class="talk-input"
+            type="text"
+            autocomplete="off"
+            enterkeyhint="send"
+            placeholder={talk.typePlaceholder}
+            data-talk-input
+          />
+          <span class="monitor-caret" aria-hidden="true"></span>
+        </span>
+        <button type="submit" class="monitor-btn">{talk.send}</button>
+        <span class="talk-voice">
+          <button type="button" class="talk-mic" data-talk-mic aria-pressed="false">
+            <MicIcon class="talk-mic-icon" />
+            <span class="sr-only">{talk.speak}</span>
+          </button>
+        </span>
+      </form>
     </div>
 
     <p class="monitor-note talk-notice" data-talk-notice role="status" hidden></p>
@@ -148,9 +167,11 @@ const { hero, tour, talk, a11y } = site;
       <h1 class="hero-title">{hero.title}</h1>
       <p class="lead hero-lead">{hero.lead}</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href={hero.primary.href} data-tour-start>{hero.primary.label}</a>
-        <a class="btn btn-ghost" href={hero.talk.href} data-talk-open>{hero.talk.label}</a>
-        <a class="btn btn-ghost" href={hero.secondary.href}>{hero.secondary.label}</a>
+        <a class="btn btn-primary btn-lg talk-cta" href={hero.talk.href} data-talk-open>
+          <MicIcon />
+          {hero.talk.label}
+        </a>
+        <a class="btn btn-ghost" href={hero.primary.href} data-tour-start>{hero.primary.label}</a>
       </div>
     </div>
   </div>
@@ -255,16 +276,35 @@ const { hero, tour, talk, a11y } = site;
     width: 100%;
   }
 
+  .talk-cta :global(svg) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
   @media (min-width: 560px) {
     .hero-ctas {
       flex-direction: row;
       flex-wrap: wrap;
+      align-items: center;
       justify-content: center;
       width: auto;
     }
 
     .hero-ctas .btn {
       width: auto;
+    }
+  }
+
+  /* On a phone the buttons come straight after the heading and the lead follows them, so Talk to Emily is on the
+     first screen of a 390 x 664 browser (the order changes the picture only: the focus order is the buttons' own). */
+  @media (max-width: 719.98px) {
+    .hero-ctas {
+      order: 1;
+    }
+
+    .hero-lead {
+      order: 2;
+      margin-top: 1.5rem;
     }
   }
 
@@ -286,10 +326,11 @@ const { hero, tour, talk, a11y } = site;
     }
   }
 
-  /* On a phone the overlay takes the copy's place under the stage while the conversation is open. */
+  /* On a phone the conversation is a sheet over the page; the copy keeps its place underneath, so nothing moves
+     when the sheet opens or closes. */
   @media (max-width: 719.98px) {
     :global(html.is-talking) .hero-inner {
-      display: none;
+      visibility: hidden;
     }
   }
 

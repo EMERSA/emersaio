@@ -38,7 +38,7 @@ Postmark as processors and has a cookies section.
 | File upload | The plain text of one PDF, .txt or .md file (at most 2 MB in, 20,000 characters kept), its name and size | Context the visitor asked Emily to read | Consent | Cloudflare (extraction in the Worker, D1 `document` row); the text reaches Convai as conversation context | Same as memory: 12 idle months or "Forget me". The file itself is never stored or forwarded |
 | QR code generator | Text typed into the generator | The tool the visitor chose | Strictly necessary for the chosen feature | None (never sent, never stored) | Not kept |
 
-Phase 2 additions, as built: consent version 2 (the Talk monitor notice) is recorded on the `visitor` row (`consent_version`, `last_seen`)
+Phase 2 additions, as built: consent version 3 (the Talk monitor notice) is recorded on the `visitor` row (`consent_version`, `last_seen`)
 by `POST /api/talk/session`; the cookie is `em_vid=<id>.<mac>; HttpOnly; Secure; SameSite=Lax; Path=/api`,
 about 13 months; quotas are 20 sessions, 200 turns and 10 files per visitor per day, 20 minutes per session;
 the Convai Knowledge Bank is not used. Turnstile runs only inside the Talk sheet, loaded when it opens. The
@@ -59,7 +59,7 @@ Phase 2 CSP and `microphone=(self)` apply to `/` only, observed as Report-Only f
 
 | Risk | Likelihood | Severity | Measures |
 | --- | --- | --- | --- |
-| Microphone used without the visitor knowing | Low | High | `Permissions-Policy: microphone=()` everywhere except `/` from Phase 2; `getUserMedia` only inside the tap; the listening state is shown on screen |
+| Microphone used without the visitor knowing | Low | High | `Permissions-Policy: microphone=()` everywhere except `/` from Phase 2; `getUserMedia` only inside the tap; the microphone is open only while a press is held, on the microphone button or on Emily herself, and closes on the release (consent version 3 says so); the listening state is shown on screen |
 | Transfer of voice data to the US (Convai) | Certain in Phase 2 | Medium | Named in the notice; Convai's data processing terms and the UK IDTA/addendum on file before launch; the NIM path keeps speech in the UK (Azure `uksouth`, Workers AI) |
 | Memory linked to the wrong person (shared device) | Medium | Medium | Memory is per browser, said so in the notice; "Forget me" is one tap; no cross-device linking in Phase 2 |
 | Prompt injection or abusive output | Medium | Medium | Guardrails middleware with an action whitelist and a length cap; page context is build-time only; the character cannot act outside the whitelisted page actions |

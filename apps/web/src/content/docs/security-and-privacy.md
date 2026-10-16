@@ -3,7 +3,7 @@ title: Security and privacy
 description: "What this site stores about you (nothing, today), what is planned for memory, and how the beings are secured."
 section: trust
 order: 1
-updated: 2026-10-14
+updated: 2026-10-16
 ---
 
 ## What this site stores today
@@ -25,9 +25,9 @@ Talk to Emily lets you talk to the guide out loud or by typing. It changes what 
 - Nothing is stored before you tap "Start talking" and read what it means.
 - Memory is tied to this browser through a signed, random identifier set only after consent, not to your name or your address.
 - What is remembered: each turn of the conversation, a few distilled facts you chose to share, your tour progress and your theme. It is held in a database in the European Union.
-- A "What you remember about me" panel shows everything, and "Forget me" erases it in one request, including anything held by the voice provider.
+- A "What Emily remembers" panel shows everything, and "Forget me" erases it in one request, including anything held by the voice provider.
 - Memory not used for twelve months is purged on its own.
-- Typing is the default; the microphone is used only while the microphone button is held.
+- Typing is the default; the microphone is used only while a press is held, on the microphone button or on Emily herself, and closes when it ends.
 - You can add one file at a time (a PDF, .txt or .md file up to 2 MB) for Emily to read. Only the text is kept, at most 20,000 characters, and Forget me deletes it with the rest. The file itself is never stored or passed on.
 - The processors are Cloudflare (the site, the person check and the database) and Convai Technologies in the United States (speech to text, Emily's replies and her voice). Microsoft joins only if we move speech to Azure, and this page will say so first.
 - Emily is an AI and may make mistakes.

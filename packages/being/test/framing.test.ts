@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   BUST_LIFT,
+  BUST_NECK_SHARE,
   BUST_SHARE,
   bustBounds,
   bustFramingFor,
@@ -10,9 +11,15 @@ import {
   FACE_CROWN_AIR,
   FACE_FOV,
   FACE_PORTRAIT_SHARE,
+  type Framing,
   faceFramingFor,
   faceLayoutT,
   framingFor,
+  PORTRAIT_FLOOR_SHARE,
+  PORTRAIT_SHARE,
+  PORTRAIT_WIDTH_SHARE,
+  portraitFramingFor,
+  talkTextTop,
   visibleHeight,
 } from '../src/stage/framing.ts';
 
@@ -107,4 +114,60 @@ test('the kinect-demo look frames the head and shoulders at 75 percent of the he
     assert.equal(f.targetZ, 0.02);
   }
   assert.equal(bustFramingFor(0.6, bust).targetY, 1.5);
+});
+
+/** The share of the canvas height, from the top, at which a world height lands under a framing. */
+const shareFromTop = (f: Framing, y: number): number => 0.5 + (f.targetY - y) / visibleHeight(f);
+
+test('talkTextTop is the foot of the neck under the kinect-demo framing, on every aspect', () => {
+  const bust = bustBounds({ minY: 1.498, maxY: 1.75, centreZ: 0.058 });
+  const neck = bust.minY + BUST_NECK_SHARE * (bust.maxY - bust.minY);
+  close(neck, 1.46, 1e-9);
+  for (const aspect of [0.6, 0.83, 1, 1.19, 1.31, 1.6, 1.74, 2.4]) {
+    close(talkTextTop(aspect), shareFromTop(bustFramingFor(aspect, bust), neck), 1e-9);
+  }
+  // Portrait and square stages: the neck at 56 percent; landscape (1440 x 828 is 1.74): 48 percent, the lift.
+  close(talkTextTop(1), 0.56, 1e-9);
+  close(talkTextTop(1440 / 828), 0.48, 1e-9);
+  // A 1024 x 780 hero sits in between, and the share never rises as the stage widens.
+  const mid = talkTextTop(1024 / 780);
+  assert.ok(mid > 0.48 && mid < 0.56, `1024 x 780: ${mid}`);
+  let last = Number.POSITIVE_INFINITY;
+  for (let aspect = 0.5; aspect <= 2.5; aspect += 0.05) {
+    const share = talkTextTop(aspect);
+    assert.ok(share <= last + 1e-12);
+    last = share;
+  }
+  // The chin, 7 cm above the neck's foot, stays above the text with room to spare.
+  assert.ok(shareFromTop(bustFramingFor(1.74, bust), 1.53) < talkTextTop(1.74) - 0.08);
+});
+
+test('the portrait fills the stage with the head and shoulders, centred, and keeps the shoulders inside', () => {
+  const bust = bustBounds({ minY: 1.498, maxY: 1.75, centreZ: 0.058 });
+  const height = bust.maxY - bust.minY;
+  const floor = bust.minY + PORTRAIT_FLOOR_SHARE * height;
+  for (const aspect of [0.6, 0.83, 1.19, 1.6, 2.17, 3]) {
+    const f = portraitFramingFor(aspect, bust);
+    const visible = visibleHeight(f);
+    assert.equal(f.fov, FACE_FOV);
+    assert.equal(f.targetZ, bust.centreZ);
+    // Centred on the band from the shoulders' line to the crown, whatever the aspect: never lifted.
+    close(f.targetY, (floor + bust.maxY) / 2, 1e-9);
+    // The band takes PORTRAIT_SHARE of the height at most, exactly that where the stage is wide enough.
+    const share = (bust.maxY - floor) / visible;
+    assert.ok(share <= PORTRAIT_SHARE + 1e-9, `aspect ${aspect}: band ${share}`);
+    // The shoulders fit across.
+    assert.ok(PORTRAIT_WIDTH_SHARE * height <= visible * aspect + 1e-9, `aspect ${aspect}: too narrow`);
+    if (aspect >= 1.19) close(share, PORTRAIT_SHARE, 1e-9);
+    // The crown keeps air above it.
+    assert.ok(shareFromTop(f, bust.maxY) > 0.05);
+  }
+  // On a phone's chat stage the face comes closer than the hero's bust framing.
+  for (const aspect of [390 / 472, 390 / 328, 390 / 180]) {
+    const portrait = portraitFramingFor(aspect, bust);
+    const hero = bustFramingFor(aspect, bust);
+    const gain = visibleHeight(hero) / visibleHeight(portrait);
+    assert.ok(gain > 1.15 && gain < 1.8, `aspect ${aspect.toFixed(2)}: ${gain.toFixed(2)}x`);
+    assert.ok(portrait.distance < hero.distance);
+  }
 });
