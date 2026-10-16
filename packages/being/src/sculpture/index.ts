@@ -43,6 +43,9 @@ const STEP_S = 1 / 120;
 const MAX_STEPS = 4;
 /** The fine flow running down her: its amplitude in metres (none under reduced motion). */
 const FLOW_M = 0.00032;
+/** Below this loudness there is no ring from the lips; above it, rings of this height per unit of loudness. */
+const VOICE_GATE = 0.06;
+const VOICE_RING = 0.07;
 /** Body shards are this much larger than the head's: the face carries the detail. */
 const BODY_SCALE = 1.9;
 const EYE_SCALE = 0.7;
@@ -72,7 +75,7 @@ export interface SculptureFrame {
   dt: number;
   elapsed: number;
   camera: PerspectiveCamera;
-  /** Loudness of her voice 0..1. */
+  /** Loudness of her voice 0..1: the sound itself, not the mouth's movement. */
   voice: number;
   /** The intro's progress 0..1 (1 settled). */
   intro: number;
@@ -218,7 +221,7 @@ export class SculptureLayer {
         sculpt[k * 4 + 1] = eye.tone[k] ?? 1;
         sculpt[k * 4 + 3] = 0;
       }
-      parts.push({ positions: world, index: eye.tris, sculpt });
+      parts.push({ positions: world, index: eye.tris, sculpt, plain: true });
       restWorld.push(world);
     }
     const welded = weld(
@@ -395,8 +398,10 @@ export class SculptureLayer {
       this.carry -= STEP_S;
       steps += 1;
       this.clock += STEP_S;
-      // Her voice rings out from the lips; a drop lands every second or so; the pointer stirs where it crosses.
-      const push = Math.min(1, frame.voice) * 0.18 * Math.sin(2 * Math.PI * 4.5 * this.clock);
+      // Her voice rings out softly from the lips (only while there is sound, so the chin stays still otherwise); a
+      // drop lands every second or so; the pointer stirs where it crosses.
+      const voice = frame.voice > VOICE_GATE ? Math.min(1, frame.voice) : 0;
+      const push = voice * VOICE_RING * Math.sin(2 * Math.PI * 4.5 * this.clock);
       if (push !== 0) for (const v of welded.lips) this.height[v] = (this.height[v] ?? 0) + push;
       if (this.clock >= this.nextDrop) {
         this.nextDrop = this.clock + 0.7 + Math.random() * 1.3;
@@ -509,7 +514,7 @@ export class SculptureLayer {
       nrm[w * 4] = lx / len;
       nrm[w * 4 + 1] = ly / len;
       nrm[w * 4 + 2] = lz / len;
-      nrm[w * 4 + 3] = (welded.ao[w] ?? 1) * (welded.tone[w] ?? 1);
+      nrm[w * 4 + 3] = (welded.ao[w] ?? 1) * (welded.albedo[w] ?? 1);
     }
     this.posTex.needsUpdate = true;
     this.nrmTex.needsUpdate = true;

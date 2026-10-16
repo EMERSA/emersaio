@@ -200,6 +200,10 @@ export interface BeingHandle {
    */
   readonly face: {
     pushArkit(frame: ArrayLike<number>): void;
+    /** Replace one viseme's mouth recipe (ARKit shape name -> weight 0..1), for tuning in the dev harness. */
+    setMouthRecipe(viseme: number, recipe: Readonly<Record<string, number>>): void;
+    /** Hold one viseme's shape (null releases it), so a recipe can be judged still; a live stream still wins. */
+    holdViseme(viseme: number | null, weight?: number): void;
   };
   /**
    * Frame statistics for the HUD: points is the cloud's grid size while it draws; depth is the range its colour

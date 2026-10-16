@@ -24,7 +24,16 @@ export type TalkState =
 export type TalkEndReason = 'visitor' | 'cap' | 'busy' | 'error' | 'disconnected';
 
 /** Why the shell should show a notice; the copy lives in site.ts. */
-export type TalkNotice = 'busy' | 'cap' | 'mic-denied' | 'reconnecting' | 'expired' | 'audio-blocked';
+export type TalkNotice =
+  | 'busy'
+  | 'cap'
+  | 'mic-denied'
+  | 'mic-missing'
+  | 'mic-busy'
+  | 'mic-failed'
+  | 'reconnecting'
+  | 'expired'
+  | 'audio-blocked';
 
 export interface TalkSessionGrant {
   token: string;
@@ -103,8 +112,17 @@ export const isBusyError = (error: unknown): boolean => {
   return /\b429\b|concurren|too many|limit|capacity|busy/i.test(message);
 };
 
-const isMicDenied = (error: unknown): boolean =>
-  error instanceof Error && /NotAllowed|Permission|denied|NotFound/i.test(`${error.name} ${error.message}`);
+/**
+ * Why the microphone did not open, from the browser's error: refused (by the visitor, the browser's site setting or
+ * the page's policy), no microphone, held by another app, or anything else (an old browser, an insecure context).
+ */
+export const micNotice = (error: unknown): TalkNotice => {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  if (/NotAllowed|Security|Permission|denied/i.test(text)) return 'mic-denied';
+  if (/NotFound|Overconstrained|not found/i.test(text)) return 'mic-missing';
+  if (/NotReadable|TrackStart|Abort|in use|could not start/i.test(text)) return 'mic-busy';
+  return 'mic-failed';
+};
 
 /**
  * One conversation with Emily: token from the Worker, connect, the 20-minute cap, the busy notice, reconnect with a
@@ -150,7 +168,7 @@ export class TalkSession {
     await this.open(this.options.turnstile, false);
   }
 
-  /** Open the microphone; a refusal leaves the session in typed mode and raises the mic-denied notice. */
+  /** Open the microphone; a failure leaves the session in typed mode and raises a notice that names the cause. */
   async startListening(): Promise<boolean> {
     if (this.voice === null || this.stateValue !== 'live') return false;
     try {
@@ -159,7 +177,7 @@ export class TalkSession {
       return true;
     } catch (error) {
       this.listening = false;
-      if (isMicDenied(error)) this.options.onNotice?.('mic-denied');
+      this.options.onNotice?.(micNotice(error));
       return false;
     }
   }

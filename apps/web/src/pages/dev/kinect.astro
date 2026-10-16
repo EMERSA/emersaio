@@ -39,6 +39,7 @@ const t = {
   figure: 'The figure',
   look: 'Look',
   looks: [
+    ['sculpture', 'Sculpture: the whole head and bust as tiny triangles of water'],
     ['kinect-demo', 'Kinect demo: head and shoulders in tiny triangles'],
     ['face', 'Face: the head alone, wire over its depth cloud'],
     ['hybrid', 'Hybrid: wire head, cloud body'],
@@ -64,6 +65,13 @@ const t = {
   opacity: 'Opacity',
   lineWidth: 'Line width (px)',
   idle: 'Loading the being.',
+  mouth: 'Mouth',
+  sound: 'Sound (viseme)',
+  hold: 'Hold this shape',
+  closeUp: 'Close-up',
+  stop: 'Tour stop',
+  play: 'Play the stop',
+  copyRecipes: 'Copy recipes',
 } as const;
 ---
 
@@ -193,6 +201,32 @@ const t = {
           </label>
         </fieldset>
 
+        <fieldset class="group" data-mouth>
+          <legend class="legend">{t.mouth}</legend>
+          <label class="field">
+            <span>{t.sound}</span>
+            <select name="sound" data-mouth-sound></select>
+          </label>
+          <label class="field check">
+            <input name="hold" type="checkbox" checked data-mouth-hold />
+            <span>{t.hold}</span>
+          </label>
+          <label class="field check">
+            <input name="closeUp" type="checkbox" data-mouth-close />
+            <span>{t.closeUp}</span>
+          </label>
+          <div class="sliders" data-mouth-sliders></div>
+          <label class="field">
+            <span>{t.stop}</span>
+            <select name="stop" data-mouth-stop></select>
+          </label>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" type="button" data-mouth-play>{t.play}</button>
+            <button class="btn btn-ghost btn-sm" type="button" data-mouth-copy>{t.copyRecipes}</button>
+          </div>
+          <p class="status" data-mouth-status aria-live="polite"></p>
+        </fieldset>
+
         <p class="status" data-harness-status aria-live="polite">{t.idle}</p>
         <p class="stats" data-harness-stats></p>
       </form>
@@ -310,6 +344,46 @@ const t = {
   }
 
   .range output {
+    text-align: right;
+    font-size: var(--text-xs);
+    color: var(--ink-muted);
+  }
+
+  .check {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .check input {
+    width: auto;
+    accent-color: var(--accent);
+  }
+
+  /* The Mouth panel's sliders are made by its script, so the scoped rules above do not reach them. */
+  .sliders {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .sliders :global(label) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5ch;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+  }
+
+  .sliders :global(span) {
+    grid-column: 1 / -1;
+  }
+
+  .sliders :global(input) {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  .sliders :global(output) {
     text-align: right;
     font-size: var(--text-xs);
     color: var(--ink-muted);

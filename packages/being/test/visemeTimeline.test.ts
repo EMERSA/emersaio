@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CHANNEL, CHANNEL_COUNT, createFrame } from '../src/face/source.ts';
 import {
+  DOMINANT_RAMP_MS,
   normalizeCues,
   TIMELINE_TAIL_MS,
+  VISEME_LEAD_MS,
   VISEME_RAMP_MS,
   VisemeTimelineSource,
 } from '../src/face/sources/VisemeTimeline.ts';
+
+/** The clock that shows a cue's shape at `at`: the lips lead the sound by VISEME_LEAD_MS. */
+const lead = (at: number): number => at - VISEME_LEAD_MS;
 
 const sampleAt = (source: VisemeTimelineSource, nowMs: number) => {
   const frame = createFrame();
@@ -33,7 +38,7 @@ test('normalizeCues sorts, clamps ids and defaults the weight', () => {
   );
 });
 
-test('a cue ramps in while the previous one fades, and silence closes the mouth', () => {
+test('a cue ramps in ahead of its sound while the previous one fades, and silence closes the mouth', () => {
   let t = 0;
   const source = new VisemeTimelineSource(
     [
@@ -46,26 +51,29 @@ test('a cue ramps in while the previous one fades, and silence closes the mouth'
   );
   assert.equal(source.priority, 10);
 
-  t = VISEME_RAMP_MS;
+  t = lead(DOMINANT_RAMP_MS / 2);
   let { frame, written } = sampleAt(source, t);
+  near(frame[21], 0.5, 'p/b/m halfway on its quicker ramp');
+  t = lead(DOMINANT_RAMP_MS);
+  ({ frame, written } = sampleAt(source, t));
   near(frame[21], 1, 'p/b/m at full ramp');
   near(frame[CHANNEL.jawOpen], 0, 'closed lips open no jaw');
   for (let channel = 0; channel < 22; channel += 1) assert.equal(written[channel], 1);
   assert.equal(written[CHANNEL.jawOpen], 1);
   assert.equal(written[CHANNEL.blinkLeft], 0);
 
-  t = 100 + VISEME_RAMP_MS / 2;
+  t = lead(100 + VISEME_RAMP_MS / 2);
   ({ frame } = sampleAt(source, t));
   near(frame[1], 0.5, 'next viseme halfway');
   near(frame[21], 0.5, 'previous viseme halfway');
 
-  t = 100 + VISEME_RAMP_MS;
+  t = lead(100 + VISEME_RAMP_MS);
   ({ frame } = sampleAt(source, t));
   near(frame[1], 1, 'ae at full');
   near(frame[21], 0, 'p faded');
   near(frame[CHANNEL.jawOpen], 0.6, 'jaw follows the openness table');
 
-  t = 300 + VISEME_RAMP_MS;
+  t = lead(300 + VISEME_RAMP_MS);
   ({ frame } = sampleAt(source, t));
   for (let channel = 0; channel < 22; channel += 1) near(frame[channel], 0, `silence ${channel}`);
   near(frame[CHANNEL.jawOpen], 0);
@@ -90,8 +98,8 @@ test('a timeline that does not end in silence closes at its duration', () => {
   let t = 100;
   const source = new VisemeTimelineSource([[0, 2]], () => t, 200);
   near(sampleAt(source, 0).frame[2], 1, 'held open');
-  t = 200 + VISEME_RAMP_MS / 2;
+  t = lead(200 + VISEME_RAMP_MS / 2);
   near(sampleAt(source, 0).frame[2], 0.5, 'closing');
-  t = 200 + VISEME_RAMP_MS;
+  t = lead(200 + VISEME_RAMP_MS);
   near(sampleAt(source, 0).frame[2], 0, 'closed');
 });

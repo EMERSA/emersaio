@@ -6,8 +6,9 @@
  *
  * Voice: Kokoro-82M (q8, CPU) with the British female voice bf_emma, falling back to af_heart. Audio is
  * trimmed, peak-normalised and encoded as mono MP3 at 48 kbps (40, then 32, when a clip would exceed 90 KB).
- * Timelines: <id>.json = { durationMs, visemes: [[offsetMs, visemeId, weight], ...] } at 50 ms resolution,
- * derived from the audio's envelope and spectrum aligned with the text. With --captions-only (or when the
+ * Timelines: <id>.json = { durationMs, visemes: [[offsetMs, visemeId, weight], ...] } at 10 ms resolution, one
+ * cue per phoneme from the timestamped model's durations (lib/phonemes.mjs); without durations, at 50 ms from the
+ * audio's envelope and spectrum aligned with the text. With --captions-only (or when the
  * model cannot be loaded) only the JSON is written, timed from the text alone, so the site runs with captions.
  */
 
@@ -15,9 +16,10 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
-import { analyse, normalise, trimSilence } from './lib/audio.mjs';
+import { analyse, normalise, trimBounds, trimSilence } from './lib/audio.mjs';
 import { kb, parseArgs } from './lib/io.mjs';
 import { encodeMp3 } from './lib/mp3.mjs';
+import { cuesFromSpans, visemeSpans } from './lib/phonemes.mjs';
 import { textOnlyTimeline } from './lib/text-visemes.mjs';
 import { loadVoice } from './lib/tts.mjs';
 import { timelineFromAudio } from './lib/visemes.mjs';
@@ -58,17 +60,21 @@ const readStops = () => {
 const writeJson = (path, data) => writeFileSync(path, `${JSON.stringify(data)}\n`);
 
 const bakeStop = async (stop, voice) => {
-  const { pcm: rawPcm, rate } = await voice.synthesise(stop.text);
+  const { pcm: rawPcm, rate, phonemes } = await voice.synthesise(stop.text);
   const pcm = normalise(trimSilence(rawPcm, rate));
+  const trimmed = trimBounds(rawPcm, rate)?.from ?? 0;
   const leadInMs = Math.round((MP3_LEAD_IN_SAMPLES / rate) * 1000);
   const pcmMs = Math.round((pcm.length / rate) * 1000);
   const durationMs = pcmMs + leadInMs;
   const frames = analyse(pcm, rate);
-  const visemes = timelineFromAudio(frames, stop.text, pcmMs).map(([offsetMs, viseme, weight]) => [
-    offsetMs === 0 ? 0 : offsetMs + leadInMs,
-    viseme,
-    weight,
-  ]);
+  // The voice's own phoneme timing when the model reports it; otherwise the text spread over the loud frames.
+  const visemes = phonemes
+    ? cuesFromSpans(visemeSpans(phonemes, rate), { rate, trimmed, leadInMs, durationMs, frames })
+    : timelineFromAudio(frames, stop.text, pcmMs).map(([offsetMs, viseme, weight]) => [
+        offsetMs === 0 ? 0 : offsetMs + leadInMs,
+        viseme,
+        weight,
+      ]);
   let mp3 = null;
   let kbps = 0;
   for (const bitrate of BITRATES) {
@@ -84,7 +90,7 @@ const bakeStop = async (stop, voice) => {
   writeFileSync(join(outDir, `${stop.id}.mp3`), mp3);
   writeJson(join(outDir, `${stop.id}.json`), { durationMs, visemes });
   console.log(
-    `${stop.id}: ${(durationMs / 1000).toFixed(2)} s, ${kb(mp3.byteLength)} at ${kbps} kbps, ${visemes.length} cues`,
+    `${stop.id}: ${(durationMs / 1000).toFixed(2)} s, ${kb(mp3.byteLength)} at ${kbps} kbps, ${visemes.length} cues${phonemes ? ' from phonemes' : ''}`,
   );
 };
 

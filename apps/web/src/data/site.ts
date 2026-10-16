@@ -133,7 +133,11 @@ export const site = {
       limit: 'That is all the talking for today. Please come back tomorrow.',
       minutesUp:
         'That is your five free minutes for today. Come back tomorrow, or email 4d@emersa.io for Emily in your organisation.',
-      micDenied: 'The microphone is off; you can keep typing.',
+      micDenied:
+        'Emily cannot hear you: the microphone is blocked for this site. On iPhone tap aA, then Website Settings, Microphone, Allow, and reload. You can keep typing.',
+      micMissing: 'No microphone was found. You can keep typing.',
+      micBusy: 'Another app is using the microphone. Close it and hold the microphone again, or keep typing.',
+      micFailed: 'This browser could not open the microphone. You can keep typing.',
       audioBlocked: 'Your browser is holding Emily’s sound back. Tap anywhere on the page to hear her.',
       timeUp: 'This conversation reached its time limit. Start again whenever you like.',
       failed: 'Something went wrong. Please try again.',

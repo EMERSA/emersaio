@@ -10,6 +10,8 @@ export interface MeshPart {
   index: ArrayLike<number>;
   /** Per vertex 0..1: R ambient occlusion, G tone, B part id (raw byte / 255), A calm. Absent means plain skin. */
   sculpt?: ArrayLike<number> | null;
+  /** Its tone is already the albedo (the eyeballs): the mouth's darkening does not apply. */
+  plain?: boolean;
 }
 
 export interface Welded {
@@ -22,6 +24,8 @@ export interface Welded {
   triPart: Uint8Array;
   /** Per welded vertex: tone, calm and occlusion (for the shader) and whether it is a lip (voice source). */
   tone: Float32Array;
+  /** How bright the surface is drawn: the tone, with the mouth's inside dark and the lips a touch bright. */
+  albedo: Float32Array;
   calm: Float32Array;
   ao: Float32Array;
   lips: Uint32Array;
@@ -43,6 +47,7 @@ export function weld(parts: MeshPart[], keep: (part: number, vertex: number) => 
   const toneL: number[] = [];
   const calmL: number[] = [];
   const aoL: number[] = [];
+  const albedoL: number[] = [];
   let count = 0;
   const key = (x: number, y: number, z: number): string =>
     `${Math.round(x / WELD_M)},${Math.round(y / WELD_M)},${Math.round(z / WELD_M)}`;
@@ -61,7 +66,9 @@ export function weld(parts: MeshPart[], keep: (part: number, vertex: number) => 
       map[v] = count;
       const s = part.sculpt;
       aoL.push(s ? (s[v * 4] ?? 1) : 1);
-      toneL.push(s ? (s[v * 4 + 1] ?? 1) : 1);
+      const tone = s ? (s[v * 4 + 1] ?? 1) : 1;
+      toneL.push(tone);
+      albedoL.push(part.plain ? tone : albedoOf(tone, Math.round((s ? (s[v * 4 + 2] ?? 0) : 0) * 255)));
       calmL.push(s ? (s[v * 4 + 3] ?? 1) : 1);
       count += 1;
     }
@@ -93,12 +100,26 @@ export function weld(parts: MeshPart[], keep: (part: number, vertex: number) => 
     tris: Uint32Array.from(trisL),
     triPart: Uint8Array.from(partL),
     tone,
+    albedo: Float32Array.from(albedoL),
     calm: Float32Array.from(calmL),
     ao: Float32Array.from(aoL),
     lips: Uint32Array.from(lips),
     nbrStart: start,
     nbr: list,
   };
+}
+
+/**
+ * The sculpture's brightness for a vertex of the head or body, from its baked tone and part (0 skin, 1 teeth, 2
+ * tongue). Teeth and tongue sit in shadow and the mouth's inside is near black, so the lips' outline carries each
+ * mouth shape; the lips themselves are drawn a little brighter than the skin.
+ */
+export function albedoOf(tone: number, part: number): number {
+  if (part === 1) return 0.38;
+  if (part === 2) return 0.26;
+  if (Math.abs(tone - 0.8) < 0.03) return 1.12;
+  if (tone < 0.5) return tone * 0.15;
+  return tone;
 }
 
 function neighbours(count: number, tris: number[]): { start: Uint32Array; list: Uint32Array } {

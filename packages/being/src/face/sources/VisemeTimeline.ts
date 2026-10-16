@@ -1,12 +1,17 @@
 import type { VisemeCue } from '../../types.ts';
 import { CHANNEL, type FaceSource, VISEME_COUNT } from '../source.ts';
+import { DOMINANT_VISEMES } from '../tables/mouthShapes.ts';
 import { clampViseme, jawOpenOf } from '../tables/ms22.ts';
 
 /** The mouth stays owned for a moment after the audio ends so the last shape releases through the driver, not a cut. */
 export const TIMELINE_TAIL_MS = 150;
 
 /** How long a cue takes to reach its weight while the previous cue fades: one short phoneme. */
-export const VISEME_RAMP_MS = 70;
+export const VISEME_RAMP_MS = 55;
+/** Lips shut, the lip under the teeth, the tongue between them: these ramp this fast, so even a short one shows. */
+export const DOMINANT_RAMP_MS = 30;
+/** Lips move ahead of the sound they make: each shape is shown this much before its cue's time. */
+export const VISEME_LEAD_MS = 40;
 
 export interface NormalizedCue {
   readonly at: number;
@@ -89,7 +94,8 @@ export const sampleCues = (
     at = durationMs;
   }
 
-  const progress = smoothstep(clamp01((t - at) / VISEME_RAMP_MS));
+  const ramp = DOMINANT_VISEMES.has(viseme) ? DOMINANT_RAMP_MS : VISEME_RAMP_MS;
+  const progress = smoothstep(clamp01((t - at) / ramp));
   addViseme(frame, viseme, weight * progress);
   if (previous !== undefined) addViseme(frame, previous.viseme, previous.weight * (1 - progress));
 };
@@ -122,7 +128,7 @@ export class VisemeTimelineSource implements FaceSource {
   }
 
   sample(_nowMs: number, frame: Float32Array, written: Uint8Array): void {
-    sampleCues(this.cues, this.clock(), this.durationMs, frame, written);
+    sampleCues(this.cues, this.clock() + VISEME_LEAD_MS, this.durationMs, frame, written);
   }
 
   stop(): void {

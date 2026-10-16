@@ -14,7 +14,23 @@ export interface ArkitStreamOptions {
    * rotations drive the head and eye bones in both modes. Off by default; setDirect() switches it later.
    */
   direct?: boolean;
+  /**
+   * Direct mode: the lip-shaping blendshapes (funnel, pucker, press, roll, close) at 1 + this, clamped to 1, so a
+   * stream tuned for a photoreal face still reads on a stylised one. 0 (the default) keeps every shape 1:1.
+   */
+  articulation?: number;
 }
+
+/** The shapes articulation strengthens: the ones that tell one sound from another, not the jaw. */
+const ARTICULATED: ReadonlySet<string> = new Set([
+  'mouthFunnel',
+  'mouthPucker',
+  'mouthPressLeft',
+  'mouthPressRight',
+  'mouthRollLower',
+  'mouthRollUpper',
+  'mouthClose',
+]);
 
 const DEGREES = Math.PI / 180;
 /** The driver clamps head rotation to these angles, so a channel value of 1 means "all the way". */
@@ -80,6 +96,8 @@ export class ArkitStreamSource implements FaceSource {
   private readonly slots: Record<Needed, number>;
   /** The frame slot of each arkit52 name, -1 where the layout has none. */
   private readonly blendshapeSlots: Int16Array;
+  /** Per arkit52 shape: the gain direct mode writes it with. */
+  private readonly gains: Float32Array;
   private readonly rotationScale: number;
   private readonly staleMs: number;
   private direct: boolean;
@@ -90,6 +108,8 @@ export class ArkitStreamSource implements FaceSource {
     this.frame = new Float32Array(order.length);
     this.slots = Object.fromEntries(NEEDED.map((name) => [name, order.indexOf(name)])) as Record<Needed, number>;
     this.blendshapeSlots = Int16Array.from(arkit52, (name) => order.indexOf(name));
+    const boost = 1 + Math.max(0, options.articulation ?? 0);
+    this.gains = Float32Array.from(arkit52, (name) => (ARTICULATED.has(name) ? boost : 1));
     this.rotationScale = options.rotationUnit === 'degrees' ? DEGREES : 1;
     this.staleMs = options.staleMs ?? 200;
     this.direct = options.direct === true;
@@ -147,7 +167,7 @@ export class ArkitStreamSource implements FaceSource {
   private sampleDirect(frame: Float32Array, written: Uint8Array): void {
     for (let index = 0; index < ARKIT_COUNT; index += 1) {
       const slot = this.blendshapeSlots[index] ?? -1;
-      frame[ARKIT_BASE + index] = slot < 0 ? 0 : clamp01(this.frame[slot] ?? 0);
+      frame[ARKIT_BASE + index] = slot < 0 ? 0 : clamp01((this.frame[slot] ?? 0) * (this.gains[index] ?? 1));
       written[ARKIT_BASE + index] = 1;
     }
     for (let viseme = 0; viseme < VISEME_COUNT; viseme += 1) {

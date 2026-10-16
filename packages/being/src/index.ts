@@ -19,7 +19,7 @@ import { FAN_LINES, FAN_PLANE_M } from './data/fanMath.ts';
 import { scatterFor } from './data/scatter.ts';
 import { TokenMeter } from './data/TokenMeter.ts';
 import { FaceDriver, hasArkitMorphs } from './face/FaceDriver.ts';
-import type { FaceSource } from './face/source.ts';
+import { CHANNEL, type FaceSource, VISEME_COUNT } from './face/source.ts';
 import type { ArkitStreamSource } from './face/sources/ArkitStream.ts';
 import { IdleSource } from './face/sources/Idle.ts';
 import { TextVisemesSource } from './face/sources/TextVisemes.ts';
@@ -79,6 +79,7 @@ export type {
 } from './data/depth/index.ts';
 export { DEFAULT_FAN_TARGETS, FAN_NODE_SHARES, FAN_PLANE_M } from './data/fanMath.ts';
 export type { KinectCloudOptions } from './data/KinectCloud.ts';
+export { MOUTH_RECIPES, type MouthRecipe } from './face/tables/mouthShapes.ts';
 export { FACE_CHIN_AIR, FACE_CROWN_AIR, FACE_PORTRAIT_SHARE, faceLayoutT } from './stage/framing.ts';
 export type * from './types.ts';
 
@@ -92,6 +93,8 @@ type CloudLayer = InstanceType<CloudModule['CloudLayer']>;
 type SculptureModule = typeof import('./sculpture/index.ts');
 type SculptureLayer = InstanceType<SculptureModule['SculptureLayer']>;
 
+/** Talk's live face stream: the lip-shaping blendshapes a third stronger, so each sound reads like the tour's. */
+const TALK_ARTICULATION = 0.3;
 /** The sculpture's intro: the pieces flow onto her over this time. */
 const SCULPT_INTRO_S = 2.6;
 /** A sculpture shard's target edge in device pixels (touch a little coarser), and the most shards per tier. */
@@ -902,7 +905,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
         dt,
         elapsed,
         camera: stage.camera,
-        voice: shared.uAudioLevel.value,
+        // The sound, not the face's own energy: the face moves when she is silent too, and the water would throb.
+        voice: Math.max(bands.level(), externalLevel),
         intro: !intro ? 1 : introAt === null ? 0 : Math.min(1, (elapsed - introAt) / SCULPT_INTRO_S),
       });
     }
@@ -1087,6 +1091,28 @@ export function createBeing(options: BeingOptions): BeingHandle {
   let arkitLoading = false;
   let arkitAttached = false;
   let arkitPending: Float32Array | null = null;
+  // The dev harness's held mouth: one viseme at a fixed weight, over the timelines and under a live stream.
+  let held: FaceSource | null = null;
+  const holdViseme = (viseme: number | null, weight = 1): void => {
+    if (held) face?.remove(held);
+    held = null;
+    if (viseme === null || !face || !(viseme >= 0 && viseme < VISEME_COUNT)) return;
+    held = {
+      name: 'held-viseme',
+      priority: 15,
+      active: () => true,
+      sample: (_now, frame, written) => {
+        for (let channel = 0; channel < VISEME_COUNT; channel += 1) {
+          frame[channel] = channel === viseme ? weight : 0;
+          written[channel] = 1;
+        }
+        frame[CHANNEL.jawOpen] = 0;
+        written[CHANNEL.jawOpen] = 1;
+      },
+    };
+    face.add(held);
+  };
+
   const pushArkit = (frame: ArrayLike<number>): void => {
     if (disposed) return;
     arkitAt = performance.now();
@@ -1105,7 +1131,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
     void import('./face/sources/ArkitStream.ts').then(
       ({ ArkitStreamSource: Source }) => {
         if (disposed) return;
-        arkit = new Source();
+        arkit = new Source({ articulation: TALK_ARTICULATION });
         const pending = arkitPending;
         arkitPending = null;
         if (pending) pushArkit(pending);
@@ -1232,7 +1258,11 @@ export function createBeing(options: BeingOptions): BeingHandle {
       setLineWidth: (px) => knob('lineWidth', (target) => target.setLineWidth(px)),
       setRipple: (m) => knob('ripple', (target) => target.setRipple(m)),
     },
-    face: { pushArkit },
+    face: {
+      pushArkit,
+      setMouthRecipe: (viseme, recipe) => face?.setRecipe(viseme, recipe),
+      holdViseme,
+    },
     stats: () => ({
       fps: stage.fps(),
       drawCalls: stage.drawCalls(),

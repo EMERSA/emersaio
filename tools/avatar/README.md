@@ -171,7 +171,7 @@ the tour on 2026-10-07.
 | `guide-lite.glb` | 177.5 KB (budget 250 KB) | head 2,400 tris / 1,266 verts / 74 morphs (skin 1,984, teeth 2 x 96, tongue 224); body 3,000 tris / 1,524 verts; seam 46 vertices, gap 0; 54 bones, 2 skins; 5 clips |
 | `cloud-12k.bin` | 82.0 KB | 12,000 points, 12,360 skin triangles and 1.77 m2 of surface sampled (640 teeth and tongue triangles left out) |
 | `cloud-6k.bin` | 41.0 KB | 6,000 points, the first half of the same shuffled sample |
-| tour clips | 10 MP3s, 39.7 to 56.7 KB each at 48 kbps, 465 KB in total | 6.7 to 9.6 s per stop, 97 to 142 cues per timeline |
+| tour clips | 8 MP3s, 39.7 to 71.7 KB each at 48 kbps, 400 KB in total | 6.8 to 12.2 s per stop, 78 to 154 phoneme-timed cues per timeline |
 
 Both GLBs pass the Khronos validator with no errors (the only warning, `NODE_SKINNED_MESH_NON_ROOT`, is the
 usual Blender layout of skinned meshes under the armature node, which three.js handles). The run prints the
@@ -186,8 +186,20 @@ LAME port `@breezystack/lamejs`. 24 kHz is an MPEG-2 rate, which LAME supports n
 resampling. If a clip would exceed 90 KB at 48 kbps the script retries at 40 and then 32 kbps and fails
 loudly if even that is too long (shorten the line). ffmpeg is not needed and is not installed.
 
-The viseme timeline is derived offline the way the runtime's `EnergyVisemes` works on live audio, with the text
-as the tie-breaker:
+The viseme timeline comes from the voice itself. The model is Kokoro's timestamped ONNX export
+(`onnx-community/Kokoro-82M-v1.0-ONNX-timestamped`: the same weights and voice, plus a `durations` output that
+says how long it spoke every input token). `lib/phonemes.mjs` turns the tokens into IPA phonemes (a stress mark
+gives its time to the phoneme it stresses, a length mark to the one it lengthens; spaces and punctuation shorter
+than 70 ms join the sound before, longer ones close the mouth), maps every English vowel, diphthong and
+consonant to one of the 22 Microsoft visemes (a diphthong shows both its shapes), and writes one cue per sound
+at 10 ms resolution, shifted by the samples the silence trim removed and by the MP3 delay (below). Lip
+closures, F/V and TH are written at full weight and held at least 60 ms (the voice times a closure by its
+release, so a short one starts earlier); the audio's loudness only scales how far a vowel opens. The runtime
+gives each viseme its own mouth shape from `packages/being/src/face/tables/mouthShapes.ts`, tuned live in the
+Mouth panel of `/dev/kinect` (`npm run dev`).
+
+Without durations (the plain export) the timeline falls back to the older method, derived the way the runtime's
+`EnergyVisemes` works on live audio, with the text as the tie-breaker:
 
 - every 50 ms: RMS on a decibel scale between the clip's floor and its peak gives the openness (the cue
   weight); a 1024-point FFT gives the spectral centroid and the share of energy above 2.5 kHz;
@@ -208,14 +220,15 @@ as the tie-breaker:
 
 ### Model cache and network
 
-The first run downloads about 92 MB (`onnx/model_quantized.onnx` plus the tokenizer files) from Hugging Face
+The first run downloads about 92 MB of the timestamped export (`onnx/model_quantized.onnx` plus the tokenizer files) from Hugging Face
 into `tools/avatar/cache/hf/` (gitignored, survives `npm ci`); the voice embeddings ship inside the kokoro-js
 package. Two things learned on this machine, both handled by `lib/tts.mjs`:
 
 - `huggingface.co` answers IPv6 first and the IPv6 route here resets the connection, so Node's `fetch` failed
   instantly with `ECONNRESET` while `curl -4` worked. The script sets `dns.setDefaultResultOrder('ipv4first')`.
 - If the download still fails, the error message prints `curl -4` commands that place the four files under
-  `tools/avatar/cache/hf-models/onnx-community/Kokoro-82M-v1.0-ONNX/`; the script uses that local copy first.
+  `tools/avatar/cache/hf-models/onnx-community/Kokoro-82M-v1.0-ONNX-timestamped/`; the script uses that local copy
+  first.
 
 `--captions-only` (or a model that cannot be loaded, exit code 2) writes `<id>.json` timed from the text
 alone (`lib/text-visemes.mjs`, about 70 ms per unit) and no MP3, which is the captions-only mode of the site.

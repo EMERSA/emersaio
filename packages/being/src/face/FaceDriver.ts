@@ -9,6 +9,7 @@ import {
   VISEME_COUNT,
 } from './source.ts';
 import { arkit52 } from './tables/arkit52.ts';
+import { MOUTH_RECIPES, type MouthRecipe, VISEME_DETAIL } from './tables/mouthShapes.ts';
 
 /** Morph indices per channel, as found in the GLB; empty where the asset has no such target. */
 export type MorphMap = ReadonlyArray<ReadonlyArray<number>>;
@@ -36,6 +37,10 @@ export const EYE_LIMITS = { yaw: 25, pitch: 15 } as const;
 
 const ATTACK_MS = 40;
 const RELEASE_MS = 110;
+/** The mouth (visemes and the jaw) follows speech closely: a stop consonant has to close the lips within its 50 ms. */
+const MOUTH_ATTACK_MS = 22;
+const MOUTH_RELEASE_MS = 55;
+const isMouthChannel = (channel: number): boolean => channel < VISEME_COUNT || channel === CHANNEL.jawOpen;
 /**
  * The ARKit block follows a live capture that is already smooth: it only takes the edge off each frame step, 90
  * percent of the way in 15 ms rising and 40 ms falling, so a stop consonant still closes the lips in time.
@@ -139,6 +144,11 @@ export class FaceDriver {
   private readonly morphs: MorphMap;
   /** 1 for each morph index an expression or viseme channel writes, so the ARKit block knows where to take max(). */
   private readonly legacyMorph: Uint8Array;
+  /** Per viseme, its mouth recipe resolved to morph indices and weights (empty when the model lacks the shapes). */
+  private recipes: Array<Array<[number, number]>> = [];
+  private recipeSum: Float32Array = new Float32Array(1);
+  private recipeMorphs: number[] = [];
+  private readonly recipeSource: MouthRecipe[] = [...MOUTH_RECIPES];
   private readonly sources: FaceSource[] = [];
   private readonly frame = createFrame();
   private readonly written = new Uint8Array(CHANNEL_COUNT);
@@ -161,6 +171,36 @@ export class FaceDriver {
     for (let channel = 0; channel < CHANNEL.headYaw; channel += 1) {
       for (const index of this.morphs[channel] ?? []) this.legacyMorph[index] = 1;
     }
+    this.resolveRecipes();
+  }
+
+  /** Replace one viseme's mouth recipe (the dev harness tunes them live); unknown shape names are skipped. */
+  setRecipe(viseme: number, recipe: MouthRecipe): void {
+    if (!(viseme >= 0 && viseme < VISEME_COUNT)) return;
+    const previous = this.recipeMorphs;
+    this.recipeSource[viseme] = { ...recipe };
+    this.resolveRecipes();
+    // A shape the new recipes no longer use would keep its last value: rest it.
+    const influences = this.mesh.morphTargetInfluences;
+    if (influences) for (const index of previous) if (!this.recipeMorphs.includes(index)) influences[index] = 0;
+  }
+
+  /** Each recipe resolved to morph indices and weights (empty when the model lacks the shapes). */
+  private resolveRecipes(): void {
+    const dictionary = this.mesh.morphTargetDictionary ?? {};
+    const used = new Set<number>();
+    this.recipes = this.recipeSource.map((recipe) => {
+      const terms: Array<[number, number]> = [];
+      for (const [name, weight] of Object.entries(recipe)) {
+        const index = dictionary[name];
+        if (index === undefined || !(weight > 0)) continue;
+        terms.push([index, Math.min(1, weight)]);
+        used.add(index);
+      }
+      return terms;
+    });
+    this.recipeMorphs = [...used];
+    this.recipeSum = new Float32Array(Math.max(this.legacyMorph.length, ...this.recipeMorphs.map((i) => i + 1), 1));
   }
 
   add(source: FaceSource): void {
@@ -199,12 +239,24 @@ export class FaceDriver {
     const release = 1 - Math.exp((-dtMs * Math.LN10) / RELEASE_MS);
     const arkitAttack = 1 - Math.exp((-dtMs * Math.LN10) / ARKIT_ATTACK_MS);
     const arkitRelease = 1 - Math.exp((-dtMs * Math.LN10) / ARKIT_RELEASE_MS);
+    const mouthAttack = 1 - Math.exp((-dtMs * Math.LN10) / MOUTH_ATTACK_MS);
+    const mouthRelease = 1 - Math.exp((-dtMs * Math.LN10) / MOUTH_RELEASE_MS);
     for (let channel = 0; channel < CHANNEL_COUNT; channel += 1) {
       const low = isBoneChannel(channel) ? -1 : 0;
       const target = MathUtils.clamp(this.targets[channel] ?? 0, low, 1);
       const value = this.current[channel] ?? 0;
       const rising = Math.abs(target) > Math.abs(value);
-      const k = isArkitChannel(channel) ? (rising ? arkitAttack : arkitRelease) : rising ? attack : release;
+      const k = isArkitChannel(channel)
+        ? rising
+          ? arkitAttack
+          : arkitRelease
+        : isMouthChannel(channel)
+          ? rising
+            ? mouthAttack
+            : mouthRelease
+          : rising
+            ? attack
+            : release;
       this.current[channel] = value + (target - value) * k;
     }
 
@@ -260,7 +312,15 @@ export class FaceDriver {
       const indices = this.morphs[channel];
       if (!indices || indices.length === 0) continue;
       const value = this.current[channel] ?? 0;
-      for (const index of indices) influences[index] = value;
+      // A viseme's own sculpted target stays underneath its recipe, at VISEME_DETAIL.
+      // The timelines' own jaw (one openness per viseme) is halved too: the recipes carry the jaw with the lips.
+      const scale =
+        this.recipeMorphs.length > 0 && channel < VISEME_COUNT
+          ? VISEME_DETAIL
+          : this.recipeMorphs.length > 0 && channel === CHANNEL.jawOpen
+            ? 0.5
+            : 1;
+      for (const index of indices) influences[index] = value * scale;
     }
     for (let channel = ARKIT_BASE; channel < ARKIT_BASE + ARKIT_COUNT; channel += 1) {
       const indices = this.morphs[channel];
@@ -269,6 +329,20 @@ export class FaceDriver {
       for (const index of indices) {
         influences[index] = this.legacyMorph[index] ? Math.max(influences[index] ?? 0, value) : value;
       }
+    }
+    // Each viseme shapes the lips through its recipe, in proportion to its weight; the larger value wins where a
+    // live stream or an expression drives the same shape.
+    if (this.recipeMorphs.length === 0) return;
+    const sum = this.recipeSum;
+    for (const index of this.recipeMorphs) sum[index] = 0;
+    for (let viseme = 1; viseme < VISEME_COUNT; viseme += 1) {
+      const weight = this.current[viseme] ?? 0;
+      if (weight < 0.002) continue;
+      for (const [index, amount] of this.recipes[viseme] ?? []) sum[index] = (sum[index] ?? 0) + weight * amount;
+    }
+    for (const index of this.recipeMorphs) {
+      const value = Math.min(1, sum[index] ?? 0);
+      if (value > (influences[index] ?? 0)) influences[index] = value;
     }
   }
 

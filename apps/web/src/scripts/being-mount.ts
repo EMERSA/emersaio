@@ -793,7 +793,7 @@ function createCaptionBeing(): BeingHandle {
     setShatter: noop,
     fan: { setTargets: noop, setActivity: noop, setEnabled: noop },
     setDepthSource: noop,
-    face: { pushArkit: noop },
+    face: { pushArkit: noop, setMouthRecipe: noop, holdViseme: noop },
     kinect: {
       setClipping: noop,
       setPointSize: noop,

@@ -11,7 +11,21 @@ const FFT_SIZE = 1024;
  * @param {Float32Array} pcm
  * @param {number} rate
  */
-export const trimSilence = (pcm, rate, { threshold = 0.012, leadMs = 60, tailMs = 160 } = {}) => {
+export const trimSilence = (pcm, rate, options) => {
+  const bounds = trimBounds(pcm, rate, options);
+  if (!bounds) return pcm;
+  const out = pcm.slice(bounds.from, bounds.to);
+  const fade = Math.min(Math.round(rate * 0.005), Math.floor(out.length / 2));
+  for (let i = 0; i < fade; i++) {
+    const gain = i / fade;
+    out[i] *= gain;
+    out[out.length - 1 - i] *= gain;
+  }
+  return out;
+};
+
+/** The samples trimSilence keeps, [from, to); null when the clip is silent throughout. */
+export const trimBounds = (pcm, rate, { threshold = 0.012, leadMs = 60, tailMs = 160 } = {}) => {
   const window = Math.round(rate * 0.01);
   let first = -1;
   let last = -1;
@@ -23,17 +37,11 @@ export const trimSilence = (pcm, rate, { threshold = 0.012, leadMs = 60, tailMs 
       last = start + window;
     }
   }
-  if (first < 0) return pcm;
-  const from = Math.max(0, first - Math.round((rate * leadMs) / 1000));
-  const to = Math.min(pcm.length, last + Math.round((rate * tailMs) / 1000));
-  const out = pcm.slice(from, to);
-  const fade = Math.min(Math.round(rate * 0.005), Math.floor(out.length / 2));
-  for (let i = 0; i < fade; i++) {
-    const gain = i / fade;
-    out[i] *= gain;
-    out[out.length - 1 - i] *= gain;
-  }
-  return out;
+  if (first < 0) return null;
+  return {
+    from: Math.max(0, first - Math.round((rate * leadMs) / 1000)),
+    to: Math.min(pcm.length, last + Math.round((rate * tailMs) / 1000)),
+  };
 };
 
 /** Peak-normalise so every stop plays at the same level. */

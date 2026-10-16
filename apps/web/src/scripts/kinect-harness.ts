@@ -8,6 +8,7 @@
  */
 import type { BeingHandle, KinectMode, Look } from '@emersa/being';
 import type { DepthSource, KinectronClient, KinectronKinectType } from '@emersa/being/depth';
+import { bindMouthPanel } from './mouth-panel.ts';
 
 type BeingModule = typeof import('@emersa/being');
 type DepthModule = typeof import('@emersa/being/depth');
@@ -23,7 +24,7 @@ const POINTS_FORMAT = new Intl.NumberFormat('en-GB');
 const LOOKS: readonly Look[] = ['kinect-demo', 'face', 'hybrid', 'kinect', 'wire'];
 const MODES: readonly KinectMode[] = ['points', 'wire', 'mesh', 'shards'];
 /** The look the being starts in, which is also the first option of the Look selector. */
-const START_LOOK: Look = 'kinect-demo';
+const START_LOOK: Look = 'sculpture';
 
 const root = document.querySelector<HTMLElement>('[data-kinect-harness]');
 if (root && root.dataset.mounted === undefined) {
@@ -89,6 +90,7 @@ async function mount(host: HTMLElement): Promise<void> {
     return;
   }
   document.addEventListener('em:theme', (event) => handle.setTheme(themeFromEvent(event)));
+  bindMouthPanel(host, handle, being.MOUTH_RECIPES);
 
   // The harness owns the external sources: the being only reads them, so the one replaced is disposed here.
   let source: DepthSource | null = null;

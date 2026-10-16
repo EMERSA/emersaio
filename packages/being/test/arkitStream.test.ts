@@ -119,3 +119,17 @@ test('direct mode maps a custom layout by name, a missing shape reads 0, and set
   near(frame[ARKIT_BASE + arkit52.indexOf('mouthPucker')], 0, 'a shape the layout lacks');
   near(frame[CHANNEL.jawOpen], 0, 'the expression jaw at rest');
 });
+
+test('articulation strengthens the lip shapes in direct mode, clamped, and leaves the jaw 1:1', () => {
+  const source = new ArkitStreamSource({ direct: true, articulation: 0.3 });
+  const frame61 = new Float32Array(ARKIT_FRAME_LENGTH);
+  frame61[arkitIndex('mouthPucker')] = 0.5;
+  frame61[arkitIndex('mouthFunnel')] = 0.9;
+  frame61[arkitIndex('jawOpen')] = 0.5;
+  source.push(frame61, 0);
+  const { frame } = sample(source, 10);
+  const at = (name: string): number => frame[ARKIT_BASE + arkit52.indexOf(name as (typeof arkit52)[number])] ?? -1;
+  assert.ok(Math.abs(at('mouthPucker') - 0.65) < 1e-6);
+  assert.equal(at('mouthFunnel'), 1);
+  assert.equal(at('jawOpen'), 0.5);
+});

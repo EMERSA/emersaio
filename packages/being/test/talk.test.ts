@@ -15,6 +15,7 @@ import {
 } from '../src/talk/ConvaiBrain.ts';
 import {
   isBusyError,
+  micNotice,
   parseGrant,
   TalkSession,
   type TalkSessionOptions,
@@ -367,6 +368,15 @@ test('settled lines go to /api/memory/turns, typed lines go to the voice, and en
   assert.ok(t.timers[0]?.cleared, 'the cap timer is cleared');
   assert.ok(t.calls.some((call) => call.url === '/api/talk/revoke'));
   assert.equal(t.session.sendText('after'), false);
+});
+
+test('the microphone notice names the cause', () => {
+  const named = (name: string, message = '') => Object.assign(new Error(message), { name });
+  assert.equal(micNotice(named('NotAllowedError', 'Permission denied')), 'mic-denied');
+  assert.equal(micNotice(named('SecurityError')), 'mic-denied');
+  assert.equal(micNotice(named('NotFoundError', 'Requested device not found')), 'mic-missing');
+  assert.equal(micNotice(named('NotReadableError', 'Could not start audio source')), 'mic-busy');
+  assert.equal(micNotice(named('TypeError', 'mediaDevices is undefined')), 'mic-failed');
 });
 
 test('a refused microphone raises mic-denied and keeps typed mode', async () => {

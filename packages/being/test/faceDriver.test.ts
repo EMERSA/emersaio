@@ -13,6 +13,7 @@ import {
 import { ARKIT_BASE, ARKIT_COUNT, CHANNEL, CHANNEL_COUNT, type FaceSource } from '../src/face/source.ts';
 import { ArkitStreamSource } from '../src/face/sources/ArkitStream.ts';
 import { ARKIT_FRAME_LENGTH, arkit52, arkitIndex } from '../src/face/tables/arkit52.ts';
+import { MOUTH_RECIPES, VISEME_DETAIL } from '../src/face/tables/mouthShapes.ts';
 
 /**
  * The guide's Head morphs in the order the GLB carries them (tools/avatar): 22 visemes, then the 52 ARKit shapes in
@@ -176,7 +177,7 @@ test('a morph the expressions and the ARKit block both drive takes the larger; t
   near(morph('mouthSmileLeft'), 0.7, 1e-6, 'the expression wins on the smile');
   near(morph('mouthSmileRight'), 0.7, 1e-6, 'the expression drives both sides');
   near(morph('tongueOut'), 0.4, 1e-6, 'a shape only the block drives');
-  near(morph('viseme_05'), 0.5, 1e-6, 'visemes still land on their own morphs');
+  near(morph('viseme_05'), 0.5 * VISEME_DETAIL, 1e-6, 'visemes keep their sculpted detail under the mouth recipes');
   near(driver.energy(), 0.9, 1e-6, 'energy is 1.5 x the larger jaw');
   // The block alone opens the mouth for the energy too.
   values.set(CHANNEL.jawOpen, 0);
@@ -203,4 +204,36 @@ test('a direct ARKit stream puts every blendshape on its morph 1:1', () => {
   for (let viseme = 0; viseme < 22; viseme += 1) {
     near(morph(`viseme_${String(viseme).padStart(2, '0')}`), 0, 1e-6, 'no viseme is approximated on top');
   }
+});
+
+test('every viseme has a mouth recipe of real ARKit shapes, each weight within 0..1', () => {
+  assert.equal(MOUTH_RECIPES.length, 22);
+  for (const recipe of MOUTH_RECIPES) {
+    for (const [name, weight] of Object.entries(recipe)) {
+      assert.ok((arkit52 as readonly string[]).includes(name), `${name} is an ARKit shape`);
+      assert.ok(weight >= 0 && weight <= 1, `${name} ${weight}`);
+    }
+  }
+});
+
+test('a viseme shapes the lips through its recipe: p, b, m press them shut and o, u round them', () => {
+  const { mesh, morph } = fakeHead();
+  const driver = new FaceDriver({ mesh, bones: {} });
+  const values = new Map<number, number>([[21, 1]]);
+  driver.add(fixed(values));
+  let now = 0;
+  const step = (frames: number): void => {
+    for (let i = 0; i < frames; i += 1) {
+      now += 50;
+      driver.update(now, 0.05);
+    }
+  };
+  step(20);
+  near(morph('mouthPressLeft'), MOUTH_RECIPES[21]?.mouthPressLeft ?? 0, 0.01, 'lips pressed');
+  near(morph('jawOpen'), 0, 0.01, 'jaw shut');
+  values.delete(21);
+  values.set(7, 1);
+  step(20);
+  near(morph('mouthPucker'), MOUTH_RECIPES[7]?.mouthPucker ?? 0, 0.01, 'lips rounded');
+  near(morph('mouthPressLeft'), 0, 0.01, 'the press has gone');
 });

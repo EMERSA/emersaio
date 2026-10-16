@@ -43,7 +43,7 @@ const fakeBeing = (options: { fail?: boolean } = {}) => {
     getLook: () => 'hybrid',
     setFraming: () => undefined,
     setShatter: () => undefined,
-    face: { pushArkit: () => undefined },
+    face: { pushArkit: () => undefined, setMouthRecipe: () => undefined, holdViseme: () => undefined },
     fan: { setTargets: () => undefined, setActivity: () => undefined, setEnabled: () => undefined },
     setDepthSource: () => undefined,
     kinect: {

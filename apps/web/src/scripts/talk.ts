@@ -52,6 +52,9 @@ const RUNTIME_NOTICES: Record<string, Notice> = {
   busy: 'busy',
   cap: 'timeUp',
   'mic-denied': 'micDenied',
+  'mic-missing': 'micMissing',
+  'mic-busy': 'micBusy',
+  'mic-failed': 'micFailed',
   reconnecting: 'reconnecting',
   expired: 'failed',
   'audio-blocked': 'audioBlocked',
@@ -604,7 +607,11 @@ class Controller {
   private setState(state: TalkState): void {
     if (state === 'reconnecting') this.ui.state.textContent = copy.notices.reconnecting;
     else if (state === 'requesting' || state === 'connecting') this.ui.state.textContent = copy.starting;
-    else if (state === 'live') this.ui.state.textContent = this.held ? copy.listening : '';
+    else if (state === 'live') {
+      this.ui.state.textContent = this.held ? copy.listening : '';
+      // Still held from a press made while connecting: open the microphone now.
+      if (this.wantMic && !this.held) this.micOp = this.micOp.then(() => this.settleMic());
+    }
     if (state === 'ended' && this.session) void this.end(false);
   }
 
@@ -634,6 +641,8 @@ class Controller {
     if (this.wantMic && !this.held && session) {
       this.held = await session.startListening().catch(() => false);
       this.reflectMic();
+      // Pressed before her voice is connected: say so, and the microphone opens once it is (setState).
+      if (!this.held && session.state !== 'live') this.ui.state.textContent = copy.starting;
       // Released while it was opening: close it again, in order.
       if (!this.wantMic && this.held) await this.closeMic(session);
     } else if (!this.wantMic && this.held) {
