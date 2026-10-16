@@ -984,6 +984,8 @@ class Controller {
   private status(text: string): void {
     this.ui.notice.textContent = text;
     this.ui.notice.hidden = false;
+    // Below the fold on a short window it would go unseen: bring it into view.
+    this.ui.notice.scrollIntoView({ block: 'nearest' });
   }
 }
 

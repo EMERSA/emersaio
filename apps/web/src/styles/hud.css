@@ -672,8 +672,14 @@ html.is-talking .being-stage {
   }
 }
 
+/* A refusal or a problem is the one thing to read here: full phosphor, a rule beside it, not a footnote. */
 .talk-notice {
   margin-top: 0.25rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--phos);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--phos);
 }
 
 /* ---------- Touring: a flat band on the page colour at the bottom edge, one hairline, nothing else ---------- */
