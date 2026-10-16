@@ -195,6 +195,23 @@ test('revoke refunds the charged time the session did not use, never below zero'
   assert.equal(await usage(asD1(db), v.id, 'talk_seconds'), charged);
 });
 
+test('an abandoned session counts only to its last line plus the grace, so a closed tab keeps the day', async () => {
+  const { env, db } = talkEnv();
+  const v = await visitor(db);
+  restore = upstreams();
+  assert.equal((await call(SESSION, jsonPost(good, { cookie: v.cookie }), env)).status, 200);
+  // Started two hours ago, one line 30 seconds in, then the tab was closed without a revoke.
+  const started = Date.now() - 7_200_000;
+  db.sqlite.prepare('UPDATE session SET started_at = ? WHERE visitor_id = ?').run(started, v.id);
+  db.sqlite
+    .prepare("INSERT INTO turn (visitor_id, session_id, role, text, ts) VALUES (?, NULL, 'user', 'hello', ?)")
+    .run(v.id, started + 30_000);
+  // The next start settles it at 30 s + the 60 s grace: 90 s used, and a fresh five minutes minus that is offered.
+  const next = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  assert.equal(next.status, 200);
+  assert.equal((await body(next)).session.secondsLeft, 300 - 90);
+});
+
 test('the sitewide TALK_SESSIONS cap: the handler takes the last slot, then the chain answers 503', async () => {
   const m = metrics();
   const { env, db } = talkEnv({ METRICS: m.binding });

@@ -6,7 +6,7 @@
  * only the four border radii (8px, 16px, 999px, 50%), no /api/* request before the being mounts, no horizontal
  * overflow, the stored theme applied, the being actually drawing on "/" (is-ready, not the poster fallback) once
  * it mounts, no request for the depth sources' chunk (/_astro/depth.*, the dev harness's alone) on any page, the hero
- * cloud drawing on a touch device with three.js still unrequested before any tap, and the menu opening at 390 px
+ * cloud drawing on a touch device (Emily then loads without a tap, but no Talk, tool or API bytes do), and the menu opening at 390 px
  * with JavaScript off.
  *
  *   node tests/browser/metrics.mjs                 (serves apps/web/dist itself)
@@ -49,8 +49,6 @@ const FORBIDDEN = [
 ];
 /** What may only load after the visitor taps Talk: the lazy talk chunks, the SDK, its transports and Turnstile. */
 const TALK_BYTES = /convai|livekit|challenges\.cloudflare\.com|\/_astro\/talk[.-]|\/api\/(talk|memory|brain)/i;
-/** The renderer's chunk, which a touch device must not request before a tap (CONVENTIONS, Performance). */
-const THREE_CHUNK = /\/_astro\/three\./;
 /** The depth sources' chunk: the dev harness's Kinectron and video inputs, which the home page never loads. */
 const DEPTH_CHUNK = /\/_astro\/depth\./;
 /** The free tools' chunks (the QR encoder, qrcode itself, the game): nothing of them before an interaction. */
@@ -302,12 +300,7 @@ try {
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
       page.on('request', (r) => {
         const url = new URL(r.url());
-        if (
-          THREE_CHUNK.test(url.pathname) ||
-          TOOL_CHUNKS.test(url.pathname) ||
-          url.pathname.startsWith('/api/') ||
-          TALK_BYTES.test(url.href)
-        )
+        if (TOOL_CHUNKS.test(url.pathname) || url.pathname.startsWith('/api/') || TALK_BYTES.test(url.href))
           early.push(url.pathname);
       });
       await page.goto(`${base}/`, { waitUntil: 'load', timeout: 60000 });
@@ -323,14 +316,15 @@ try {
       const issues = [];
       if (state.webgl2 && !hero)
         issues.push(`the hero cloud never drew (canvas state "${state.cloud}"): a WebGL2 or shader failure`);
-      if (state.mount) issues.push(`the being mounted (${state.mount.kind}) without a tap`);
       for (const path of early) issues.push(`${path} requested before any tap`);
       if (errors.length) issues.push(`${errors.length} console error(s): ${errors[0].slice(0, 120)}`);
       await page.screenshot({ path: join(shots, 'metrics-home-touch-390.png') });
       rows.push([
         'touch hero at 390',
         issues.length ? 'FAIL' : 'PASS',
-        issues.length ? issues.join('; ') : `hero cloud ${hero ? 'drew' : 'skipped (no WebGL2)'}, nothing early`,
+        issues.length
+          ? issues.join('; ')
+          : `hero cloud ${hero ? 'drew' : 'skipped (no WebGL2)'}, no Talk or tool bytes early`,
       ]);
     } catch (error) {
       rows.push(['touch hero at 390', 'FAIL', `threw: ${String(error.message ?? error).slice(0, 160)}`]);

@@ -151,6 +151,15 @@ export async function endSessions(db: MemoryDb, visitorId: string, nowMs = Date.
   return results;
 }
 
+/** The visitor's last recorded line at or after a moment, or null: when an abandoned session was last in use. */
+export async function lastActivity(db: MemoryDb, visitorId: string, sinceMs: number): Promise<number | null> {
+  const ts = await db
+    .prepare('SELECT MAX(ts) AS ts FROM turn WHERE visitor_id = ? AND ts >= ?')
+    .bind(visitorId, sinceMs)
+    .first<number | null>('ts');
+  return typeof ts === 'number' ? ts : null;
+}
+
 /** What revoke gives back: the charged seconds the session did not use, counted from when it started. */
 export const unusedSeconds = (session: Pick<SessionRow, 'started_at' | 'charged_seconds'>, nowMs: number): number =>
   Math.max(0, session.charged_seconds - Math.floor((nowMs - session.started_at) / 1000));

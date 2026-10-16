@@ -611,6 +611,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
     if (!target || !avatar || !head || target.built()) return;
     target.build({ head: avatar.head, body: avatar.body, eyeL: avatar.bones.eyeL, eyeR: avatar.bones.eyeR });
     target.setSubject(0, (head.bounds.minY + head.bounds.maxY) / 2, head.bounds.centreZ, headBust?.minY ?? 1.25);
+    applyScene();
   };
 
   /** A knob of the cloud: applied at once when the layer is there, otherwise when it arrives. */
@@ -654,8 +655,13 @@ export function createBeing(options: BeingOptions): BeingHandle {
     const headBounds = (headLook || isSculpt) && head ? head.bounds : null;
     // One object per head: the stage compares bounds by identity, and its layout calls back into this function.
     const bust = bustLook && headBounds ? headBust : null;
+    // Until the sculpture has built, its look shows nothing of the figure (the poster stays), never the old wire.
+    if (isSculpt && avatar && !sculpt?.built()) {
+      showWire(avatar.head, false);
+      if (avatar.body) showWire(avatar.body, false);
+    }
     if (sculpt) {
-      if (isSculpt && avatar) {
+      if (isSculpt && avatar && sculpt.built()) {
         showWire(avatar.head, true);
         if (avatar.body) showWire(avatar.body, true);
       }

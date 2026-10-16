@@ -1,7 +1,7 @@
 /**
  * Mounts the being on documents whose <main data-being> asks for it. Three.js loads only when the device can carry
- * it: after the LCP and an idle moment on hover-capable desktops, on the first tap elsewhere (the tap that opens
- * Talk included), never without WebGL2, and under reduced motion only for Talk, which draws her still. Every other
+ * it: after the LCP and an idle moment on every device that can carry it (phones too), on the first tap on a weak
+ * device or under Save-Data (the tap that opens Talk included), never without WebGL2, and under reduced motion only for Talk, which draws her still. Every other
  * path keeps the poster and runs the tour with captions alone, and no failure here is allowed to escape: each one
  * ends in that captions-only mode, or, when not even the tour could be built, in the transcript that "Start the
  * tour" points at without JavaScript.
@@ -169,7 +169,9 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
     }
     return;
   }
-  if (m.device.hoverFine && !m.device.lowEnd && !m.device.saveData) {
+  // Emily is there from the start on every device that can carry her (phones too: she is the page), after the LCP
+  // and an idle moment; a weak device or Save-Data keeps the poster until the first tap.
+  if (!m.device.lowEnd && !m.device.saveData) {
     void afterLcp()
       .then(whenIdle)
       .then(() => loadBeing(m))
@@ -181,8 +183,8 @@ function mount(activeMode: Mode, stage: HTMLElement): void {
       });
     return;
   }
-  // Touch and weak devices keep the poster until the first tap, which also serves as the audio gesture. A deep link
-  // keeps its stop for that tap and puts the control that starts it in front of the visitor.
+  // Weak devices keep the poster until the first tap, which also serves as the audio gesture. A deep link keeps its
+  // stop for that tap and puts the control that starts it in front of the visitor.
   if (m.pendingStop !== null) m.el.startButtons[0]?.focus();
 }
 

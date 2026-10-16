@@ -7,10 +7,12 @@
    stage fills the hero and the conversation starts under her neck (--talk-top, from talkTextTop in the runtime's
    framing.ts), replies rising from the prompt. The monitor is hidden until the tour or Talk starts. The tour pins it
    to the bottom edge of the viewport as a flat band on the page colour (the page scrolls under it, so it needs a
-   floor) and the page keeps that much room at its foot (--dock-h). On a phone the conversation is a sheet under the
-   header sized to the visible viewport (--vv-h, --vv-top from talk.ts): Emily on top, never covered, and the
-   consent or the chat under her; html.is-chatting marks the chat, html.is-keyboard a keyboard (or a screen as short
-   as one with it up) that leaves the chat less room.
+   floor) and the page keeps that much room at its foot (--dock-h). The conversation lives in the page, which still
+   scrolls: Talk rolls up to Emily (the desktop hero one window tall, a phone's Emily at the top with the
+   conversation under her, sized to the visible viewport from --vv-h and --vv-top), and once she is mostly scrolled
+   away the conversation pins itself to the window's foot as a HUD (html.is-talk-away) until Close. html.is-chatting
+   marks the chat, html.is-keyboard a keyboard (or a screen as short as one with it up) that leaves the chat less
+   room.
    ========================================================================== */
 
 .being-dock {
@@ -766,16 +768,36 @@ html.is-touring body {
   padding-bottom: var(--dock-h, 0px);
 }
 
-/* ---------- Phones: the conversation as a sheet under the header, Emily on top ---------- */
+/* ---------- Scrolled away from Emily while talking: the conversation is a HUD pinned to the window's foot ---------- */
+html.is-talking.is-talk-away .monitor {
+  position: fixed;
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  width: auto;
+  max-width: none;
+  height: min(42svh, 24rem);
+  margin: 0;
+  padding: 0.75rem max(var(--gutter), calc((100% - 44rem) / 2)) calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+/* The page keeps room for the HUD at its foot, so the end of the page can still scroll out from under it. */
+html.is-talking.is-talk-away body {
+  padding-bottom: min(42svh, 24rem);
+}
+
+/* ---------- Phones: Emily at the top of the page, the conversation under her pinned to the window ---------- */
 @media (max-width: 719.98px) {
-  /* The sheet starts under the header, or at the top of the visible viewport once the keyboard has panned the
-     header away, and ends at the visible viewport's foot. The page behind is locked and inert (talk.ts). */
+  /* The conversation runs from under Emily (or the top of the visible viewport once the keyboard has panned the
+     header away) to the visible viewport's foot. The page is not locked: it scrolls under the conversation. */
   html.is-talking {
     --overlay-top: max(var(--vv-top, 0px), var(--header-h));
     --overlay-h: calc(var(--vv-top, 0px) + var(--vv-h, 100dvh) - var(--overlay-top));
     --talk-stage: clamp(160px, 34svh, 300px);
-    overflow: hidden;
-    overscroll-behavior: none;
   }
 
   html.is-talking.is-chatting {
@@ -786,22 +808,12 @@ html.is-touring body {
     --talk-stage: clamp(96px, calc(var(--overlay-h) - 13rem), 34svh);
   }
 
-  /* The hero keeps its height under the sheet, so nothing on the page moves when the sheet opens or closes. */
-  html.is-talking .being-dock {
-    min-height: var(--stage-h);
-  }
-
+  /* Emily stays in the page, as tall as the room the conversation leaves her at the top of the window. */
   html.is-talking .being-slot {
-    position: fixed;
-    top: var(--overlay-top);
-    right: 0;
-    left: 0;
-    z-index: 50;
     height: var(--talk-stage);
-    background: var(--bg);
   }
 
-  html.is-talking .monitor {
+  html.is-talking:not(.is-talk-away) .monitor {
     position: fixed;
     top: calc(var(--overlay-top) + var(--talk-stage));
     right: 0;

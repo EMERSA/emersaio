@@ -23,6 +23,7 @@ import {
   capsFor,
   endSessions,
   FREE_TALK_SECONDS_PER_DAY,
+  lastActivity,
   MAX_UPLOADS_PER_DAY,
   type MemoryDb,
   recordConsent,
@@ -50,10 +51,26 @@ export const UPLOADS_FULL = 'That is all the files for today. Please come back t
 
 const tomorrow = (): Record<string, string> => ({ 'Retry-After': String(secondsUntilTomorrow()) });
 
-/** End the visitor's open sessions and give back the talk time they were charged but did not use. */
-async function settle(db: MemoryDb, id: string, nowMs = Date.now()): Promise<number> {
+/** An abandoned session counts as used until its last line plus this, not until it is found. */
+export const ABANDONED_GRACE_MS = 60_000;
+
+/**
+ * End the visitor's open sessions and give back the talk time they were charged but did not use. Revoke (the
+ * visitor ended it) counts up to now. A session found still open when the next one starts was abandoned (a closed
+ * tab, a reload, a locked phone): it counts up to its last recorded line plus ABANDONED_GRACE_MS, so leaving the
+ * page does not cost the rest of the day's minutes.
+ */
+async function settle(db: MemoryDb, id: string, nowMs = Date.now(), abandoned = false): Promise<number> {
   const ended = await endSessions(db, id, nowMs);
-  const back = ended.reduce((sum, session) => sum + unusedSeconds(session, nowMs), 0);
+  let back = 0;
+  for (const session of ended) {
+    let until = nowMs;
+    if (abandoned) {
+      const last = (await lastActivity(db, id, session.started_at)) ?? session.started_at;
+      until = Math.min(nowMs, last + ABANDONED_GRACE_MS);
+    }
+    back += unusedSeconds(session, until);
+  }
   if (back > 0) await refund(db, id, 'talk_seconds', back, nowMs);
   return back;
 }
@@ -99,7 +116,7 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   if (turnsLeft === 0) return fail(429, DAY_FULL, { ...tomorrow(), ...cookie });
 
   // A session the visitor left open (a closed tab, a refresh) is settled first, so its unused time is theirs again.
-  if (known) await settle(s.db, id);
+  if (known) await settle(s.db, id, Date.now(), true);
   const used = await usage(s.db, id, 'talk_seconds');
   const left = FREE_TALK_SECONDS_PER_DAY - used;
   if (left <= 0) {

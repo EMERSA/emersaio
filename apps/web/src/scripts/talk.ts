@@ -31,6 +31,8 @@ const DOCUMENT_MAX_CHARS = 20000;
 
 /** The phone layout of hud.css: the conversation as a sheet under the header. */
 const PHONE = matchMedia('(max-width: 719.98px)');
+/** Less of Emily's stage than this in view, and the conversation pins itself to the foot of the window. */
+const AWAY_RATIO = 0.35;
 /** A mouse or a trackpad: focusing the field opens no on-screen keyboard over the conversation. */
 const FINE_POINTER = matchMedia('(pointer: fine)');
 const COARSE_POINTER = matchMedia('(pointer: coarse)');
@@ -320,6 +322,13 @@ class Controller {
       ui.start.addEventListener(type, () => void import('@emersa/being/talk').catch(() => undefined), { once: true });
     }
     ui.close.addEventListener('click', () => void this.end(true));
+    // Emily mostly out of view while talking: the conversation becomes the pinned HUD at the window's foot.
+    if (ui.stage && 'IntersectionObserver' in window) {
+      new IntersectionObserver(
+        ([entry]) => root.classList.toggle('is-talk-away', (entry?.intersectionRatio ?? 1) < AWAY_RATIO),
+        { threshold: [0, AWAY_RATIO, 1] },
+      ).observe(ui.stage);
+    }
     ui.form.addEventListener('submit', (event) => {
       event.preventDefault();
       this.send();
@@ -352,6 +361,10 @@ class Controller {
     ui.mic.addEventListener('blur', release);
     window.addEventListener('blur', release);
     window.addEventListener('pagehide', release);
+    // Leaving the page ends a live conversation, so its unused minutes go back to the visitor at once.
+    window.addEventListener('pagehide', () => {
+      if (this.session) void this.session.end('visitor').catch(() => undefined);
+    });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) release();
     });
@@ -456,10 +469,9 @@ class Controller {
     root.classList.add('is-talking');
     this.requestBeing();
     this.trackViewport(true);
-    // Phones open the conversation as a sheet over a locked page; from 720px it stays in the page, the hero one
-    // window tall (Hero.astro), and the page scrolls on as usual.
-    this.lockPage(PHONE.matches);
-    if (!PHONE.matches) document.querySelector('.hero')?.scrollIntoView({ block: 'start' });
+    // The conversation lives in the page: it rolls up to Emily, and the page still scrolls. Scrolled away from her,
+    // the conversation stays pinned to the foot of the window as a HUD (html.is-talk-away) until it is closed.
+    window.scrollTo({ top: 0, behavior: 'instant' });
     if (this.session) {
       this.focusInput();
       return;
@@ -891,7 +903,6 @@ class Controller {
   /** The width crossed the phone breakpoint while the monitor is open: the sheet, the lock and the framing follow. */
   private relayout(): void {
     if (!root.classList.contains('is-talking')) return;
-    this.lockPage(PHONE.matches);
     this.publishViewport();
     this.applyLayout();
   }

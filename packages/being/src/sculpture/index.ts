@@ -303,6 +303,8 @@ export class SculptureLayer {
     if (u.uNrm) u.uNrm.value = this.nrmTex;
     this.deform();
     if (this.targetM > 0) this.rebuildShards();
+    // Switched on before the avatar arrived (the chunk often lands first on a phone): take over its meshes now.
+    if (this.active) this.setActive(true);
   }
 
   private eyes: Bone[] = [];
@@ -327,12 +329,12 @@ export class SculptureLayer {
 
   /** Draw the sculpture (and the depth-only meshes under it), or hand the meshes back to the wire. */
   setActive(on: boolean): void {
-    if (on === this.active) return;
     this.active = on;
     this.mesh.visible = on && this.welded !== null;
     const avatar = this.avatar;
-    if (!avatar) return;
-    if (on) {
+    // The avatar's meshes are swapped for the depth-only material once, when both the look and the avatar are
+    // here, whichever came first; switching off puts their own materials back.
+    if (on && avatar && this.saved.length === 0) {
       for (const mesh of [avatar.head, avatar.body]) {
         if (!mesh) continue;
         this.saved.push([mesh, mesh.material]);
@@ -340,7 +342,7 @@ export class SculptureLayer {
         mesh.renderOrder = -2;
         mesh.layers.enable(0);
       }
-    } else {
+    } else if (!on) {
       for (const [mesh, material] of this.saved) {
         mesh.material = material;
         mesh.renderOrder = 0;

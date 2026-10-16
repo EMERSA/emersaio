@@ -344,11 +344,10 @@ const { hero, tour, talk, a11y } = site;
     }
   }
 
-  /* On a phone the conversation is a sheet over the page; the copy keeps its place underneath, so nothing moves
-     when the sheet opens or closes. */
+  /* On a phone the copy sits under Emily, not over her: it stays, so a page scrolled while talking has no hole. */
   @media (max-width: 719.98px) {
     :global(html.is-talking) .hero-inner {
-      visibility: hidden;
+      opacity: 1;
     }
   }
 

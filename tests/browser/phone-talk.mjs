@@ -120,9 +120,10 @@ try {
       });
 
       await page.goto(`${base}/`, { waitUntil: 'load', timeout: 60000 });
-      // LCP, an idle moment and the hero cloud: nothing of three may arrive without a tap.
+      // Emily is there from the start on a phone too: three arrives after the LCP and an idle moment, without a tap.
       await page.waitForTimeout(2500);
-      check(`${tag} no three.js before a tap`, threeAt.length === 0, `${threeAt.length} request(s)`);
+      for (let i = 0; i < 40 && threeAt.length === 0; i++) await page.waitForTimeout(250);
+      check(`${tag} Emily loads without a tap`, threeAt.length > 0, `${threeAt.length} request(s)`);
       const hero = await measure(page);
       check(
         `${tag} Talk button fully above the fold`,
@@ -205,8 +206,8 @@ try {
         };
       });
       check(
-        `${tag} consent: the page behind is locked and inert`,
-        locked.overflow === 'hidden' && locked.behind > 2 && locked.inert === locked.behind && !locked.header,
+        `${tag} consent: the page is not locked, it still scrolls under the conversation`,
+        locked.overflow !== 'hidden' && locked.inert === 0 && !locked.header,
         `overflow ${locked.overflow}, ${locked.inert} of ${locked.behind} inert, header inert ${locked.header}`,
       );
       await page.screenshot({ path: join(shots, `phone-${tag}-consent.png`) });

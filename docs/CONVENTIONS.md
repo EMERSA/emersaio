@@ -95,7 +95,7 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
   from 185, and the chunk sits within 1 KB of it); `@emersa/being` ≤ 30 KB gz, its lazy `cloud` chunk ≤ 16 KB gz and
   `sculpture` chunk ≤ 24 KB gz (warning from 20), both known by their chunk names. Content pages ≤ 4 KB gz.
 - The `<h1>` is the LCP element: canvases are `aria-hidden`, start at `opacity: 0` and fade in on `is-ready`.
-- three.js is loaded with dynamic `import()` after LCP + idle on hover-capable desktops and only on tap on touch.
+- three.js is loaded with dynamic `import()` after LCP + idle on every device that can carry it (phones too: Emily is the page); a low-end device or Save-Data waits for a tap.
 - Pixel ratio ≤ 1.5 on touch, ≤ 2 on desktop; bloom never runs on touch devices. The tiers (`stage/Quality.ts`):
   `full` draws the 320 x 240 cloud, the ribbon, the reflection and the rim light; `balanced` (where touch starts)
   the 160 x 120 cloud, the ribbon and the rim; `lite` the small cloud alone; `poster` nothing. The kinect-demo
