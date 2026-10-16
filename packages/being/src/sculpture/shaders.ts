@@ -68,7 +68,9 @@ void main() {
   float flow = uFlow * (sin(ph1) + 0.6 * sin(ph2));
   vec3 slope = uFlow * vec3(70.0 * cos(ph1), k1 * cos(ph1) + 0.6 * k2 * cos(ph2), -0.6 * 90.0 * cos(ph2));
   vec3 lit = normalize(nrm - 0.9 * (slope - dot(slope, nrm) * nrm));
-  p += nrm * (height + flow + 0.0006);
+  // Lifted clear of the deepest trough (water 1.2 mm, flow 0.5 mm): a shard below the surface would be hidden by the
+  // depth prepass and leave a black hole in her skin.
+  p += nrm * (height + flow + 0.0024);
 
   uint id = uint(gl_InstanceID);
   float seed = hash01(id * 3u + 11u);
