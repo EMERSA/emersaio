@@ -183,3 +183,34 @@ def joint_centre(human: bpy.types.Object, group_name: str) -> Vector:
     if not points:
         raise SystemExit(f"Vertex group {group_name} is empty")
     return sum(points, Vector()) / len(points)
+
+
+EYE_HELPERS = {"LeftEye": "helper-l-eye", "RightEye": "helper-r-eye"}
+
+
+def measure_eyes(human: bpy.types.Object, rig: bpy.types.Object) -> dict[str, dict]:
+    """The helper eyeballs measured from the eye bones: the runtime draws its own eyeballs on those bones.
+
+    The radius is the median distance from the bone's head to the helper eyeball's vertices (the cornea bulges a
+    little further, which the maximum shows). Call it after the rig exists and before the helpers are deleted.
+    """
+    eyes: dict[str, dict] = {}
+    for bone_name, group_name in EYE_HELPERS.items():
+        index = human.vertex_groups[group_name].index
+        points = [
+            human.matrix_world @ vertex.co
+            for vertex in human.data.vertices
+            if any(group.group == index for group in vertex.groups)
+        ]
+        if not points:
+            raise SystemExit(f"Vertex group {group_name} is empty")
+        centre = rig.matrix_world @ rig.data.bones[bone_name].head_local
+        distances = sorted((point - centre).length for point in points)
+        eyes[bone_name] = {
+            "centre_blender": [round(value, 5) for value in centre],
+            "radius": round(distances[len(distances) // 2], 5),
+            "radius_min": round(distances[0], 5),
+            "radius_max": round(distances[-1], 5),
+            "vertices": len(points),
+        }
+    return eyes

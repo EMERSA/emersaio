@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const CONTRACT_PATH = fileURLToPath(new URL('../tables/contract.json', import.meta.url));
 
-/** @returns {{ height: number, meshes: { head: string, body: string }, morphs: { required: string[], optional: string[] }, bones: { required: string[], optional: string[] }, clips: { required: string[], optional: string[] }, budgets: Record<string, number> }} */
+/** @returns {{ height: number, meshes: { head: string, body: string }, attributes: { required: string[] }, morphs: { required: string[], optional: string[] }, bones: { required: string[], optional: string[] }, clips: { required: string[], optional: string[] }, budgets: Record<string, number> }} */
 export const loadContract = () => JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
 
 /**
@@ -71,6 +71,13 @@ export const check = (found, options = {}) => {
   warnings.push(...missing(contract.clips.optional, found.clips, 'optional clip'));
   if (found.body?.listPrimitives().some((prim) => prim.listTargets().length > 0)) {
     errors.push('the Body mesh carries morph targets; only Head may morph');
+  }
+  for (const mesh of [found.head, found.body]) {
+    for (const semantic of contract.attributes?.required ?? []) {
+      if (mesh?.listPrimitives().some((prim) => !prim.getAttribute(semantic))) {
+        errors.push(`the ${mesh.getName()} mesh has no ${semantic} attribute`);
+      }
+    }
   }
   return { errors, warnings };
 };

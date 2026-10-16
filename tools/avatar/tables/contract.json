@@ -2,6 +2,10 @@
   "$comment": "The avatar asset contract build.mjs enforces. Required names fail the build; optional ones only warn.",
   "height": 1.75,
   "meshes": { "head": "Head", "body": "Body" },
+  "attributes": {
+    "$comment": "Vertex attributes both meshes must carry besides POSITION, JOINTS_0 and WEIGHTS_0. _SCULPT is VEC4 unsigned bytes, normalised: r AO, g tone, b part id (round(b * 255): 0 skin, 1 teeth, 2 tongue), a calm. See tools/avatar/lib/sculpt.mjs.",
+    "required": ["_SCULPT"]
+  },
   "morphs": {
     "required": [
       "viseme_00",

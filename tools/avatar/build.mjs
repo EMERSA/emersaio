@@ -3,34 +3,50 @@
  * Raw Blender GLBs -> the shipped guide.glb and guide-lite.glb.
  *
  *   node tools/avatar/build.mjs [--in tools/avatar/src/guide-raw.glb] [--lite-in tools/avatar/src/guide-lite-raw.glb]
- *                               [--out apps/web/src/assets/being] [--allow-oversize]
+ *                               [--report tools/avatar/src/build-report.json] [--out apps/web/src/assets/being]
+ *                               [--allow-oversize]
  *
- * Pipeline: strip everything but positions, skin weights and morph positions; drop materials; dedup; prune;
- * resample clips; meshopt (reorder + int16 quantisation + EXT_meshopt_compression); then keep whichever of
- * dense or sparse morph storage is smaller. Fails when a contract name is missing or a size budget is blown.
+ * Pipeline: strip everything but positions, skin weights, _SCULPT and morph positions; drop materials; store
+ * _SCULPT as normalised bytes; put the measured eye radius on the eye bones; dedup; prune; resample clips; meshopt
+ * (reorder + int16 quantisation on one grid for the whole figure + EXT_meshopt_compression); then keep whichever of
+ * dense or sparse morph storage is smaller. Fails when a contract name is missing, a size budget is blown or the
+ * Head/Body seam opens by more than 0.1 mm at rest or under any morph (lib/seams.mjs).
  */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PropertyType } from '@gltf-transform/core';
 import { cloneDocument, dedup, meshopt, prune, resample, sparse } from '@gltf-transform/functions';
 import { check, inventory, loadContract } from './lib/contract.mjs';
 import { createIO, kb, MeshoptEncoder, parseArgs } from './lib/io.mjs';
+import { describeSculpt, quantizeSculpt, SCULPT } from './lib/sculpt.mjs';
+import { describeSeams, SEAM_TOLERANCE_M, seamReport } from './lib/seams.mjs';
 import { bounds, restPositions } from './lib/skinned.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
-const KEEP_ATTRIBUTES = new Set(['POSITION', 'JOINTS_0', 'WEIGHTS_0']);
+const KEEP_ATTRIBUTES = new Set(['POSITION', 'JOINTS_0', 'WEIGHTS_0', SCULPT]);
 
 const args = parseArgs(process.argv.slice(2));
 const rawPath = resolve(ROOT, args.in ?? 'tools/avatar/src/guide-raw.glb');
 const liteRawPath = resolve(ROOT, args['lite-in'] ?? 'tools/avatar/src/guide-lite-raw.glb');
+const reportPath = resolve(ROOT, args.report ?? join(dirname(rawPath), 'build-report.json'));
 const outDir = resolve(ROOT, args.out ?? 'apps/web/src/assets/being');
 const allowOversize = args['allow-oversize'] === true;
 const contract = loadContract();
 
-/** Keep the wire renderer's inputs only; everything else is weight a phone would download for nothing. */
+/** The eye measurements build.py took from MakeHuman's helper eyeballs, or null without a report. */
+const readEyes = () => {
+  try {
+    return JSON.parse(readFileSync(reportPath, 'utf8')).eyes ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/** Keep the runtime's inputs only; everything else is weight a phone would download for nothing. */
 const strip = (document) => {
   const root = document.getRoot();
   for (const mesh of root.listMeshes()) {
@@ -142,12 +158,39 @@ const geometryReport = (document) => {
   return { height, box, warnings };
 };
 
+/**
+ * The runtime draws its own eyeballs on the eye bones, so the eyeball radius build.py measured from MakeHuman's helper
+ * eyes travels with them as extras.eyeRadius (metres); three.js's GLTFLoader puts it in bone.userData.eyeRadius.
+ */
+const tagEyes = (document, eyes) => {
+  if (!eyes) {
+    console.warn(`  warning: no eye measurements in ${reportPath}; the eye bones carry no eyeRadius`);
+    return;
+  }
+  for (const node of document.getRoot().listNodes()) {
+    const eye = eyes[node.getName()];
+    if (eye) node.setExtras({ ...node.getExtras(), eyeRadius: eye.radius });
+  }
+};
+
 const optimise = async (document) => {
   await document.transform(
     dedup(),
     prune({ keepAttributes: false, keepIndices: false, keepLeaves: false, keepSolidTextures: false }),
     resample(),
-    meshopt({ encoder: MeshoptEncoder, level: 'high' }),
+    // One 16-bit quantisation grid for the whole figure (about 0.03 mm over its 1.75 m). Head and Body hold the same
+    // float position for each seam vertex, so on a shared grid they quantise to the same integers and the seam stays
+    // exact; per-mesh grids would put them up to half a 14-bit step (0.05 mm) apart. The quantiser's own cleanup would
+    // fold the two skins, now identical, into one, so it is off and the prune and dedup below keep both.
+    meshopt({
+      encoder: MeshoptEncoder,
+      level: 'high',
+      quantizationVolume: 'scene',
+      quantizePosition: 16,
+      cleanup: false,
+    }),
+    prune({ keepAttributes: true, keepIndices: true, keepLeaves: true, keepSolidTextures: true }),
+    dedup({ propertyTypes: [PropertyType.ACCESSOR] }),
   );
 };
 
@@ -164,7 +207,7 @@ const encodeSmallest = async (io, document) => {
   return { bytes: useSparse ? sparseBytes : denseBytes, mode: useSparse ? 'sparse' : 'dense', denseBytes, sparseBytes };
 };
 
-const buildOne = async (io, document, fileName, budget) => {
+const buildOne = async (io, document, fileName, budget, eyes) => {
   strip(document);
   const found = inventory(document);
   const result = check(found);
@@ -175,43 +218,55 @@ const buildOne = async (io, document, fileName, budget) => {
   }
   const geometry = geometryReport(document);
   for (const warning of geometry.warnings) console.warn(`  warning: ${warning}`);
+  quantizeSculpt(document);
+  tagEyes(document, eyes);
   const pruned = pruneClips(document);
   const encoded = await encodeSmallest(io, document);
-  const outPath = join(outDir, fileName);
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(outPath, encoded.bytes);
 
-  // Re-read what was written: proves the file decodes with the meshopt decoder the browser will use.
-  const reread = await io.readBinary(readFileSync(outPath));
+  // Re-read the encoded bytes before anything is written: proves the file decodes with the meshopt decoder the
+  // browser will use, and the seam is measured on exactly what ships.
+  const reread = await io.readBinary(encoded.bytes);
   const shipped = inventory(reread);
-  const clips = reread
-    .getRoot()
-    .listAnimations()
-    .map((animation) => `${animation.getName()} ${clipSeconds(animation).toFixed(2)}s`);
-  console.log(
-    `${fileName}: ${kb(encoded.bytes.byteLength)} (${encoded.mode} morphs; dense ${kb(encoded.denseBytes.byteLength)}, sparse ${kb(encoded.sparseBytes.byteLength)}), budget ${kb(budget)}`,
-  );
-  console.log(
-    `  head ${shipped.head ? `${triangles(shipped.head)} tris, ${shipped.head.listPrimitives()[0]?.getAttribute('POSITION')?.getCount()} verts, ${shipped.morphs.length} morphs` : 'missing'}`,
-  );
-  console.log(
-    `  body ${shipped.body ? `${triangles(shipped.body)} tris, ${shipped.body.listPrimitives()[0]?.getAttribute('POSITION')?.getCount()} verts` : 'absent'}`,
-  );
-  console.log(
-    `  bones ${shipped.bones.length}, clips ${clips.join(', ')} (${pruned.kept} animated channels per clip, ${pruned.removed} rest-pose channels dropped), height ${geometry.height.toFixed(3)} m`,
-  );
+  const seams = shipped.body ? seamReport(reread, contract.meshes, shipped.morphs) : null;
+  if (seams && !seams.ok) {
+    console.error(`  ${describeSeams(seams)}`);
+    throw new Error(`${fileName}: Head and Body do not meet within ${SEAM_TOLERANCE_M * 1000} mm`);
+  }
   if (encoded.bytes.byteLength > budget) {
     const message = `${fileName} is ${kb(encoded.bytes.byteLength)}, over its ${kb(budget)} budget`;
     if (!allowOversize) throw new Error(message);
     console.warn(`  warning: ${message}`);
   }
+  const outPath = join(outDir, fileName);
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(outPath, encoded.bytes);
+  const clips = reread
+    .getRoot()
+    .listAnimations()
+    .map((animation) => `${animation.getName()} ${clipSeconds(animation).toFixed(2)}s`);
+  const primitive = (mesh) => mesh?.listPrimitives()[0];
+  console.log(
+    `${fileName}: ${kb(encoded.bytes.byteLength)} (${encoded.mode} morphs; dense ${kb(encoded.denseBytes.byteLength)}, sparse ${kb(encoded.sparseBytes.byteLength)}), budget ${kb(budget)}`,
+  );
+  console.log(
+    `  head ${shipped.head ? `${triangles(shipped.head)} tris, ${primitive(shipped.head)?.getAttribute('POSITION')?.getCount()} verts, ${shipped.morphs.length} morphs; ${describeSculpt(primitive(shipped.head))}` : 'missing'}`,
+  );
+  console.log(
+    `  body ${shipped.body ? `${triangles(shipped.body)} tris, ${primitive(shipped.body)?.getAttribute('POSITION')?.getCount()} verts; ${describeSculpt(primitive(shipped.body))}` : 'absent'}`,
+  );
+  console.log(
+    `  bones ${shipped.bones.length} (${reread.getRoot().listSkins().length} skins), clips ${clips.join(', ')} (${pruned.kept} animated channels per clip, ${pruned.removed} rest-pose channels dropped), height ${geometry.height.toFixed(3)} m`,
+  );
+  if (seams) console.log(`  ${describeSeams(seams)}`);
   return shipped;
 };
 
-/** The repository lints generated JSON too, so hand it to Biome's formatter rather than imitating it. */
+/** The repository lints generated JSON too, so hand it to Biome's formatter rather than imitating it. Biome refuses
+ * files outside the repository (a --report or --in elsewhere), and then formats none, so those are left out. */
 const formatJson = (paths) => {
   const biome = resolve(ROOT, 'node_modules/@biomejs/biome/bin/biome');
-  const present = paths.filter((path) => existsSync(path));
+  const inside = (path) => !relative(ROOT, path).startsWith('..') && !isAbsolute(relative(ROOT, path));
+  const present = paths.filter((path) => existsSync(path) && inside(path));
   if (!present.length) return;
   try {
     execFileSync(process.execPath, [biome, 'format', '--write', ...present], { stdio: 'ignore' });
@@ -222,7 +277,14 @@ const formatJson = (paths) => {
 
 const main = async () => {
   const io = await createIO();
-  const full = await buildOne(io, await io.read(rawPath), 'guide.glb', contract.budgets['guide.glb']);
+  const eyes = readEyes();
+  if (eyes)
+    console.log(
+      `eyes: radius ${Object.values(eyes)
+        .map((eye) => `${(eye.radius * 1000).toFixed(1)} mm`)
+        .join(' / ')}`,
+    );
+  const full = await buildOne(io, await io.read(rawPath), 'guide.glb', contract.budgets['guide.glb'], eyes);
 
   let liteDocument;
   try {
@@ -238,7 +300,7 @@ const main = async () => {
       if (mesh.getName() === contract.meshes.body) mesh.dispose();
     }
   }
-  await buildOne(io, liteDocument, 'guide-lite.glb', contract.budgets['guide-lite.glb']);
+  await buildOne(io, liteDocument, 'guide-lite.glb', contract.budgets['guide-lite.glb'], eyes);
 
   const tables = join(HERE, 'tables');
   writeFileSync(
@@ -246,7 +308,7 @@ const main = async () => {
     `${JSON.stringify({ mesh: contract.meshes.head, names: full.morphs }, null, 2)}\n`,
   );
   writeFileSync(join(tables, 'rig.json'), `${JSON.stringify({ bones: full.bones, clips: full.clips }, null, 2)}\n`);
-  formatJson([join(tables, 'morphs.json'), join(tables, 'rig.json'), join(HERE, 'src', 'build-report.json')]);
+  formatJson([join(tables, 'morphs.json'), join(tables, 'rig.json'), reportPath]);
   console.log(
     `tables: ${full.morphs.length} morph names -> tables/morphs.json, ${full.bones.length} bones and ${full.clips.length} clips -> tables/rig.json`,
   );

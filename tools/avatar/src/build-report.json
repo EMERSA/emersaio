@@ -135,59 +135,296 @@
     "RightHandThumb3"
   ],
   "clips": ["Idle", "Nod", "PointLeft", "PointRight", "Wave"],
+  "eyes": {
+    "LeftEye": {
+      "centre_blender": [0.03132, -0.12105, 1.63552],
+      "radius": 0.0166,
+      "radius_min": 0.01649,
+      "radius_max": 0.01703,
+      "vertices": 72
+    },
+    "RightEye": {
+      "centre_blender": [-0.03132, -0.12105, 1.63552],
+      "radius": 0.0166,
+      "radius_min": 0.01649,
+      "radius_max": 0.01703,
+      "vertices": 72
+    }
+  },
+  "pieces": {
+    "skin": 13380,
+    "upper_teeth": 68,
+    "lower_teeth": 68,
+    "tongue": 226,
+    "lips_faces": 394,
+    "lips_vertices": 438
+  },
+  "split": {
+    "head_faces": 4554,
+    "body_faces": 9144,
+    "faces_added_by_motion": 0,
+    "body_islands_absorbed": [],
+    "head_skin_components": 1,
+    "seam_vertices": 46,
+    "seam_motion_before_feather_mm": 0.44
+  },
   "full": {
     "file": "C:\\Martin\\WEB\\EmersaIO\\emersaio\\tools\\avatar\\src\\guide-raw.glb",
-    "bytes": 2145188,
+    "bytes": 2939704,
     "head": {
-      "vertices": 1825,
-      "triangles": 3498,
-      "morphs": 74
+      "vertices": 2566,
+      "triangles": 5000,
+      "triangles_by_piece": {
+        "skin": 4360,
+        "upper_teeth": 96,
+        "lower_teeth": 96,
+        "tongue": 448
+      },
+      "morphs": 74,
+      "decimation": [
+        {
+          "piece": "skin",
+          "from": 8468,
+          "to": 4360,
+          "target": 4360,
+          "ratio": 0.549,
+          "attempts": 1
+        }
+      ]
     },
     "body": {
-      "vertices": 4088,
-      "triangles": 7998
+      "vertices": 4024,
+      "triangles": 8000,
+      "decimation": [
+        {
+          "piece": "skin",
+          "from": 18288,
+          "to": 8000,
+          "target": 8000,
+          "ratio": 0.4374,
+          "attempts": 1
+        }
+      ]
+    },
+    "morph_transfer": {
+      "morphs": 74,
+      "nearest_surface_max_mm": {
+        "skin": 0.322,
+        "upper_teeth": 0.0,
+        "lower_teeth": 0.0,
+        "tongue": 0.0
+      },
+      "sample_vs_collapse_max_mm": 2.379,
+      "sample_vs_collapse_mean_mm": 0.0465,
+      "guarded_vertices": 0
+    },
+    "seam_feather": {
+      "rings": 2,
+      "seam_vertices": 46,
+      "feathered_vertices": 121
+    },
+    "seam_blender": {
+      "vertices": 46,
+      "missing": 0,
+      "unpaired": 0,
+      "gap_m": 0.0,
+      "weight_difference": 0.0,
+      "motion_m": 0.0
+    },
+    "sculpt": {
+      "ao_method": "cycles ao bake, 64 samples, 0.05 m, welded copy",
+      "seam_ao_difference": 0.0,
+      "head": {
+        "ao": {
+          "min": 0.0,
+          "mean": 0.603,
+          "max": 1.0
+        },
+        "calm": {
+          "min": 0.0,
+          "mean": 0.614,
+          "max": 1.0
+        },
+        "vertices": {
+          "lips": 162,
+          "moved_over_2mm_by_lip_keys": 377,
+          "mouth_interior": 257,
+          "teeth": 136,
+          "tongue": 226,
+          "calmed": 1080
+        },
+        "mouth": {
+          "pieces_after_cutting_the_lips": 2,
+          "candidates": [
+            {
+              "vertices": 257,
+              "borders_lips": true,
+              "mean_ao": 0.204,
+              "inside": true
+            }
+          ]
+        }
+      },
+      "body": {
+        "ao": {
+          "min": 0.013,
+          "mean": 0.939,
+          "max": 1.0
+        },
+        "calm": {
+          "min": 1.0,
+          "mean": 1.0,
+          "max": 1.0
+        }
+      }
     },
     "weights": {
       "Head": {
-        "vertices": 1825,
+        "vertices": 2566,
         "orphans_fixed": 0
       },
       "Body": {
-        "vertices": 4088,
+        "vertices": 4024,
         "orphans_fixed": 0
       }
     },
     "bounds_blender": {
       "min": [-0.534, -0.3219, -0.0002],
-      "max": [0.5341, 0.1006, 1.75]
+      "max": [0.534, 0.1006, 1.75]
     }
   },
   "lite": {
     "file": "C:\\Martin\\WEB\\EmersaIO\\emersaio\\tools\\avatar\\src\\guide-lite-raw.glb",
-    "bytes": 1324220,
+    "bytes": 1557276,
     "head": {
-      "vertices": 1064,
-      "triangles": 1999,
-      "morphs": 74
+      "vertices": 1266,
+      "triangles": 2400,
+      "triangles_by_piece": {
+        "skin": 1984,
+        "upper_teeth": 96,
+        "lower_teeth": 96,
+        "tongue": 224
+      },
+      "morphs": 74,
+      "decimation": [
+        {
+          "piece": "tongue",
+          "from": 448,
+          "to": 224,
+          "target": 224,
+          "ratio": 0.9754,
+          "attempts": 1
+        },
+        {
+          "piece": "skin",
+          "from": 8468,
+          "to": 1984,
+          "target": 1984,
+          "ratio": 0.2701,
+          "attempts": 1
+        }
+      ]
     },
     "body": {
-      "vertices": 1561,
-      "triangles": 3000
+      "vertices": 1524,
+      "triangles": 3000,
+      "decimation": [
+        {
+          "piece": "skin",
+          "from": 18288,
+          "to": 3000,
+          "target": 3000,
+          "ratio": 0.164,
+          "attempts": 1
+        }
+      ]
+    },
+    "morph_transfer": {
+      "morphs": 74,
+      "nearest_surface_max_mm": {
+        "skin": 0.961,
+        "upper_teeth": 0.0,
+        "lower_teeth": 0.0,
+        "tongue": 0.415
+      },
+      "sample_vs_collapse_max_mm": 2.682,
+      "sample_vs_collapse_mean_mm": 0.1125,
+      "guarded_vertices": 0
+    },
+    "seam_feather": {
+      "rings": 2,
+      "seam_vertices": 46,
+      "feathered_vertices": 108
+    },
+    "seam_blender": {
+      "vertices": 46,
+      "missing": 0,
+      "unpaired": 0,
+      "gap_m": 0.0,
+      "weight_difference": 0.0,
+      "motion_m": 0.0
+    },
+    "sculpt": {
+      "ao_method": "cycles ao bake, 64 samples, 0.05 m, welded copy",
+      "seam_ao_difference": 0.0,
+      "head": {
+        "ao": {
+          "min": 0.0,
+          "mean": 0.567,
+          "max": 1.0
+        },
+        "calm": {
+          "min": 0.0,
+          "mean": 0.584,
+          "max": 1.0
+        },
+        "vertices": {
+          "lips": 70,
+          "moved_over_2mm_by_lip_keys": 150,
+          "mouth_interior": 137,
+          "teeth": 136,
+          "tongue": 114,
+          "calmed": 466
+        },
+        "mouth": {
+          "pieces_after_cutting_the_lips": 2,
+          "candidates": [
+            {
+              "vertices": 137,
+              "borders_lips": true,
+              "mean_ao": 0.221,
+              "inside": true
+            }
+          ]
+        }
+      },
+      "body": {
+        "ao": {
+          "min": 0.016,
+          "mean": 0.946,
+          "max": 1.0
+        },
+        "calm": {
+          "min": 1.0,
+          "mean": 1.0,
+          "max": 1.0
+        }
+      }
     },
     "weights": {
       "Head": {
-        "vertices": 1064,
+        "vertices": 1266,
         "orphans_fixed": 0
       },
       "Body": {
-        "vertices": 1561,
+        "vertices": 1524,
         "orphans_fixed": 0
       }
     },
     "bounds_blender": {
-      "min": [-0.5339, -0.3219, -0.0002],
-      "max": [0.5344, 0.0998, 1.75]
+      "min": [-0.5338, -0.322, 0.0004],
+      "max": [0.5338, 0.0998, 1.75]
     }
   },
-  "seconds": 6.2
+  "seconds": 7.4
 }

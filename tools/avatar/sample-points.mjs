@@ -7,13 +7,15 @@
  * EMCL: 16-byte header (magic "EMCL", uint16 version 1, uint32 count, 6 zero bytes), then Int16 x,y,z triplets
  * in metres * 10000, then one Uint8 seed per point. Little-endian. Points are sampled uniformly by triangle
  * area from the rest pose and shuffled, so any prefix of the file is itself a uniform sample: the 6k cloud is
- * the first half of the 12k one.
+ * the first half of the 12k one. Only skin is sampled: the teeth and the tongue (part 1 and 2 in _SCULPT) sit
+ * inside the closed mouth and would show through a point cloud.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createIO, kb, parseArgs } from './lib/io.mjs';
+import { PART, readSculpt } from './lib/sculpt.mjs';
 import { bounds, restPositions } from './lib/skinned.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -40,20 +42,26 @@ const createRandom = (state) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-/** Every triangle of every mesh in rest-pose world space, with its area. */
+/** Every skin triangle of every mesh in rest-pose world space, with its area; teeth and tongue are counted apart. */
 const collectTriangles = (document) => {
   const triangles = [];
   let total = 0;
+  let skipped = 0;
   for (const node of document.getRoot().listNodes()) {
     const mesh = node.getMesh();
     if (!mesh) continue;
     for (const prim of mesh.listPrimitives()) {
       if (prim.getMode() !== 4) continue;
       const positions = restPositions(node, prim);
+      const parts = readSculpt(prim)?.part ?? null;
       const indices = prim.getIndices();
       const count = indices ? indices.getCount() : positions.length / 3;
       const index = (i) => (indices ? indices.getScalar(i) : i);
       for (let i = 0; i + 2 < count; i += 3) {
+        if (parts && [index(i), index(i + 1), index(i + 2)].some((vertex) => parts[vertex] !== PART.skin)) {
+          skipped++;
+          continue;
+        }
         const a = index(i) * 3;
         const b = index(i + 1) * 3;
         const c = index(i + 2) * 3;
@@ -73,7 +81,7 @@ const collectTriangles = (document) => {
       }
     }
   }
-  return { triangles, total };
+  return { triangles, total, skipped };
 };
 
 const samplePoints = (triangles, total, count, random) => {
@@ -136,7 +144,7 @@ const encode = (points, count, random) => {
 const main = async () => {
   const io = await createIO();
   const document = await io.readBinary(readFileSync(inPath));
-  const { triangles, total } = collectTriangles(document);
+  const { triangles, total, skipped } = collectTriangles(document);
   if (!triangles.length) throw new Error(`${inPath} has no triangles to sample`);
   const random = createRandom(seed);
   const largest = Math.max(...COUNTS.map((entry) => entry.count));
@@ -150,7 +158,7 @@ const main = async () => {
     console.log(`${file}: ${count} points, ${kb(encoded.byteLength)}`);
   }
   console.log(
-    `sampled ${triangles.length} triangles, ${total.toFixed(3)} m2 of surface; bounds x ${box.min[0].toFixed(3)}..${box.max[0].toFixed(3)} y ${box.min[1].toFixed(3)}..${box.max[1].toFixed(3)} z ${box.min[2].toFixed(3)}..${box.max[2].toFixed(3)} m`,
+    `sampled ${triangles.length} triangles (${skipped} teeth and tongue triangles left out), ${total.toFixed(3)} m2 of surface; bounds x ${box.min[0].toFixed(3)}..${box.max[0].toFixed(3)} y ${box.min[1].toFixed(3)}..${box.max[1].toFixed(3)} z ${box.min[2].toFixed(3)}..${box.max[2].toFixed(3)} m`,
   );
 };
 

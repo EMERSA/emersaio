@@ -1,4 +1,4 @@
-"""glTF export with exactly what the wire renderer needs: positions, skin, morph positions, clips. Nothing else."""
+"""glTF export with exactly what the runtime needs: positions, skin, morph positions, _SCULPT, clips. Nothing else."""
 
 from __future__ import annotations
 
@@ -6,8 +6,10 @@ import os
 
 import bpy
 
-# No normals, tangents, UVs, colours, materials or images: the barycentric wire shader needs none of them and
-# every attribute would cost bytes on a phone. Morph normals are off for the same reason.
+# No normals, tangents, UVs, colours, materials or images: the runtime derives normals itself, and every attribute
+# would cost bytes on a phone. Morph normals are off for the same reason. Custom attributes are on: the exporter
+# writes only those whose names start with "_", which here is _SCULPT alone (topology's own bookkeeping attributes,
+# orig_index, piece, seam and lips_region, do not start with one).
 EXPORT_SETTINGS = {
     "export_format": "GLB",
     "export_apply": False,
@@ -15,7 +17,7 @@ EXPORT_SETTINGS = {
     "export_texcoords": False,
     "export_normals": False,
     "export_tangents": False,
-    "export_attributes": False,
+    "export_attributes": True,
     "export_vertex_color": "NONE",
     "export_materials": "NONE",
     "export_image_format": "NONE",

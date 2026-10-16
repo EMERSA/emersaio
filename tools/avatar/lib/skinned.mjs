@@ -22,9 +22,11 @@ const multiply = (out, a, b) => {
 /**
  * @param {import('@gltf-transform/core').Node} node
  * @param {import('@gltf-transform/core').Primitive} prim
+ * @param {Float32Array | Float64Array | null} [local] accessor-space positions to use instead of POSITION (for
+ *   example the positions plus a morph target's offsets), xyz triplets in the same order
  * @returns {Float32Array} xyz triplets in world space, metres
  */
-export const restPositions = (node, prim) => {
+export const restPositions = (node, prim, local = null) => {
   const position = prim.getAttribute('POSITION');
   if (!position) throw new Error(`primitive on node "${node.getName()}" has no POSITION`);
   const count = position.getCount();
@@ -33,10 +35,17 @@ export const restPositions = (node, prim) => {
   const joints = prim.getAttribute('JOINTS_0');
   const weights = prim.getAttribute('WEIGHTS_0');
   const element = [0, 0, 0, 0];
+  const read = (i) => {
+    if (!local) return position.getElement(i, element);
+    element[0] = local[i * 3];
+    element[1] = local[i * 3 + 1];
+    element[2] = local[i * 3 + 2];
+    return element;
+  };
   if (!skin || !joints || !weights) {
     const world = node.getWorldMatrix();
     for (let i = 0; i < count; i++) {
-      position.getElement(i, element);
+      read(i);
       out.set(transformPoint(world, element), i * 3);
     }
     return out;
@@ -51,7 +60,7 @@ export const restPositions = (node, prim) => {
   const jointIndex = [0, 0, 0, 0];
   const weight = [0, 0, 0, 0];
   for (let i = 0; i < count; i++) {
-    position.getElement(i, element);
+    read(i);
     joints.getElement(i, jointIndex);
     weights.getElement(i, weight);
     let x = 0;
