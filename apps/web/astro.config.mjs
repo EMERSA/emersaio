@@ -73,6 +73,8 @@ export default defineConfig({
               // The being's kinect cloud (packages/being/src/cloud), fetched after the core for the looks that draw
               // it, in one piece: the depth files it shares with the dev harness's depth sources would otherwise
               // split off into a chunk of their own that no budget counts. Nothing the core imports is listed here.
+              // The sculpture look (packages/being/src/sculpture), fetched after the core for the home page.
+              { name: 'sculpture', test: /packages[\\/]being[\\/]src[\\/]sculpture[\\/]/ },
               {
                 name: 'cloud',
                 test: /packages[\\/]being[\\/]src[\\/](?:cloud[\\/]|data[\\/](?:KinectCloud|SurfaceFluid|fluidMath|kinectGrid|depth[\\/](?:BeingDepthSource|DepthSource|depthMath))\.ts|avatar[\\/]shaders[\\/](?:kinect|kinectGrid|fluid)\.)/,

@@ -291,7 +291,8 @@ function loadBeing(m: Mount, talk = false): Promise<BeingHandle | null> {
         theme: currentTheme(),
         quality,
         bloom: false,
-        look: 'kinect-demo',
+        // The sculpture needs a real GPU; a software renderer (no graphics card) gets the lighter scan of the bust.
+        look: softwareGl() ? 'kinect-demo' : 'sculpture',
         intro: !caps.reducedMotion,
         ribbon: false,
         reflection: false,
@@ -338,6 +339,22 @@ function loadBeing(m: Mount, talk = false): Promise<BeingHandle | null> {
  * The tier to start at. Reduced motion makes the runtime suggest the poster; Talk draws the being still instead,
  * so there the tier comes from the device as it would without reduced motion.
  */
+/** True when WebGL runs in software (SwiftShader, llvmpipe and the like): hundreds of thousands of shards would crawl. */
+let software: boolean | null = null;
+function softwareGl(): boolean {
+  if (software !== null) return software;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
+    const name = info && gl ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+    software = /swiftshader|llvmpipe|software|basic render/i.test(name);
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  } catch {
+    software = false;
+  }
+  return software;
+}
+
 function startQuality(caps: Capabilities): Quality {
   if (!caps.reducedMotion || caps.suggestedQuality !== 'poster') return caps.suggestedQuality;
   if (caps.lowEnd || caps.saveData) return 'lite';

@@ -18,7 +18,7 @@ export type Theme = 'dark' | 'light';
  * triangles that the liquid bends, coloured white nearest through cyan and azure to navy, the silhouette dissolving
  * into dust.
  */
-export type Look = 'wire' | 'kinect' | 'hybrid' | 'face' | 'kinect-demo';
+export type Look = 'wire' | 'kinect' | 'hybrid' | 'face' | 'kinect-demo' | 'sculpture';
 /** What the shell may ask for: the looks, plus the shared contract's name for the face, 'kinect-face'. */
 export type LookRequest = Look | 'kinect-face';
 

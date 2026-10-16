@@ -80,7 +80,8 @@ function pickBody(meshes: Mesh[], head: Mesh): Mesh | null {
 function prepareWireGeometry(mesh: Mesh): void {
   const old = mesh.geometry;
   const geometry = old.index ? old.toNonIndexed() : old.clone();
-  old.dispose();
+  // The sculpture look reads the original, indexed geometry (shared corners, the _sculpt attribute).
+  mesh.userData.sourceGeometry = old;
   for (const name of UNUSED_ATTRIBUTES) if (geometry.hasAttribute(name)) geometry.deleteAttribute(name);
   delete geometry.morphAttributes.normal;
   delete geometry.morphAttributes.color;

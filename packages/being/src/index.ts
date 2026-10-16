@@ -89,6 +89,14 @@ type Ribbon = InstanceType<Extras['Ribbon']>;
 type FloorReflection = InstanceType<Extras['FloorReflection']>;
 type CloudModule = typeof import('./cloud/index.ts');
 type CloudLayer = InstanceType<CloudModule['CloudLayer']>;
+type SculptureModule = typeof import('./sculpture/index.ts');
+type SculptureLayer = InstanceType<SculptureModule['SculptureLayer']>;
+
+/** The sculpture's intro: the pieces flow onto her over this time. */
+const SCULPT_INTRO_S = 2.6;
+/** A sculpture shard's target edge in device pixels (touch a little coarser), and the most shards per tier. */
+const SCULPT_PX = { fine: 2.0, touch: 2.4 } as const;
+const SCULPT_CAP: Readonly<Record<string, number>> = { full: 350_000, balanced: 220_000, lite: 110_000 };
 
 /** Captions-only speech reveals this many characters per second; the text-timed mouth follows the same clock. */
 const TYPEWRITER_CPS = 14;
@@ -391,6 +399,7 @@ function disposeAvatar(avatar: LoadedAvatar): void {
     const mesh = object as Mesh;
     if (!mesh.isMesh) return;
     mesh.geometry.dispose();
+    (mesh.userData.sourceGeometry as Mesh['geometry'] | undefined)?.dispose();
     const material = mesh.material;
     if (Array.isArray(material)) for (const m of material) m.dispose();
     else material.dispose();
@@ -410,7 +419,7 @@ const clampUnit = (value: number): number => (Number.isFinite(value) ? Math.min(
 const normaliseLook = (look: LookRequest | undefined): Look => (look === 'kinect-face' ? 'face' : (look ?? 'hybrid'));
 
 /** Every look but the wire draws the kinect cloud, whose code is the cloud chunk. */
-const drawsCloud = (look: Look): boolean => look !== 'wire';
+const drawsCloud = (look: Look): boolean => look !== 'wire' && look !== 'sculpture';
 
 export function createBeing(options: BeingOptions): BeingHandle {
   const canvas = options.canvas;
@@ -474,6 +483,10 @@ export function createBeing(options: BeingOptions): BeingHandle {
   const currentLayer = (): CloudLayer | null => layer;
   let layerLoading: Promise<CloudLayer | null> | null = null;
   const pendingKnobs = new Map<string, (target: CloudLayer) => void>();
+  // The sculpture (sculpture/index.ts), its own chunk, fetched for the look that draws it.
+  let sculpt: SculptureLayer | null = null;
+  let sculptLoading: Promise<SculptureLayer | null> | null = null;
+  const stirLast = { x: 0, y: 0, t: 0 };
   /** The cloud's mode as the page set it, reported until the layer can say so itself. */
   let chosenMode: KinectMode | null = null;
   const fan = new DataFan(shared, theme.blending(), { reducedMotion, pixelRatio: caps.maxPixelRatio });
@@ -570,6 +583,33 @@ export function createBeing(options: BeingOptions): BeingHandle {
     return layerLoading;
   };
 
+  /** Fetch the sculpture chunk once; it builds as soon as both it and the avatar are there. */
+  const loadSculpture = (): Promise<SculptureLayer | null> => {
+    sculptLoading ??= import('./sculpture/index.ts').then((module) => {
+      if (disposed) return null;
+      const next = new module.SculptureLayer({
+        scene: stage.scene,
+        shared,
+        blending: theme.blending(),
+        reducedMotion,
+        register: (material) => theme.register(material),
+      });
+      sculpt = next;
+      buildSculpture();
+      applyScene();
+      return next;
+    });
+    return sculptLoading;
+  };
+
+  /** Build the sculpture from the avatar once both have arrived. */
+  const buildSculpture = (): void => {
+    const target = sculpt;
+    if (!target || !avatar || !head || target.built()) return;
+    target.build({ head: avatar.head, body: avatar.body, eyeL: avatar.bones.eyeL, eyeR: avatar.bones.eyeR });
+    target.setSubject(0, (head.bounds.minY + head.bounds.maxY) / 2, head.bounds.centreZ, headBust?.minY ?? 1.25);
+  };
+
   /** A knob of the cloud: applied at once when the layer is there, otherwise when it arrives. */
   const knob = (name: string, apply: (target: CloudLayer) => void): void => {
     if (layer) apply(layer);
@@ -588,6 +628,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
     const isFace = effective === 'face';
     // The kinect-demo look: head and shoulders as tiny shards from a fixed sensor, no wire unless asked for.
     const isDemo = effective === 'kinect-demo';
+    // The sculpture: the complete head and bust as tiny triangles on her surface, framed like the bust.
+    const isSculpt = effective === 'sculpture';
     const headLook = isFace || isDemo;
     const casters: Mesh[] = [];
     if (avatar) {
@@ -600,14 +642,29 @@ export function createBeing(options: BeingOptions): BeingHandle {
         if (!bodyWire && !isFace) casters.push(avatar.body);
       }
     }
+    const bustLook = isDemo || isSculpt;
     stage.setOrbit(
-      isDemo ? ORBIT_YAW_DEG : PARALLAX_YAW_DEG,
-      isDemo ? ORBIT_PITCH_DEG : PARALLAX_PITCH_DEG,
-      isDemo && !reducedMotion,
+      bustLook ? ORBIT_YAW_DEG : PARALLAX_YAW_DEG,
+      bustLook ? ORBIT_PITCH_DEG : PARALLAX_PITCH_DEG,
+      bustLook && !reducedMotion,
     );
-    const headBounds = headLook && head ? head.bounds : null;
+    const headBounds = (headLook || isSculpt) && head ? head.bounds : null;
     // One object per head: the stage compares bounds by identity, and its layout calls back into this function.
-    const bust = isDemo && headBounds ? headBust : null;
+    const bust = bustLook && headBounds ? headBust : null;
+    if (sculpt) {
+      if (isSculpt && avatar) {
+        showWire(avatar.head, true);
+        if (avatar.body) showWire(avatar.body, true);
+      }
+      sculpt.setActive(isSculpt && avatar !== null);
+      // A shard about SCULPT_PX device pixels across at the stage's scale, within the tier's cap.
+      const frameM = stage.frameSize().height;
+      const pxPerM = frameM > 0 ? (stage.size().height / frameM) * stage.getPixelRatio() : 1000;
+      sculpt.setDensity(
+        (touch ? SCULPT_PX.touch : SCULPT_PX.fine) / pxPerM,
+        SCULPT_CAP[monitor?.current() ?? 'full'] ?? 450_000,
+      );
+    }
     const bounds = bust ?? headBounds;
     if (layer) {
       // The bust lattice follows the sensor frame's size on screen, so a shard stays a couple of pixels across
@@ -687,8 +744,9 @@ export function createBeing(options: BeingOptions): BeingHandle {
   applyQuality(monitor.current());
   // The rim light sits a share of the frame's width to the right of the head, so a resize places it again.
   stage.onLayout(() => {
-    if (head && (effective === 'face' || effective === 'kinect-demo')) applyScene();
+    if (head && (effective === 'face' || effective === 'kinect-demo' || effective === 'sculpture')) applyScene();
   });
+  const sculptAtStart: Promise<SculptureLayer | null> = look === 'sculpture' ? loadSculpture() : Promise.resolve(null);
   // The look asked for draws the cloud: its chunk is on its way now, beside the avatar's.
   const layerAtStart: Promise<CloudLayer | null> = drawsCloud(look) ? loadLayer() : Promise.resolve(null);
 
@@ -837,6 +895,17 @@ export function createBeing(options: BeingOptions): BeingHandle {
     const talking = listening || framingMode === 'portrait' || now - arkitAt < TALK_RECENT_MS;
     orbit.update(dt, voiced ? 0 : talking ? RETURN_TALKING_S : RETURN_AFTER_S);
     placeTurntable();
+    if (sculpt && effective === 'sculpture') {
+      // The sculpture reads the bones and morphs as they stand this frame, before three renders them.
+      turntable.updateMatrixWorld(true);
+      sculpt.update({
+        dt,
+        elapsed,
+        camera: stage.camera,
+        voice: shared.uAudioLevel.value,
+        intro: !intro ? 1 : introAt === null ? 0 : Math.min(1, (elapsed - introAt) / SCULPT_INTRO_S),
+      });
+    }
     // While she speaks or moves, or the camera eases to a new framing, the loop runs at the display rate: a touch
     // device's idle cap would halve the lip sync and the drag.
     stage.setBusy(voiced || gestures.pressing() || orbit.moving() || inIntro || stage.isEasing());
@@ -874,6 +943,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
       extrasLoading,
       // The look's cloud is part of being ready: a kinect-demo being shows nothing without it.
       layerAtStart,
+      sculptAtStart,
     ]);
     if (disposed) {
       disposeAvatar(result);
@@ -935,6 +1005,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
     rig = new Rig({ root: result.root, clips: result.clips, bones: result.bones, face: driver, reducedMotion });
     if (pendingLook.set) rig.lookAt(pendingLook.x, pendingLook.y);
     for (const action of pendingActions.splice(0)) rig.pose(action);
+    buildSculpture();
     turntable.add(result.root);
     stage.scene.add(turntable);
     if (post) stage.attachBloom(post.createBloomChain);
@@ -1084,7 +1155,18 @@ export function createBeing(options: BeingOptions): BeingHandle {
       }
     },
     stir(x: number, y: number): void {
-      if (reducedMotion || effective !== 'kinect-demo') return;
+      if (reducedMotion) return;
+      if (effective === 'sculpture') {
+        const now = performance.now();
+        const seconds = Math.max(0.001, (now - stirLast.t) / 1000);
+        const speed = seconds < 0.25 ? Math.hypot(x - stirLast.x, y - stirLast.y) / seconds : 0;
+        stirLast.x = x;
+        stirLast.y = y;
+        stirLast.t = now;
+        if (speed > 0.05) sculpt?.stir(clampUnit(x), clampUnit(y), speed, stage.camera);
+        return;
+      }
+      if (effective !== 'kinect-demo') return;
       layer?.stir(clampUnit(x), clampUnit(y), stage.camera);
     },
     setListening(on: boolean): void {
@@ -1096,6 +1178,12 @@ export function createBeing(options: BeingOptions): BeingHandle {
       if (wanted === look) return;
       look = wanted;
       applyScene();
+      if (look === 'sculpture' && !sculptLoading) {
+        loadSculpture().catch((error: unknown) => {
+          sculptLoading = null;
+          if (!disposed) options.onError?.(error);
+        });
+      }
       // A look that draws the cloud fetches its chunk now, if no earlier look did; the layer joins when it lands.
       if (drawsCloud(look) && !layerLoading) {
         loadLayer().catch((error: unknown) => {
@@ -1150,7 +1238,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
       drawCalls: stage.drawCalls(),
       triangles: stage.triangles(),
       quality: monitor.current(),
-      points: layer ? layer.points() : 0,
+      points: effective === 'sculpture' && sculpt ? sculpt.shards() : layer ? layer.points() : 0,
       depth: layer ? layer.clippingRange() : { near: 0, far: 0 },
       look,
       // Until the cloud has arrived, the mode it will take: the page's, or the look's own (points is KINECT_DEFAULTS'
@@ -1192,6 +1280,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
       ribbon?.dispose();
       layer?.dispose();
       layer = null;
+      sculpt?.dispose();
+      sculpt = null;
       stage.dispose();
     },
   };
