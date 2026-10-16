@@ -48,7 +48,8 @@ const isCurrent = (href: string): boolean => {
         )
       }
       <a class="nav-link report-link" href={site.report.href} title={site.report.hint}>
-        {site.report.label}
+        <span class="report-link-long">{site.report.label}</span>
+        <span class="report-link-short" aria-hidden="true">{site.report.short}</span>
       </a>
       <ThemeToggle />
       <details class="menu" data-menu>
@@ -63,6 +64,9 @@ const isCurrent = (href: string): boolean => {
               </a>
             ))
           }
+          <a class="menu-link" href={site.report.href} title={site.report.hint}>
+            {site.report.label}
+          </a>
         </nav>
       </details>
     </div>
@@ -159,9 +163,29 @@ const isCurrent = (href: string): boolean => {
     display: none;
   }
 
-  /* Narrow phones: Report gives way first (the Stay safe section and the footer still carry it), and on the
-     narrowest Talk shortens to one word rather than going. */
-  @media (max-width: 479.98px) {
+  /* Report cyberattack in full where there is room; "Report attack" on a mid-width screen; on a phone it moves into
+     the menu (and the Stay safe section and the footer still carry it), and on the narrowest Talk shortens to one
+     word rather than going. */
+  .report-link-short {
+    display: none;
+  }
+
+  @media (max-width: 1199.98px) {
+    .report-link-long {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .report-link-short {
+      display: inline;
+    }
+  }
+
+  @media (max-width: 599.98px) {
     .report-link {
       display: none;
     }

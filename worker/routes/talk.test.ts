@@ -6,18 +6,29 @@ import { afterEach, test } from 'node:test';
 import { CONSENT_VERSION, verifyVisitorId } from '../lib/consent.ts';
 import {
   bump,
-  FREE_TALK_SECONDS_PER_DAY,
   listDocuments,
   MAX_SESSIONS_PER_DAY,
   openSession,
   UNGUARDED_SESSIONS_PER_DAY,
   usage,
 } from '../lib/memory.ts';
+import { anonymousNetwork, networkKey } from '../lib/network.ts';
 import { count, dayKey, TALK_SESSIONS } from '../lib/quota.ts';
 import { asD1, seedCounter } from '../test/d1.ts';
 import { assertSecure, body, call, kinds, limiter, metrics, post, SAME_SITE } from '../test/harness.ts';
 import { HMAC, seen, talkEnv, upstreams, visitor } from '../test/talk.ts';
-import { MINUTES_UP, OLD_CONSENT, UNREADABLE_PDF, VOICE_BUSY, VOICE_OFF } from './talk.ts';
+import {
+  DAILY_CONVERSATIONS,
+  DAILY_DONE,
+  FIRST_DAY_CONVERSATIONS,
+  FIRST_DAY_DONE,
+  FREE_SESSION_MINUTES,
+  OLD_CONSENT,
+  TALK_PER_NETWORK,
+  UNREADABLE_PDF,
+  VOICE_BUSY,
+  VOICE_OFF,
+} from './talk.ts';
 
 const SESSION = 'https://emersa.io/api/talk/session';
 const UPLOAD = 'https://emersa.io/api/talk/upload';
@@ -126,7 +137,7 @@ test('the daily session cap answers 429 with Retry-After', async () => {
   assert.ok(Number(response.headers.get('retry-after')) > 0);
 });
 
-test('without TURNSTILE_SECRET: no siteverify call, the session is counted unguarded, and the 4th is refused', async () => {
+test('without TURNSTILE_SECRET: no siteverify call, and the session is counted unguarded', async () => {
   const m = metrics();
   const { env, db } = talkEnv({ guarded: false, METRICS: m.binding });
   const v = await visitor(db);
@@ -140,38 +151,77 @@ test('without TURNSTILE_SECRET: no siteverify call, the session is counted ungua
   assert.deepEqual(seen, ['https://api.convai.com/user/connect']);
   assert.ok(kinds(m).includes('unguarded'));
   assert.equal(UNGUARDED_SESSIONS_PER_DAY, 10);
-  for (let i = 1; i < UNGUARDED_SESSIONS_PER_DAY; i++) {
-    assert.equal((await call(SESSION, jsonPost(good, { cookie: v.cookie }), env)).status, 200, `session ${i + 1}`);
+});
+
+test('the allowance: three conversations on the first day, each told which it is, then a clear refusal', async () => {
+  const { env, db } = talkEnv();
+  const v = await visitor(db);
+  restore = upstreams();
+  for (let n = 1; n <= FIRST_DAY_CONVERSATIONS; n++) {
+    const ok = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+    assert.equal(ok.status, 200);
+    const b = await body(ok);
+    assert.deepEqual(b.allowance, { used: n, of: 3, firstDay: true });
+    assert.equal(b.session.maxMinutes, FREE_SESSION_MINUTES);
   }
   const over = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
   assert.equal(over.status, 429);
   assert.ok(Number(over.headers.get('retry-after')) > 0);
-  // The guarded deployment keeps its wider cap for the same visitor.
-  const guarded = talkEnv();
-  const g = await visitor(guarded.db);
-  for (let i = 0; i < UNGUARDED_SESSIONS_PER_DAY; i++) await bump(asD1(guarded.db), g.id, 'sessions');
-  assert.equal((await call(SESSION, jsonPost(good, { cookie: g.cookie }), guarded.env)).status, 200);
+  assert.deepEqual(await body(over), { ok: false, error: FIRST_DAY_DONE, reason: 'allowance' });
+  assert.match(FIRST_DAY_DONE, /4d@emersa.io/);
+  assert.match(FIRST_DAY_DONE, /QR code generator is free/);
 });
 
-test('talk time: a used-up day answers 429 with reason "minutes"; a partial day shortens the session', async () => {
+test('the allowance: a visitor from an earlier day gets one conversation a day', async () => {
   const { env, db } = talkEnv();
   const v = await visitor(db);
+  db.sqlite.prepare('UPDATE visitor SET created_at = ? WHERE id = ?').run(Date.now() - 2 * 86_400_000, v.id);
   restore = upstreams();
-  await bump(asD1(db), v.id, 'talk_seconds', FREE_TALK_SECONDS_PER_DAY);
-  const up = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
-  assert.equal(up.status, 429);
-  assert.ok(Number(up.headers.get('retry-after')) > 0);
-  assert.deepEqual(await body(up), { ok: false, error: MINUTES_UP, reason: 'minutes' });
-  assert.equal(seen.length, 1, 'Turnstile only: no Convai token is minted for a used-up day');
+  const ok = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  assert.equal(ok.status, 200);
+  assert.deepEqual((await body(ok)).allowance, { used: 1, of: DAILY_CONVERSATIONS, firstDay: false });
+  const over = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  assert.equal(over.status, 429);
+  assert.deepEqual(await body(over), { ok: false, error: DAILY_DONE, reason: 'allowance' });
+});
 
-  const w = await visitor(db, 'e'.repeat(32));
-  await bump(asD1(db), w.id, 'talk_seconds', 240);
-  const short = await call(SESSION, jsonPost(good, { cookie: w.cookie }), env);
-  assert.equal(short.status, 200);
-  assert.deepEqual((await body(short)).session, { turnsLeft: 200, maxMinutes: 1, secondsLeft: 60 });
-  assert.equal(await usage(asD1(db), w.id, 'talk_seconds'), 300, 'the minute is charged when the token is minted');
-  const row = db.sqlite.prepare('SELECT charged_seconds FROM session WHERE visitor_id = ?').get(w.id);
-  assert.equal(row?.charged_seconds, 60);
+test('one network shares a daily cap of free conversations, kept under an HMAC of the address, not the address', async () => {
+  const { env, db } = talkEnv();
+  restore = upstreams();
+  const ip = '203.0.113.7';
+  const key = await networkKey(HMAC, ip);
+  assert.match(key, /^[0-9a-f]{32}$/);
+  assert.notEqual(key, await networkKey(HMAC, '203.0.113.8'));
+  seedCounter(db, { ...TALK_PER_NETWORK, key }, dayKey(), TALK_PER_NETWORK.cap);
+  const over = await call(SESSION, jsonPost(good, { 'cf-connecting-ip': ip }), env);
+  assert.equal(over.status, 429);
+  assert.deepEqual(await body(over), { ok: false, error: TALK_PER_NETWORK.full, reason: 'network' });
+  assert.equal(await count(asD1(db), TALK_SESSIONS, dayKey()), 0, 'the sitewide slot is given back');
+  const other = await call(SESSION, jsonPost(good, { 'cf-connecting-ip': '203.0.113.8' }), env);
+  assert.equal(other.status, 200);
+  assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS n FROM counters WHERE key LIKE '203.%'").get()?.n, 0);
+});
+
+test('anonymous networks: Tor and VPN, hosting or cloud organisations, but not homes, phones or Private Relay', () => {
+  assert.ok(anonymousNetwork({ country: 'T1' }));
+  for (const org of [
+    'Mullvad VPN AB',
+    'DigitalOcean, LLC',
+    'Hetzner Online GmbH',
+    'Amazon.com, Inc.',
+    'M247 Europe SRL',
+  ])
+    assert.ok(anonymousNetwork({ country: 'GB', asOrganization: org }), org);
+  for (const org of [
+    'British Telecommunications PLC',
+    'Vodafone Limited',
+    'Sky UK Limited',
+    'Akamai Technologies, Inc.',
+    'Cloudflare, Inc.',
+    'Comcast Cable Communications, LLC',
+  ])
+    assert.ok(!anonymousNetwork({ country: 'GB', asOrganization: org }), org);
+  assert.ok(!anonymousNetwork(undefined));
 });
 
 test('revoke refunds the charged time the session did not use, never below zero', async () => {
@@ -206,10 +256,10 @@ test('an abandoned session counts only to its last line plus the grace, so a clo
   db.sqlite
     .prepare("INSERT INTO turn (visitor_id, session_id, role, text, ts) VALUES (?, NULL, 'user', 'hello', ?)")
     .run(v.id, started + 30_000);
-  // The next start settles it at 30 s + the 60 s grace: 90 s used, and a fresh five minutes minus that is offered.
+  // The next start settles it at 30 s + the 60 s grace: 90 s used, plus the new conversation's five minutes.
   const next = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
   assert.equal(next.status, 200);
-  assert.equal((await body(next)).session.secondsLeft, 300 - 90);
+  assert.equal(await usage(asD1(db), v.id, 'talk_seconds'), 90 + 300);
 });
 
 test('the sitewide TALK_SESSIONS cap: the handler takes the last slot, then the chain answers 503', async () => {

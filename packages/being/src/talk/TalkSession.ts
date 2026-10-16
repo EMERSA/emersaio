@@ -42,6 +42,8 @@ export interface TalkSessionGrant {
   endUserId: string;
   turnsLeft: number;
   maxMinutes: number;
+  /** Which free conversation this is today, of how many, and whether it is the visitor's first day. */
+  allowance?: { used: number; of: number; firstDay: boolean };
 }
 
 /** The voice the session drives; ConvaiBrain in the browser, a fake in tests. */
@@ -87,7 +89,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 /** Validate the Worker's answer; anything off-shape is treated as unavailable rather than trusted. */
 export const parseGrant = (payload: unknown): TalkSessionGrant | undefined => {
   if (!isRecord(payload) || payload.ok !== true) return undefined;
-  const { token, expiresAt, characterId, endUserId, session } = payload;
+  const { token, expiresAt, characterId, endUserId, session, allowance } = payload;
   if (typeof token !== 'string' || token === '') return undefined;
   if (typeof characterId !== 'string' || characterId === '') return undefined;
   if (typeof endUserId !== 'string' || endUserId === '') return undefined;
@@ -100,6 +102,9 @@ export const parseGrant = (payload: unknown): TalkSessionGrant | undefined => {
     endUserId,
     turnsLeft,
     maxMinutes: maxMinutes > 0 ? Math.min(maxMinutes, MAX_SESSION_MINUTES) : MAX_SESSION_MINUTES,
+    ...(isRecord(allowance) && typeof allowance.used === 'number' && typeof allowance.of === 'number'
+      ? { allowance: { used: allowance.used, of: allowance.of, firstDay: allowance.firstDay === true } }
+      : {}),
   };
 };
 

@@ -598,6 +598,12 @@ class Controller {
       }
       performance.mark('talk:live');
       performance.measure('talk:tap-to-live', 'talk:tap', 'talk:live');
+      // Which free conversation this is: the visitor always knows where they stand.
+      const allowance = session.grant?.allowance;
+      if (allowance) {
+        const line = allowance.firstDay ? copy.allowanceFirstDay : copy.allowanceDaily;
+        this.status(line.replace('{used}', String(allowance.used)).replace('{of}', String(allowance.of)));
+      }
       this.focusInput();
     } catch {
       this.session = null;

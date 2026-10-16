@@ -22,7 +22,7 @@ import {
   bump,
   capsFor,
   endSessions,
-  FREE_TALK_SECONDS_PER_DAY,
+  getVisitor,
   lastActivity,
   MAX_UPLOADS_PER_DAY,
   type MemoryDb,
@@ -34,8 +34,9 @@ import {
   usage,
 } from '../lib/memory.ts';
 import { writePoint } from '../lib/metrics.ts';
+import { anonymousNetwork, networkKey, type RequestOrigin } from '../lib/network.ts';
 import { pdfText } from '../lib/pdf.ts';
-import { dayKey, release, reserve, secondsUntilTomorrow, TALK_SESSIONS } from '../lib/quota.ts';
+import { type Counter, dayKey, release, reserve, secondsUntilTomorrow, TALK_SESSIONS } from '../lib/quota.ts';
 import { multiLine, oneLine } from '../lib/text.ts';
 import { verify } from '../lib/turnstile.ts';
 import { consented, OLD_CONSENT, secureCookie, store } from '../lib/visitor.ts';
@@ -47,6 +48,25 @@ export const NOT_HUMAN = 'We could not confirm the check. Please try again.';
 export { OLD_CONSENT };
 export const DAY_FULL = 'That is all the talking for today. Please come back tomorrow.';
 export const MINUTES_UP = 'That is your free five minutes for today. Please come back tomorrow.';
+
+/** The free allowance: three conversations on a visitor's first day (a slip of the finger costs nothing), then one a day. */
+export const FIRST_DAY_CONVERSATIONS = 3;
+export const DAILY_CONVERSATIONS = 1;
+/** Each free conversation lasts up to this long. */
+export const FREE_SESSION_MINUTES = 5;
+/** Free conversations from one network a day, whoever they are: an office or a home shares one address. */
+export const TALK_PER_NETWORK: Counter = {
+  scope: 'talk-net',
+  key: '',
+  cap: 12,
+  full: 'Your network has used today’s free conversations with Emily. Please try again tomorrow, or write to 4d@emersa.io.',
+};
+const MORE =
+  ' To keep talking now, write to 4d@emersa.io; buying minutes and a short form for 10 free minutes are coming soon. Our QR code generator is free to use any time.';
+export const FIRST_DAY_DONE = `That is your three free conversations for today. From tomorrow you get one a day.${MORE}`;
+export const DAILY_DONE = `That is your free conversation for today; you get another tomorrow.${MORE}`;
+export const VPN_REFUSED =
+  'Free conversations are not available through a VPN, proxy or Tor. Turn it off and try again, or write to 4d@emersa.io.';
 export const UPLOADS_FULL = 'That is all the files for today. Please come back tomorrow.';
 
 const tomorrow = (): Record<string, string> => ({ 'Retry-After': String(secondsUntilTomorrow()) });
@@ -117,14 +137,24 @@ export async function talkSession(c: ApiContext): Promise<Response> {
 
   // A session the visitor left open (a closed tab, a refresh) is settled first, so its unused time is theirs again.
   if (known) await settle(s.db, id, Date.now(), true);
-  const used = await usage(s.db, id, 'talk_seconds');
-  const left = FREE_TALK_SECONDS_PER_DAY - used;
-  if (left <= 0) {
-    writePoint(env, c.route, '429-minutes');
-    return json({ ok: false, error: MINUTES_UP, reason: 'minutes' }, 429, { ...tomorrow(), ...cookie });
+  // The free allowance: three conversations on the visitor's first day, then one a day.
+  const row = known ? await getVisitor(s.db, id) : null;
+  const firstDay = !row || dayKey(row.created_at) === dayKey();
+  const allowed = firstDay ? FIRST_DAY_CONVERSATIONS : DAILY_CONVERSATIONS;
+  const had = await usage(s.db, id, 'sessions');
+  if (had >= allowed) {
+    writePoint(env, c.route, '429-allowance');
+    return json({ ok: false, error: firstDay ? FIRST_DAY_DONE : DAILY_DONE, reason: 'allowance' }, 429, {
+      ...tomorrow(),
+      ...cookie,
+    });
+  }
+  if (anonymousNetwork(c.request.cf as RequestOrigin | undefined)) {
+    writePoint(env, c.route, '429-vpn');
+    return json({ ok: false, error: VPN_REFUSED, reason: 'vpn' }, 429, cookie);
   }
   // Future: a paywall attaches here.
-  const maxMinutes = Math.min(SESSION_MINUTES, Math.ceil(left / 60));
+  const maxMinutes = Math.min(SESSION_MINUTES, FREE_SESSION_MINUTES);
 
   // The sitewide brake first: the atomic slot under TALK_SESSIONS is taken before the voice service is asked for
   // anything that costs money (the quota() middleware did the cheap read). A mint the service then refuses gives
@@ -134,11 +164,20 @@ export async function talkSession(c: ApiContext): Promise<Response> {
     writePoint(env, c.route, '503-cap');
     return fail(503, TALK_SESSIONS.full, { ...tomorrow(), ...cookie });
   }
+  // Then the network's share: free conversations from one address a day (the address is kept only as an HMAC).
+  const ip = c.request.headers.get('cf-connecting-ip');
+  const network: Counter | null = ip ? { ...TALK_PER_NETWORK, key: await networkKey(s.key, ip) } : null;
+  if (network && !(await reserve(s.db, network, day)).allowed) {
+    await release(s.db, TALK_SESSIONS, day);
+    writePoint(env, c.route, '429-network');
+    return json({ ok: false, error: TALK_PER_NETWORK.full, reason: 'network' }, 429, { ...tomorrow(), ...cookie });
+  }
   let minted: Awaited<ReturnType<typeof connect>>;
   try {
     minted = await connect(env.CONVAI_API_KEY, Date.now(), apiBase(env));
   } catch (error) {
     await release(s.db, TALK_SESSIONS, day);
+    if (network) await release(s.db, network, day);
     const kind = error instanceof ConvaiError ? error.kind : 'unknown';
     console.error('talk: convai connect failed', kind);
     writePoint(env, c.route, `503-convai-${kind}`);
@@ -159,7 +198,8 @@ export async function talkSession(c: ApiContext): Promise<Response> {
       expiresAt: minted.expiresAt,
       characterId: env.CONVAI_CHARACTER_ID,
       endUserId: await endUserId(s.key, id),
-      session: { turnsLeft, maxMinutes, secondsLeft: left },
+      session: { turnsLeft, maxMinutes, secondsLeft: maxMinutes * 60 },
+      allowance: { used: had + 1, of: allowed, firstDay },
     },
     200,
     cookie,

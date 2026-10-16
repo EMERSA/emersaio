@@ -112,6 +112,10 @@ export const site = {
     fileNote:
       'Emily reads plain text (.txt) files up to 2 MB and takes in the first 6,000 characters. The text is kept with what she remembers about you, for 12 months after your last visit, and Forget me deletes it. Please add nothing confidential and no one else’s personal data.',
     fileChoose: 'Choose a .txt file',
+    /** Shown as a conversation starts: which free one it is ({used} of {of}). */
+    allowanceFirstDay:
+      'Conversation {used} of {of} today, on us, up to five minutes each. From tomorrow it is one a day.',
+    allowanceDaily: 'Your free conversation for today, up to five minutes.',
     fileCancel: 'Cancel',
     uploaded: 'Emily has read',
     typeLabel: 'Type to Emily',
@@ -315,8 +319,10 @@ export const site = {
 
   /** The report button: one email, one template, the same inbox as vulnerability reports. */
   report: {
-    label: 'Report',
-    long: 'Report an incident',
+    label: 'Report cyberattack',
+    /** The header's label on a mid-width screen. */
+    short: 'Report attack',
+    long: 'Report a cyberattack',
     hint: 'Opens an email to 4d@emersa.io with a short template.',
     href: REPORT_MAILTO,
   },
