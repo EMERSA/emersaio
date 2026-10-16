@@ -31,6 +31,7 @@ const fakeBeing = () => {
     setListening: () => undefined,
     setLook: () => undefined,
     getLook: () => 'hybrid',
+    setFraming: () => undefined,
     setShatter: () => undefined,
     face: { pushArkit: () => undefined },
     fan: { setTargets: () => undefined, setActivity: () => undefined, setEnabled: () => undefined },

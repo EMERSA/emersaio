@@ -5,8 +5,9 @@
  * computed backdrop-filter or background-clip: text anywhere, none of the removed ornament classes in the DOM,
  * only the four border radii (8px, 16px, 999px, 50%), no /api/* request before the being mounts, no horizontal
  * overflow, the stored theme applied, the being actually drawing on "/" (is-ready, not the poster fallback) once
- * it mounts, the hero cloud drawing on a touch device with three.js still unrequested before any tap, and the
- * menu opening at 390 px with JavaScript off.
+ * it mounts, no request for the depth sources' chunk (/_astro/depth.*, the dev harness's alone) on any page, the hero
+ * cloud drawing on a touch device with three.js still unrequested before any tap, and the menu opening at 390 px
+ * with JavaScript off.
  *
  *   node tests/browser/metrics.mjs                 (serves apps/web/dist itself)
  *   node tests/browser/metrics.mjs --base http://127.0.0.1:8850   (a running Worker)
@@ -50,6 +51,8 @@ const FORBIDDEN = [
 const TALK_BYTES = /convai|livekit|challenges\.cloudflare\.com|\/_astro\/talk[.-]|\/api\/(talk|memory|brain)/i;
 /** The renderer's chunk, which a touch device must not request before a tap (CONVENTIONS, Performance). */
 const THREE_CHUNK = /\/_astro\/three\./;
+/** The depth sources' chunk: the dev harness's Kinectron and video inputs, which the home page never loads. */
+const DEPTH_CHUNK = /\/_astro\/depth\./;
 /** The free tools' chunks (the QR encoder, qrcode itself, the game): nothing of them before an interaction. */
 const TOOL_CHUNKS = /\/_astro\/(?:qr|qrcode)[.-]/;
 const RADII = ['0px', '8px', '16px', '999px', '50%'];
@@ -113,6 +116,8 @@ try {
         const apiRequests = [];
         /** Phase 2: nothing of Talk (the talk chunk, Convai, LiveKit, Turnstile, /api/talk) before a tap. */
         const talkRequests = [];
+        /** The depth sources: never on any page of the site, the being's cloud carries its own. */
+        const depthRequests = [];
         page.on('console', (m) => {
           if (m.type() !== 'error') return;
           const url = m.location()?.url ?? '';
@@ -125,6 +130,7 @@ try {
           const url = new URL(r.url());
           if (url.pathname.startsWith('/api/')) apiRequests.push({ path: url.pathname, at: Date.now() });
           if (TALK_BYTES.test(url.href) || TOOL_CHUNKS.test(url.pathname)) talkRequests.push(url.href);
+          if (DEPTH_CHUNK.test(url.pathname)) depthRequests.push(url.pathname);
         });
         const issues = [];
         try {
@@ -246,6 +252,7 @@ try {
               issues.push('the being fell back to the poster (is-fallback) with WebGL2 available');
           }
           for (const href of talkRequests) issues.push(`talk or tool bytes before any tap: ${href}`);
+          for (const pathname of depthRequests) issues.push(`the depth sources' chunk was requested: ${pathname}`);
           for (const r of apiRequests) {
             if (m.hasStage) {
               if (!m.mount) issues.push(`${r.path} requested but the being never mounted`);

@@ -5,6 +5,9 @@
  *   - the hero point cloud chunk (raw WebGL2, loaded after LCP + idle on every device), 7 KB
  *   - the three.js vendor chunk, 195 KB (warning from 185)
  *   - the @emersa/being chunk, 30 KB
+ *   - the being's kinect cloud (packages/being/src/cloud, the chunk "cloud", fetched after the core for the looks that
+ *     draw a cloud), 16 KB
+ *   - the being's sculpture (packages/being/src/sculpture, the chunk "sculpture"), 24 KB (warning from 20)
  *   - content pages (docs), 4 KB (budgets.json)
  * Chunks are classified by their names (Astro keeps the source file's name in front of the hash) and by content
  * markers that survive minification. The pre-interaction set follows the real module graph, static and dynamic
@@ -41,6 +44,9 @@ const LIMITS = {
   three: 195 * KB,
   threeWarn: 185 * KB,
   being: 30 * KB,
+  cloud: 16 * KB,
+  sculpture: 24 * KB,
+  sculptureWarn: 20 * KB,
   talk: 200 * KB,
   qr: 40 * KB,
 };
@@ -94,10 +100,12 @@ const TALK_MARK = /convai|livekit/i;
 const QR_MARK = /qr-code\.png|errorCorrectionLevel/i;
 
 /**
- * three | being | talk | tour | qr | pre | content | shared. "shared" chunks take the class of whoever
- * reaches them.
+ * three | being | cloud | sculpture | talk | tour | qr | pre | content | shared. "shared" chunks take the class of
+ * whoever reaches them.
  * Astro names a component's script "<Component>.astro_astro_type_script_…", so Base (main.ts) and Hero (hero.ts and
  * being-mount.ts) are matched by their component names as well as by the source names a manual chunk would carry.
+ * The being's lazy parts are known by their chunk names (rolldown names a directory's index.ts after the directory)
+ * before the being's marker, which they carry too.
  */
 function classify(chunk) {
   const s = stem(chunk.name);
@@ -105,6 +113,8 @@ function classify(chunk) {
   const being = BEING_MARK.test(chunk.code) || /^being-mount/.test(s);
   if (three && being) return 'three+being';
   if (three) return 'three';
+  if (/^cloud$/.test(s)) return 'cloud';
+  if (/^sculpture$/.test(s)) return 'sculpture';
   if (TALK_MARK.test(chunk.code) || /^talk/i.test(s)) return 'talk';
   if (being) return 'being';
   if (/^tour(-ui)?\b/i.test(s)) return 'tour';
@@ -114,8 +124,11 @@ function classify(chunk) {
 }
 for (const chunk of chunks.values()) chunk.class = classify(chunk);
 
-/** Loaded after LCP + idle on hover-capable desktops, on a tap elsewhere: never part of the pre-interaction set. */
-const HEAVY = new Set(['three', 'being', 'talk', 'three+being']);
+/**
+ * Loaded after LCP + idle on hover-capable desktops, on a tap elsewhere: never part of the pre-interaction set. The
+ * cloud and the sculpture come after the being's core, which imports them.
+ */
+const HEAVY = new Set(['three', 'being', 'cloud', 'sculpture', 'talk', 'three+being']);
 /**
  * Loaded on a gesture only: the tour on Start (or a ?tour= deep link), the game on Play, the QR encoder on the first
  * focus or tap inside its card.
@@ -222,6 +235,14 @@ else rows.push(['three.js chunk(s)', 'absent', kb(LIMITS.three), 'skip']);
 const beingChunks = byClass('being');
 if (beingChunks.length) judge('@emersa/being chunk(s)', sum(beingChunks), LIMITS.being);
 else rows.push(['@emersa/being chunk(s)', 'absent', kb(LIMITS.being), 'skip']);
+const cloudLabel = 'cloud chunk (the kinect looks, after the core)';
+const cloudChunks = byClass('cloud');
+if (cloudChunks.length) judge(cloudLabel, sum(cloudChunks), LIMITS.cloud);
+else rows.push([cloudLabel, 'absent', kb(LIMITS.cloud), 'skip']);
+const sculptureLabel = 'sculpture chunk (after the core)';
+const sculptureChunks = byClass('sculpture');
+if (sculptureChunks.length) judge(sculptureLabel, sum(sculptureChunks), LIMITS.sculpture, LIMITS.sculptureWarn);
+else rows.push([sculptureLabel, 'absent', kb(LIMITS.sculpture), 'skip']);
 if (byClass('three+being').length) {
   warnings.push(
     'a chunk holds both three.js and @emersa/being; split them (apps/web/astro.config.mjs, vite build.rolldownOptions.output.codeSplitting) so the being budget can be measured',

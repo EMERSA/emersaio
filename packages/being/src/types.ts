@@ -29,6 +29,12 @@ export type LookRequest = Look | 'kinect-face';
  */
 export type KinectMode = 'points' | 'wire' | 'mesh' | 'shards';
 
+/**
+ * How the kinect-demo look frames Emily: 'bust' is the hero's head and shoulders, 'portrait' her head and neck as
+ * large as the stage allows, for a phone's conversation, where nothing covers the stage.
+ */
+export type FramingMode = 'bust' | 'portrait';
+
 /** A node of the data fan in canvas-normalised coordinates: -1..1, x right, y up. */
 export interface FanTarget {
   x: number;
@@ -131,6 +137,11 @@ export interface BeingHandle {
   /** Switch between the wire, the kinect cloud, the hybrid of the two and the face; the small docked stage always draws wire. */
   setLook(look: LookRequest): void;
   getLook(): Look;
+  /**
+   * Frame the kinect-demo bust as the hero's head and shoulders ('bust', the default) or as the phone conversation's
+   * portrait of her head and neck ('portrait'). The camera eases over 500 ms, or lands at once under reduced motion.
+   */
+  setFraming(mode: FramingMode): void;
   /** True while a line plays (clip or captions-only): the shell shows its 'AI-generated voice' line from this. */
   isSpeaking(): boolean;
   /**
@@ -183,6 +194,8 @@ export interface BeingHandle {
   /**
    * Live face input. pushArkit feeds one 61-value ARKit frame (the order of ARKIT_ORDER_61, as Convai streams it)
    * to the face's stream source at priority 20; 200 ms without a frame and the face returns to its own sources.
+   * On an avatar that carries the 52 ARKit morphs (the guide does) the blendshapes land on them 1:1 and the rotations
+   * turn the head and the eyes; while frames arrive the loop runs at the display rate, also on touch devices.
    * The source's code loads on the first push, so a page that never talks never fetches it.
    */
   readonly face: {
@@ -206,7 +219,17 @@ export interface BeingHandle {
   dispose(): void;
 }
 
+/** The detail of 'em:being-hold', which the canvas dispatches (bubbling) as a press held still on Emily starts and ends. */
+export interface BeingHoldDetail {
+  active: boolean;
+}
+
 export interface BeingOptions {
+  /**
+   * The canvas the being draws on. Its pointer gestures are the runtime's: a drag turns Emily (and tilts the view),
+   * and a press held still for 250 ms dispatches a bubbling 'em:being-hold' CustomEvent<BeingHoldDetail> with
+   * active true, then false on the release. A tap is left to the page.
+   */
   canvas: HTMLCanvasElement;
   /** URL of guide.glb or guide-lite.glb (meshopt-compressed glTF). */
   assetUrl: string;

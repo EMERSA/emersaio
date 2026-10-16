@@ -1,5 +1,5 @@
-import { CHANNEL, type FaceSource, VISEME_COUNT } from '../source.ts';
-import { ARKIT_ORDER_61 } from '../tables/arkit52.ts';
+import { ARKIT_BASE, ARKIT_COUNT, CHANNEL, type FaceSource, VISEME_COUNT } from '../source.ts';
+import { ARKIT_ORDER_61, arkit52 } from '../tables/arkit52.ts';
 
 export interface ArkitStreamOptions {
   /** Frame layout by name; pass the provider's own order if it differs from ARKIT_ORDER_61. */
@@ -8,6 +8,12 @@ export interface ArkitStreamOptions {
   rotationUnit?: 'radians' | 'degrees';
   /** A frame older than this means the stream has stopped and the face releases to lower sources. */
   staleMs?: number;
+  /**
+   * Direct mode, for an avatar that carries the 52 ARKit morphs (FaceDriver's hasArkitMorphs): every blendshape is
+   * written 1:1 into the ARKit block of the face channels instead of being approximated as visemes and moods. The
+   * rotations drive the head and eye bones in both modes. Off by default; setDirect() switches it later.
+   */
+  direct?: boolean;
 }
 
 const DEGREES = Math.PI / 180;
@@ -62,24 +68,40 @@ const now = (): number => (typeof performance === 'undefined' ? Date.now() : per
 
 /**
  * A live 61-value ARKit frame stream (Convai, or any capture tool) mapped onto the face channels. Priority 20:
- * while frames arrive the stream owns the whole face; 200 ms without a frame and it lets go. The viseme
- * channels are an approximation from jaw and lip shapes, so the wire mouth keeps its phoneme language.
+ * while frames arrive the stream owns the whole face; 200 ms without a frame and it lets go. By default the viseme
+ * channels are an approximation from jaw and lip shapes, so the wire mouth keeps its phoneme language; in direct
+ * mode the 52 blendshapes land 1:1 on the morphs of the same name and the viseme and expression channels are held at
+ * rest, so nothing approximated is added on top of the capture.
  */
 export class ArkitStreamSource implements FaceSource {
   readonly name = 'arkit-stream';
   readonly priority = 20;
   private readonly frame: Float32Array;
   private readonly slots: Record<Needed, number>;
+  /** The frame slot of each arkit52 name, -1 where the layout has none. */
+  private readonly blendshapeSlots: Int16Array;
   private readonly rotationScale: number;
   private readonly staleMs: number;
+  private direct: boolean;
   private lastPushAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: ArkitStreamOptions = {}) {
     const order = options.order ?? ARKIT_ORDER_61;
     this.frame = new Float32Array(order.length);
     this.slots = Object.fromEntries(NEEDED.map((name) => [name, order.indexOf(name)])) as Record<Needed, number>;
+    this.blendshapeSlots = Int16Array.from(arkit52, (name) => order.indexOf(name));
     this.rotationScale = options.rotationUnit === 'degrees' ? DEGREES : 1;
     this.staleMs = options.staleMs ?? 200;
+    this.direct = options.direct === true;
+  }
+
+  /** Switch direct mode: on once the avatar is known to carry the ARKit morphs, off for one that does not. */
+  setDirect(on: boolean): void {
+    this.direct = on;
+  }
+
+  isDirect(): boolean {
+    return this.direct;
   }
 
   /** Feed one frame. `atMs` is on the driver clock (performance.now) and defaults to now. */
@@ -92,11 +114,51 @@ export class ArkitStreamSource implements FaceSource {
     this.lastPushAt = atMs;
   }
 
+  /** A frame arrived within the stale window: the stream is speaking through the face. */
   active(nowMs: number): boolean {
     return nowMs - this.lastPushAt < this.staleMs;
   }
 
   sample(_nowMs: number, frame: Float32Array, written: Uint8Array): void {
+    if (this.direct) this.sampleDirect(frame, written);
+    else this.sampleApproximate(frame, written);
+
+    frame[CHANNEL.headYaw] = this.rotation('headYaw', HEAD_RANGE.yaw);
+    frame[CHANNEL.headPitch] = this.rotation('headPitch', HEAD_RANGE.pitch);
+    frame[CHANNEL.headRoll] = this.rotation('headRoll', HEAD_RANGE.roll);
+
+    const eyeYaw = (this.rotation('leftEyeYaw', EYE_RANGE.yaw) + this.rotation('rightEyeYaw', EYE_RANGE.yaw)) / 2;
+    const eyePitch =
+      (this.rotation('leftEyePitch', EYE_RANGE.pitch) + this.rotation('rightEyePitch', EYE_RANGE.pitch)) / 2;
+    // Without rotation slots the look blendshapes say where the eyes point: in means toward the nose.
+    frame[CHANNEL.eyesYaw] = eyeYaw !== 0 ? eyeYaw : this.lookYaw();
+    frame[CHANNEL.eyesPitch] = eyePitch !== 0 ? eyePitch : this.lookPitch();
+
+    for (const channel of OWNED_CHANNELS) written[channel] = 1;
+    for (const channel of BONE_CHANNELS) written[channel] = 1;
+  }
+
+  stop(): void {
+    this.lastPushAt = Number.NEGATIVE_INFINITY;
+    this.frame.fill(0);
+  }
+
+  /** The 52 blendshapes 1:1 into the ARKit block; the visemes and the expression channels stay at rest. */
+  private sampleDirect(frame: Float32Array, written: Uint8Array): void {
+    for (let index = 0; index < ARKIT_COUNT; index += 1) {
+      const slot = this.blendshapeSlots[index] ?? -1;
+      frame[ARKIT_BASE + index] = slot < 0 ? 0 : clamp01(this.frame[slot] ?? 0);
+      written[ARKIT_BASE + index] = 1;
+    }
+    for (let viseme = 0; viseme < VISEME_COUNT; viseme += 1) {
+      frame[viseme] = 0;
+      written[viseme] = 1;
+    }
+    for (const channel of OWNED_CHANNELS) frame[channel] = 0;
+  }
+
+  /** Visemes and moods approximated from the jaw and lip shapes, for an avatar without the ARKit morphs. */
+  private sampleApproximate(frame: Float32Array, written: Uint8Array): void {
     const jawOpen = this.read('jawOpen');
     const funnel = this.read('mouthFunnel');
     const pucker = this.read('mouthPucker');
@@ -122,24 +184,6 @@ export class ArkitStreamSource implements FaceSource {
     frame[CHANNEL.browDown] = clamp01((this.read('browDownLeft') + this.read('browDownRight')) / 2);
     frame[CHANNEL.smile] = clamp01((this.read('mouthSmileLeft') + this.read('mouthSmileRight')) / 2);
     frame[CHANNEL.frown] = clamp01((this.read('mouthFrownLeft') + this.read('mouthFrownRight')) / 2);
-
-    frame[CHANNEL.headYaw] = this.rotation('headYaw', HEAD_RANGE.yaw);
-    frame[CHANNEL.headPitch] = this.rotation('headPitch', HEAD_RANGE.pitch);
-    frame[CHANNEL.headRoll] = this.rotation('headRoll', HEAD_RANGE.roll);
-
-    const eyeYaw = (this.rotation('leftEyeYaw', EYE_RANGE.yaw) + this.rotation('rightEyeYaw', EYE_RANGE.yaw)) / 2;
-    const eyePitch =
-      (this.rotation('leftEyePitch', EYE_RANGE.pitch) + this.rotation('rightEyePitch', EYE_RANGE.pitch)) / 2;
-    // Without rotation slots the look blendshapes say where the eyes point: in means toward the nose.
-    frame[CHANNEL.eyesYaw] = eyeYaw !== 0 ? eyeYaw : this.lookYaw();
-    frame[CHANNEL.eyesPitch] = eyePitch !== 0 ? eyePitch : this.lookPitch();
-
-    for (const channel of OWNED_CHANNELS) written[channel] = 1;
-  }
-
-  stop(): void {
-    this.lastPushAt = Number.NEGATIVE_INFINITY;
-    this.frame.fill(0);
   }
 
   private read(name: Needed): number {
@@ -164,6 +208,7 @@ export class ArkitStreamSource implements FaceSource {
   }
 }
 
+/** The expression channels the stream owns in both modes: approximated from the capture, or at rest in direct mode. */
 const OWNED_CHANNELS = [
   CHANNEL.jawOpen,
   CHANNEL.blinkLeft,
@@ -172,6 +217,10 @@ const OWNED_CHANNELS = [
   CHANNEL.browDown,
   CHANNEL.smile,
   CHANNEL.frown,
+] as const;
+
+/** The head and eye bones, which the rotation slots drive in both modes. */
+const BONE_CHANNELS = [
   CHANNEL.headYaw,
   CHANNEL.headPitch,
   CHANNEL.headRoll,

@@ -71,6 +71,15 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
   `kinect.setPointSize(px)` and `kinect.setZOffset(m)` (clipping and offset apply to sensor and video sources), and
   `stats().points` / `stats().depth`. Nothing Kinectron is bundled or loaded from a CDN; the dev harness
   `/dev/kinect` serves a local copy and never ships (`docs/runbooks/kinectron.md`, ADR-0005).
+- The kinect cloud (`KinectCloud`, `BeingDepthSource`, `SurfaceFluid`) is the lazy chunk `cloud`
+  (`packages/being/src/cloud/index.ts`), imported only for the looks that draw it; the core imports no value of
+  `data/depth/`, and the depth sources' values live on `@emersa/being/depth` alone. The cloud chunk imports nothing
+  of the core at runtime (the build groups it with its dependencies in `apps/web/astro.config.mjs`).
+- `handle.setFraming('bust' | 'portrait')` frames the kinect-demo bust as the hero's head and shoulders or as the
+  phone conversation's portrait, easing over 500 ms (at once under reduced motion). The canvas's pointer gestures are
+  the runtime's (`stage/gesture.ts`, `stage/orbit.ts`): a drag turns Emily (a full-width drag is one turn, the tilt is
+  camera elevation within 20 degrees) and she comes back to face the visitor; a press held still for 250 ms
+  dispatches a bubbling `em:being-hold` (`detail: { active }`) from the canvas as it starts and ends.
 
 ## Worker
 
@@ -83,7 +92,8 @@ Read before writing code. These rules are enforced by the build (`scripts/csp-ch
 ## Performance
 
 - Budgets in `scripts/bundle-budget.mjs`: pre-interaction JS on `/` ≤ 16 KB gz; three chunk ≤ 195 KB gz (warning
-  from 185, and the chunk sits within 1 KB of it); `@emersa/being` ≤ 30 KB gz. Content pages ≤ 4 KB gz.
+  from 185, and the chunk sits within 1 KB of it); `@emersa/being` ≤ 30 KB gz, its lazy `cloud` chunk ≤ 16 KB gz and
+  `sculpture` chunk ≤ 24 KB gz (warning from 20), both known by their chunk names. Content pages ≤ 4 KB gz.
 - The `<h1>` is the LCP element: canvases are `aria-hidden`, start at `opacity: 0` and fade in on `is-ready`.
 - three.js is loaded with dynamic `import()` after LCP + idle on hover-capable desktops and only on tap on touch.
 - Pixel ratio ≤ 1.5 on touch, ≤ 2 on desktop; bloom never runs on touch devices. The tiers (`stage/Quality.ts`):

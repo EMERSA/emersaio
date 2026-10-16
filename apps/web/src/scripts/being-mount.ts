@@ -6,7 +6,15 @@
  * ends in that captions-only mode, or, when not even the tour could be built, in the transcript that "Start the
  * tour" points at without JavaScript.
  */
-import type { BeingHandle, BeingOptions, Capabilities, Quality, SpeakRequest, TourScript } from '@emersa/being';
+import type {
+  BeingHandle,
+  BeingOptions,
+  Capabilities,
+  FramingMode,
+  Quality,
+  SpeakRequest,
+  TourScript,
+} from '@emersa/being';
 import { primeAudio } from '@emersa/being/audio';
 import type { PageAdapter, TourController, TourState } from '@emersa/being/tour';
 import type { TourUi, VoiceAbsence } from './tour-ui.ts';
@@ -14,10 +22,6 @@ import type { TourUi, VoiceAbsence } from './tour-ui.ts';
 type Mode = 'tour' | 'talk';
 type Theme = 'dark' | 'light';
 type TourModule = typeof import('@emersa/being/tour');
-/** How the being frames Emily: the hero's bust, or the portrait of a phone's chat (talk.ts asks, em:talk-layout). */
-type Framing = 'bust' | 'portrait';
-/** setFraming arrives with the runtime's portrait framing; until then the call is optional. */
-type FramingHandle = BeingHandle & { setFraming?: (mode: Framing) => void };
 
 interface Elements {
   stage: HTMLElement;
@@ -52,7 +56,7 @@ interface Mount {
   /** The load has finished, with a being or without one. */
   settled: boolean;
   /** The framing Talk asked for last; a being that arrives later takes it on. */
-  framing: Framing;
+  framing: FramingMode;
   /** The tour started without the being; one that arrives afterwards is disposed rather than shown mute. */
   abandoned: boolean;
   /** The being's WebGL context went away; the poster stays whatever the quality ladder reports afterwards. */
@@ -354,10 +358,10 @@ function pickAsset(stage: HTMLElement, caps: Capabilities, device: Device, quali
   return preferLite ? lite || full : full || lite;
 }
 
-/** The framing Talk asked for, on a runtime that has it. */
-function applyFraming(being: BeingHandle, framing: Framing): void {
+/** The framing Talk asked for. */
+function applyFraming(being: BeingHandle, framing: FramingMode): void {
   try {
-    (being as FramingHandle).setFraming?.(framing);
+    being.setFraming(framing);
   } catch {
     // The being keeps the framing it has.
   }
@@ -716,7 +720,7 @@ function createCaptionBeing(): BeingHandle {
     cancel = null;
   };
   const noop = (): void => undefined;
-  const handle: FramingHandle = {
+  const handle: BeingHandle = {
     ready: Promise.resolve(),
     speak(request: SpeakRequest): Promise<void> {
       stopSpeaking();

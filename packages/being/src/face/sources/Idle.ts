@@ -5,6 +5,11 @@ export interface IdleOptions {
   random?: () => number;
   blinkMinMs?: number;
   blinkMaxMs?: number;
+  /**
+   * Reduced motion: the face holds still, its brows, eyes and breath at their first values, and only blinks. Lip sync
+   * from the speech sources is untouched.
+   */
+  still?: boolean;
 }
 
 const BLINK_CLOSE_MS = 120;
@@ -33,7 +38,8 @@ const smoothstep = (progress: number): number => progress * progress * (3 - 2 * 
 
 /**
  * The face when nothing else owns it: blinks every few seconds, a little brow life, eyes that wander and the
- * breath on the jaw. Priority 0, so any speech or stream takes the channels it needs and the rest keeps living.
+ * breath on the jaw; held still (reduced motion), only the blinks. Priority 0, so any speech or stream takes the
+ * channels it needs and the rest keeps living.
  */
 export class IdleSource implements FaceSource {
   readonly name = 'idle';
@@ -41,6 +47,7 @@ export class IdleSource implements FaceSource {
   private readonly random: () => number;
   private readonly blinkMinMs: number;
   private readonly blinkMaxMs: number;
+  private readonly still: boolean;
   private readonly phases: readonly number[];
   private startedAt = -1;
   private lastSampleAt = -1;
@@ -56,6 +63,7 @@ export class IdleSource implements FaceSource {
     this.random = options.random ?? Math.random;
     this.blinkMinMs = options.blinkMinMs ?? 2000;
     this.blinkMaxMs = Math.max(this.blinkMinMs, options.blinkMaxMs ?? 6000);
+    this.still = options.still === true;
     this.phases = [this.random() * TWO_PI, this.random() * TWO_PI, this.random() * TWO_PI];
   }
 
@@ -67,7 +75,8 @@ export class IdleSource implements FaceSource {
     if (this.startedAt < 0) this.begin(nowMs);
     const dtMs = this.lastSampleAt < 0 ? 0 : Math.max(0, nowMs - this.lastSampleAt);
     this.lastSampleAt = nowMs;
-    const seconds = (nowMs - this.startedAt) / 1000;
+    // Held still, the slow sines keep their first values and the eyes their first target.
+    const seconds = this.still ? 0 : (nowMs - this.startedAt) / 1000;
 
     const blink = this.blinkAt(nowMs);
     frame[CHANNEL.blinkLeft] = blink;
@@ -81,7 +90,7 @@ export class IdleSource implements FaceSource {
     frame[CHANNEL.browUp] = browUp;
     frame[CHANNEL.browDown] = browDown;
 
-    this.wander(nowMs, dtMs);
+    if (!this.still) this.wander(nowMs, dtMs);
     frame[CHANNEL.eyesYaw] = this.eyeYaw;
     frame[CHANNEL.eyesPitch] = this.eyePitch;
 

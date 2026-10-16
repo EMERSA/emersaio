@@ -1,9 +1,9 @@
 /// <reference types="node" />
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CHANNEL, CHANNEL_COUNT, createFrame } from '../src/face/source.ts';
+import { ARKIT_BASE, CHANNEL, CHANNEL_COUNT, createFrame } from '../src/face/source.ts';
 import { ArkitStreamSource } from '../src/face/sources/ArkitStream.ts';
-import { ARKIT_FRAME_LENGTH, arkitIndex } from '../src/face/tables/arkit52.ts';
+import { ARKIT_FRAME_LENGTH, arkit52, arkitIndex } from '../src/face/tables/arkit52.ts';
 
 const DEGREES = Math.PI / 180;
 
@@ -68,4 +68,54 @@ test('eyes follow the look blendshapes when no rotation slots are set', () => {
   near(frame[CHANNEL.eyesPitch], 0.5, 'looking up');
   source.stop();
   assert.ok(!source.active(0));
+});
+
+test('direct mode writes all 52 blendshapes 1:1 into the ARKit block and keeps the rotations on the bones', () => {
+  const source = new ArkitStreamSource({ direct: true });
+  assert.equal(source.isDirect(), true);
+  const frame61 = new Float32Array(ARKIT_FRAME_LENGTH);
+  arkit52.forEach((name, index) => {
+    frame61[arkitIndex(name)] = index / 51;
+  });
+  frame61[arkitIndex('tongueOut')] = 1.4;
+  frame61[arkitIndex('cheekPuff')] = -0.2;
+  frame61[arkitIndex('headYaw')] = 25 * DEGREES;
+  frame61[arkitIndex('headRoll')] = -5 * DEGREES;
+  frame61[arkitIndex('leftEyePitch')] = 20 * DEGREES;
+  frame61[arkitIndex('rightEyePitch')] = 20 * DEGREES;
+  source.push(frame61, 0);
+  const { frame, written } = sample(source, 10);
+  arkit52.forEach((name, index) => {
+    assert.equal(written[ARKIT_BASE + index], 1, `${name} is written`);
+    if (name === 'tongueOut') near(frame[ARKIT_BASE + index], 1, 'clamped to 1');
+    else if (name === 'cheekPuff') near(frame[ARKIT_BASE + index], 0, 'clamped to 0');
+    else near(frame[ARKIT_BASE + index], index / 51, name);
+  });
+  // Nothing approximated on top: the visemes and the moods are held at rest, and owned, so no lower source adds.
+  for (let viseme = 0; viseme < 22; viseme += 1) {
+    assert.equal(written[viseme], 1);
+    assert.equal(frame[viseme], 0);
+  }
+  for (const channel of [CHANNEL.jawOpen, CHANNEL.blinkLeft, CHANNEL.browUp, CHANNEL.smile, CHANNEL.frown]) {
+    assert.equal(written[channel], 1);
+    assert.equal(frame[channel], 0);
+  }
+  near(frame[CHANNEL.headYaw], 1, 'yaw still on the head bone');
+  near(frame[CHANNEL.headRoll], -0.5, 'roll still on the head bone');
+  near(frame[CHANNEL.eyesPitch], 1, 'eye pitch still on the eye bones');
+});
+
+test('direct mode maps a custom layout by name, a missing shape reads 0, and setDirect switches modes', () => {
+  const source = new ArkitStreamSource({ order: ['tongueOut', 'jawOpen', 'headPitch'] });
+  assert.equal(source.isDirect(), false, 'approximate by default');
+  source.push([0.7, 0.5, 0], 0);
+  const before = sample(source, 1);
+  assert.equal(before.written[ARKIT_BASE], 0, 'no block without direct mode');
+  near(before.frame[CHANNEL.jawOpen], 0.5, 'the jaw on the expression channel');
+  source.setDirect(true);
+  const { frame } = sample(source, 1);
+  near(frame[ARKIT_BASE + arkit52.indexOf('tongueOut')], 0.7, 'tongue by name');
+  near(frame[ARKIT_BASE + arkit52.indexOf('jawOpen')], 0.5, 'jaw by name');
+  near(frame[ARKIT_BASE + arkit52.indexOf('mouthPucker')], 0, 'a shape the layout lacks');
+  near(frame[CHANNEL.jawOpen], 0, 'the expression jaw at rest');
 });

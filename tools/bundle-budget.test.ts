@@ -96,3 +96,56 @@ test('a small build passes, dynamic edges into three and the tour are not counte
     rmSync(dist, { recursive: true, force: true });
   }
 });
+
+/** Random bytes as base64: gzip keeps about one byte per random byte, so `bytes` sets the compressed size. */
+const incompressibleOf = (bytes: number) => `export const blob = "${randomBytes(bytes).toString('base64')}";\n`;
+
+test('the being chunks after the core are known by name: cloud (16 KB) and sculpture (24 KB, warning from 20)', () => {
+  const dist = fixture({
+    'a.js': 'const b = () => import(`./src.js`);\nexport { b };\n',
+    // The core carries the being's marker; so do its lazy chunks, which the class goes by the name before.
+    'src.js':
+      'const c = () => import(`./cloud.js`);const s = () => import(`./sculpture.js`);export const uTokenRate = 1;export { c, s };\n',
+    'cloud.js': `import{uTokenRate}from"./src.js";console.log(uTokenRate);${incompressibleOf(8_000)}`,
+    'sculpture.js': `import{uTokenRate}from"./src.js";console.log(uTokenRate);${incompressibleOf(21_500)}`,
+  });
+  try {
+    const { status, output } = run(dist);
+    assert.equal(status, 0, output);
+    assert.match(output, /_astro\/cloud\.js\s+cloud\s/);
+    assert.match(output, /_astro\/sculpture\.js\s+sculpture\s/);
+    assert.match(output, /cloud chunk \(the kinect looks, after the core\)\s+[7-9]\.[0-9] KB\s+16\.0 KB\s+ok/);
+    assert.match(output, /sculpture chunk \(after the core\)\s+2[0-3]\.[0-9] KB\s+24\.0 KB\s+WARN/);
+    assert.match(output, /WARN {2}sculpture chunk \(after the core\): [0-9.]+ KB is within/);
+    // Neither is counted before an interaction: the pre-interaction walk stops at the core.
+    assert.match(output, /\/ before interaction[^\n]*\s0\.[0-9] KB\s+16\.0 KB\s+ok/);
+  } finally {
+    rmSync(dist, { recursive: true, force: true });
+  }
+});
+
+test('a cloud chunk over 16 KB fails, and a page that imports it statically fails on its own', () => {
+  const over = fixture({
+    'a.js': 'const b = () => import(`./src.js`);\nexport { b };\n',
+    'src.js': 'const c = () => import(`./cloud.js`);export const uTokenRate = 1;export { c };\n',
+    'cloud.js': incompressibleOf(18_000),
+  });
+  try {
+    const { status, output } = run(over);
+    assert.equal(status, 1, output);
+    assert.match(output, /cloud chunk \(the kinect looks, after the core\): 1[7-9]\.[0-9] KB exceeds 16\.0 KB/);
+  } finally {
+    rmSync(over, { recursive: true, force: true });
+  }
+  const eager = fixture({
+    'a.js': 'import{blob}from"./cloud.js";console.log(blob);\n',
+    'cloud.js': 'export const blob = 1;\n',
+  });
+  try {
+    const { status, output } = run(eager);
+    assert.equal(status, 1, output);
+    assert.match(output, /a\.js statically imports cloud\.js \(cloud\)/);
+  } finally {
+    rmSync(eager, { recursive: true, force: true });
+  }
+});

@@ -13,9 +13,9 @@ import {
   SCATTER_REACH_M,
   SENSOR_TANGENTS,
   scatterFade,
-  scatterFor,
   scatterTravel,
 } from '../src/data/depth/depthMath.ts';
+import { scatterFor } from '../src/data/scatter.ts';
 
 const close = (actual: number, expected: number, eps = 1e-6): void => {
   assert.ok(Math.abs(actual - expected) < eps, `${actual} is not within ${eps} of ${expected}`);

@@ -216,13 +216,6 @@ export function backProject(
 /** How far the cloud may drift while tokens stream, in metres. */
 export const SCATTER_REACH_M = 0.35;
 
-/** The scatter amount the token meter asks for: the normalised rate carries it, each arrival adds a flick. */
-export function scatterFor(tokenRate01: number, pulse01: number): number {
-  const rate = Number.isFinite(tokenRate01) ? Math.min(1, Math.max(0, tokenRate01)) : 0;
-  const pulse = Number.isFinite(pulse01) ? Math.min(1, Math.max(0, pulse01)) : 0;
-  return Math.min(1, rate + 0.3 * pulse);
-}
-
 /** Metres a point with hash h (0..1) has travelled at a scatter amount; every point moves at its own pace. */
 export function scatterTravel(scatter01: number, h: number): number {
   return scatter01 * (0.3 + 0.7 * h) * SCATTER_REACH_M;

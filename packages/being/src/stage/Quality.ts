@@ -169,31 +169,42 @@ const WARMUP_S = 2;
 const STEP_CHANGE = 0.1;
 /** The poster is never swapped in while the loop still holds this many frames per second. */
 export const POSTER_FLOOR_FPS = 24;
+/** The rung of any ladder that stops the loop for the shell's poster: the sampling ends there. */
+export const POSTER_RUNG = 'poster';
 
 /**
- * Watches the frame rate and steps the quality down, never up: a visitor who saw the lite being does not get the
- * full one flickering back in when the fan spins up.
+ * Watches the frame rate and steps down a ladder of rungs, never up: a visitor who saw the lite being does not get
+ * the full one flickering back in when the fan spins up. The ladder is the tiers by default (QUALITY_LADDER); a look
+ * with finer steps of its own passes its rungs, top first, and a rung named 'poster' keeps the poster's floor.
  */
-export class QualityMonitor {
-  private quality: Quality;
-  private readonly onChange: (quality: Quality) => void;
+export class QualityMonitor<Rung extends string = Quality> {
+  private quality: Rung;
+  private readonly onChange: (quality: Rung) => void;
+  private readonly ladder: readonly Rung[];
   private slowFor = 0;
   private warmup = WARMUP_S;
   /** The frame rate at the last step down, to judge whether that step helped. */
   private steppedAt: number | null = null;
 
   // Explicit fields rather than parameter properties: node --test runs this file with type stripping alone.
-  constructor(quality: Quality, onChange: (quality: Quality) => void) {
+  constructor(quality: Rung, onChange: (quality: Rung) => void, ladder?: readonly Rung[]) {
     this.quality = quality;
     this.onChange = onChange;
+    // Without a ladder the rungs are the tiers, which is what the default type parameter says they are.
+    this.ladder = ladder ?? (QUALITY_LADDER as readonly string[] as readonly Rung[]);
   }
 
-  current(): Quality {
+  current(): Rung {
     return this.quality;
   }
 
+  /** The rungs, top first. */
+  rungs(): readonly Rung[] {
+    return this.ladder;
+  }
+
   /** An explicit choice from the outside; it restarts the watch but does not fire onChange. */
-  set(quality: Quality): void {
+  set(quality: Rung): void {
     this.quality = quality;
     this.steppedAt = null;
     this.reset();
@@ -206,7 +217,7 @@ export class QualityMonitor {
   }
 
   sample(fps: number, dtSeconds: number, targetFps: number): void {
-    if (this.quality === 'poster') return;
+    if (this.quality === POSTER_RUNG) return;
     if (this.warmup > 0) {
       this.warmup -= dtSeconds;
       return;
@@ -218,10 +229,11 @@ export class QualityMonitor {
     }
     this.slowFor = Math.min(PATIENCE_S, this.slowFor + dtSeconds);
     if (this.slowFor < PATIENCE_S) return;
-    const next = stepDown(this.quality);
-    if (!next) return;
+    const index = this.ladder.indexOf(this.quality);
+    const next = index < 0 ? undefined : this.ladder[index + 1];
+    if (next === undefined) return;
     if (this.steppedAt !== null && Math.abs(fps - this.steppedAt) < this.steppedAt * STEP_CHANGE) return;
-    if (next === 'poster' && fps >= POSTER_FLOOR_FPS) return;
+    if (next === POSTER_RUNG && fps >= POSTER_FLOOR_FPS) return;
     this.steppedAt = fps;
     this.quality = next;
     this.reset();

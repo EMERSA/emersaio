@@ -70,6 +70,13 @@ export default defineConfig({
               { name: 'three', test: /node_modules[\\/]three[\\/]/ },
               // The QR encoder and its two helpers, loaded on the first focus inside the QR card (tools-boot.ts).
               { name: 'qr', test: /node_modules[\\/](?:qrcode|dijkstrajs|encode-utf8)[\\/]/ },
+              // The being's kinect cloud (packages/being/src/cloud), fetched after the core for the looks that draw
+              // it, in one piece: the depth files it shares with the dev harness's depth sources would otherwise
+              // split off into a chunk of their own that no budget counts. Nothing the core imports is listed here.
+              {
+                name: 'cloud',
+                test: /packages[\\/]being[\\/]src[\\/](?:cloud[\\/]|data[\\/](?:KinectCloud|SurfaceFluid|fluidMath|kinectGrid|depth[\\/](?:BeingDepthSource|DepthSource|depthMath))\.ts|avatar[\\/]shaders[\\/](?:kinect|kinectGrid|fluid)\.)/,
+              },
             ],
           },
         },

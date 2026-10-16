@@ -57,3 +57,19 @@ test('a blink closes in about 120 ms and reopens', () => {
   assert.equal(read(1120), 1);
   assert.equal(read(1400), 0);
 });
+
+test('held still (reduced motion), the idle face only blinks: brows, eyes and breath keep their first values', () => {
+  const source = new IdleSource({ random: seeded(7), still: true, blinkMinMs: 1500, blinkMaxMs: 1500 });
+  const first = createFrame();
+  source.sample(0, first, new Uint8Array(CHANNEL_COUNT));
+  let blinked = 0;
+  for (let nowMs = 10; nowMs <= 6000; nowMs += 10) {
+    const frame = createFrame();
+    source.sample(nowMs, frame, new Uint8Array(CHANNEL_COUNT));
+    for (const channel of [CHANNEL.browUp, CHANNEL.browDown, CHANNEL.eyesYaw, CHANNEL.eyesPitch, CHANNEL.jawOpen]) {
+      assert.equal(frame[channel], first[channel], `channel ${channel} holds still at ${nowMs} ms`);
+    }
+    blinked = Math.max(blinked, frame[CHANNEL.blinkLeft] ?? 0);
+  }
+  assert.equal(blinked, 1, 'she still blinks');
+});

@@ -9,8 +9,17 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import type { FramingMode } from '../types.ts';
 import { Backdrop, type BackdropUniforms } from './Backdrop.ts';
-import { bustFramingFor, type Framing, faceFramingFor, framingFor, type HeadBounds, visibleHeight } from './framing.ts';
+import {
+  bustFramingFor,
+  type Framing,
+  faceFramingFor,
+  framingFor,
+  type HeadBounds,
+  portraitFramingFor,
+  visibleHeight,
+} from './framing.ts';
 import type { BloomChain, BloomChainOptions } from './postprocessing.ts';
 
 /** The figure stands with its feet at y = 0 and its crown here, facing +Z (avatar asset contract). */
@@ -40,6 +49,8 @@ export const ORBIT_YAW_DEG = 25;
 export const ORBIT_PITCH_DEG = 12;
 const DRIFT_YAW_DEG = 4;
 const DRIFT_PITCH_DEG = 1.5;
+/** A change of framing (setFraming) eases over this long; under reduced motion it lands at once. */
+export const FRAMING_EASE_S = 0.5;
 
 export interface StageOptions {
   canvas: HTMLCanvasElement;
@@ -55,8 +66,26 @@ export interface StageOptions {
   idleFps: number;
   /** The rim light and the god rays behind the figure; left out, the stage has no backdrop. */
   backdrop?: { uniforms: BackdropUniforms; blending: Blending };
+  /** A change of framing lands at once instead of easing. */
+  reducedMotion?: boolean;
   onContextLost?: () => void;
 }
+
+/** One framing eased into another: where it started, where it goes and how far along it is. */
+interface FramingEase {
+  from: Framing;
+  to: Framing;
+  elapsed: number;
+}
+
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+/** Slow out of the old framing and into the new one. */
+const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const sameFraming = (a: Framing, b: Framing): boolean =>
+  Math.abs(a.fov - b.fov) < 1e-6 &&
+  Math.abs(a.distance - b.distance) < 1e-6 &&
+  Math.abs(a.targetY - b.targetY) < 1e-6 &&
+  Math.abs(a.targetZ - b.targetZ) < 1e-6;
 
 export type FrameCallback = (dtSeconds: number, elapsedSeconds: number) => void;
 
@@ -92,7 +121,17 @@ export class Stage {
   private bloomScale = 1;
   /** The light theme draws with normal blending, which the composer's output has to treat as premultiplied. */
   private lightOutput = false;
+  /** The framing the layout asks for (frameSize and layoutT read it), and the one the camera holds right now. */
   private framing: Framing = framingFor(1);
+  private view: Framing = framingFor(1);
+  /** A framing change on its way, and whether the next layout eases into its framing rather than landing on it. */
+  private framingEase: FramingEase | null = null;
+  private easeNext = false;
+  /** The bust's framing: the hero's head and shoulders, or the phone conversation's portrait. */
+  private framingMode: FramingMode = 'bust';
+  private readonly reducedMotion: boolean;
+  /** The camera's elevation above the target in degrees (a drag tilts the view), on top of the parallax. */
+  private elevationDeg = 0;
   /** The head's bounds while the face look frames the head alone; null frames the figure. */
   private faceBounds: HeadBounds | null = null;
   /** Where the pointer wants the view (-1..1), and where the eased view is. */
@@ -150,6 +189,7 @@ export class Stage {
     this.lastRender = now;
     // Counting every pass of the frame, not just the last one, needs manual resets.
     this.renderer.info.reset();
+    this.easeFraming(dt);
     this.easeParallax(dt);
     this.frame(dt, (now - this.startedAt) / 1000);
     this.render();
@@ -160,6 +200,7 @@ export class Stage {
     this.host = options.canvas.parentElement ?? options.canvas;
     this.idleFps = options.idleFps;
     this.pixelRatio = options.pixelRatio;
+    this.reducedMotion = options.reducedMotion === true;
     this.onContextLostCallback = options.onContextLost;
 
     this.renderer = new WebGLRenderer({
@@ -268,7 +309,7 @@ export class Stage {
     return this.running;
   }
 
-  /** Speaking lifts the idle frame cap. */
+  /** Anything moving (speech, a drag, the intro, a framing change) lifts the idle frame cap; the caller decides. */
   setBusy(on: boolean): void {
     this.busy = on;
   }
@@ -334,6 +375,35 @@ export class Stage {
   }
 
   /**
+   * How a bust (the kinect-demo look) is framed: 'bust' is the hero's head and shoulders (bustFramingFor),
+   * 'portrait' the phone conversation's head and neck, as large as the stage allows (portraitFramingFor). The camera
+   * eases from one to the other over FRAMING_EASE_S, or lands at once under reduced motion; the other looks keep
+   * their own framing whatever the mode.
+   */
+  setFraming(mode: FramingMode): void {
+    if (mode === this.framingMode) return;
+    this.framingMode = mode;
+    this.easeNext = !this.reducedMotion;
+    this.layout();
+  }
+
+  /** True while the camera eases from one framing to another. */
+  isEasing(): boolean {
+    return this.framingEase !== null;
+  }
+
+  /**
+   * Tilt the view this many degrees above (positive) or below the target, on top of the parallax: the turn a drag
+   * gives (stage/orbit.ts). The sensor of the kinect looks stays where it is, so the cloud shows its relief.
+   */
+  setElevation(deg: number): void {
+    const next = Number.isFinite(deg) ? MathUtils.clamp(deg, -60, 60) : 0;
+    if (next === this.elevationDeg) return;
+    this.elevationDeg = next;
+    this.placeCamera();
+  }
+
+  /**
    * The pointer in -1..1 (x right, y up): the view orbits its target by at most PARALLAX_YAW_DEG of yaw and
    * PARALLAX_PITCH_DEG of pitch, eased, so the fixed sensor's artefacts show from a slightly different side.
    */
@@ -359,15 +429,18 @@ export class Stage {
     return { width: this.width, height: this.height };
   }
 
-  /** Metres of the scene the frame takes in at the point the camera looks at. */
+  /**
+   * Metres of the scene the frame takes in at the point the camera looks at, in the framing the layout asked for
+   * (where a framing change is going, not where its ease is), so what is sized from it is sized once.
+   */
   frameSize(): { width: number; height: number } {
     const height = visibleHeight(this.framing);
     return { width: height * this.camera.aspect, height };
   }
 
-  /** The camera's distance from the point it looks at. */
+  /** The camera's distance from the point it looks at, as it stands this frame. */
   distance(): number {
-    return this.framing.distance;
+    return this.view.distance;
   }
 
   /** True while the canvas is too small for the extras (bloom, the cloud, the ribbon, the floor). */
@@ -432,13 +505,21 @@ export class Stage {
       small || !this.faceBounds
         ? framingFor(aspect, small)
         : this.bust
-          ? bustFramingFor(aspect, this.faceBounds)
+          ? this.framingMode === 'portrait'
+            ? portraitFramingFor(aspect, this.faceBounds)
+            : bustFramingFor(aspect, this.faceBounds)
           : faceFramingFor(aspect, this.faceBounds);
     this.camera.aspect = aspect;
-    this.camera.fov = this.framing.fov;
-    this.cameraTarget.set(0, this.framing.targetY, this.framing.targetZ);
-    this.placeCamera();
-    this.camera.updateProjectionMatrix();
+    // A framing change eases from wherever the camera is; a layout during the ease (the phone's sheet resizing the
+    // stage as it opens) eases on toward the new target. Any other layout lands at once.
+    if ((this.easeNext || this.framingEase) && !sameFraming(this.view, this.framing)) {
+      this.framingEase = { from: { ...this.view }, to: this.framing, elapsed: 0 };
+    } else {
+      this.framingEase = null;
+      this.view = this.framing;
+    }
+    this.easeNext = false;
+    this.applyView();
 
     if (this.chain) {
       this.chain.composer.setPixelRatio(this.pixelRatio);
@@ -448,15 +529,45 @@ export class Stage {
     this.layoutCallback?.();
   }
 
-  /** The camera on its orbit about the target: level in front of it, turned by the eased parallax. */
+  /** The lens and the target of the framing the camera holds now, then the camera on its orbit about the target. */
+  private applyView(): void {
+    this.camera.fov = this.view.fov;
+    this.cameraTarget.set(0, this.view.targetY, this.view.targetZ);
+    this.placeCamera();
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** One step of a framing change: the camera between the two framings, eased in and out. */
+  private easeFraming(dt: number): void {
+    const ease = this.framingEase;
+    if (!ease) return;
+    ease.elapsed += dt;
+    const p = Math.min(1, ease.elapsed / FRAMING_EASE_S);
+    const k = easeInOut(p);
+    const { from, to } = ease;
+    this.view = {
+      t: lerp(from.t, to.t, k),
+      fov: lerp(from.fov, to.fov, k),
+      distance: lerp(from.distance, to.distance, k),
+      targetY: lerp(from.targetY, to.targetY, k),
+      targetZ: lerp(from.targetZ, to.targetZ, k),
+    };
+    if (p >= 1) {
+      this.view = to;
+      this.framingEase = null;
+    }
+    this.applyView();
+  }
+
+  /** The camera on its orbit about the target: level in front of it, turned by the eased parallax and the elevation. */
   private placeCamera(): void {
     // The drift: a slow Lissajous of a few degrees, period about 10 s in yaw and 14 s in pitch.
     const t = this.driftClock;
     const driftYaw = this.drift ? DRIFT_YAW_DEG * Math.sin((t * 2 * Math.PI) / 10) : 0;
     const driftPitch = this.drift ? DRIFT_PITCH_DEG * Math.sin((t * 2 * Math.PI) / 14) : 0;
     const yaw = MathUtils.degToRad(this.parallax.x * this.orbitYawDeg + driftYaw);
-    const pitch = MathUtils.degToRad(this.parallax.y * this.orbitPitchDeg + driftPitch);
-    const d = this.framing.distance;
+    const pitch = MathUtils.degToRad(this.parallax.y * this.orbitPitchDeg + driftPitch + this.elevationDeg);
+    const d = this.view.distance;
     this.camera.position.set(
       this.cameraTarget.x + d * Math.sin(yaw) * Math.cos(pitch),
       this.cameraTarget.y + d * Math.sin(pitch),

@@ -2,7 +2,7 @@
  * The pieces: how far the head is scattered (0 assembled, 1 fully apart), free of three.js for node --test. The wire
  * shader moves every triangle as one rigid piece by this amount and the head's depth cloud scatters with it.
  */
-import { scatterFor } from '../data/depth/depthMath.ts';
+import { scatterFor } from '../data/scatter.ts';
 
 /** The intro: the head assembles from pieces over this long after the being first shows. */
 export const INTRO_S = 1.6;

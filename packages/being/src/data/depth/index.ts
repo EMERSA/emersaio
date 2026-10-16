@@ -46,7 +46,6 @@ export {
   SENSOR_TANGENTS,
   type SensorKind,
   scatterFade,
-  scatterFor,
   scatterTravel,
   sensorFrame,
 } from './depthMath.ts';

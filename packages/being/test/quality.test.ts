@@ -6,6 +6,7 @@ import {
   bustGrid,
   CLOUD_GRIDS,
   POSTER_FLOOR_FPS,
+  QUALITY_LADDER,
   QualityMonitor,
   qualityProfile,
   startingQuality,
@@ -13,7 +14,12 @@ import {
 import type { Quality } from '../src/types.ts';
 
 /** Feed the monitor a steady frame rate for a number of seconds, one sample per frame. */
-const drive = (monitor: QualityMonitor, fps: number, targetFps: number, seconds: number): void => {
+const drive = <Rung extends string>(
+  monitor: QualityMonitor<Rung>,
+  fps: number,
+  targetFps: number,
+  seconds: number,
+): void => {
   const dt = 1 / fps;
   for (let t = 0; t < seconds; t += dt) monitor.sample(fps, dt, targetFps);
 };
@@ -159,4 +165,22 @@ test('bustGrid keeps a shard about BUST_CELL_PX across: rows follow the frame, i
   assert.deepEqual(bustGrid(Number.NaN, full), { cols: 128, rows: 96 });
   // A few pixels of resize land on the same step: no rebuild.
   assert.deepEqual(bustGrid(752, full), bustGrid(748, full));
+});
+
+test('a ladder of its own: the monitor walks its rungs and keeps the poster floor; the tiers are the default', () => {
+  type Rung = 's0' | 's1' | 's2' | 'poster';
+  const rungs: readonly Rung[] = ['s0', 's1', 's2', 'poster'];
+  const changes: Rung[] = [];
+  const monitor = new QualityMonitor<Rung>('s0', (rung) => changes.push(rung), rungs);
+  assert.deepEqual(monitor.rungs(), rungs);
+  drive(monitor, 40, 60, 8);
+  assert.equal(monitor.current(), 's1');
+  drive(monitor, 28, 60, 8);
+  assert.equal(monitor.current(), 's2');
+  drive(monitor, POSTER_FLOOR_FPS + 1, 60, 60);
+  assert.equal(monitor.current(), 's2', 'never the poster while the floor rate holds');
+  drive(monitor, POSTER_FLOOR_FPS - 6, 60, 8);
+  assert.equal(monitor.current(), 'poster');
+  assert.deepEqual(changes, ['s1', 's2', 'poster']);
+  assert.deepEqual(new QualityMonitor('full', () => undefined).rungs(), QUALITY_LADDER);
 });

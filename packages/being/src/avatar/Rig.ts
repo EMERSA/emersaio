@@ -122,7 +122,8 @@ function crossFade(from: AnimationAction | null, to: AnimationAction, seconds: n
  * Body animation: the Idle clip (or a procedural sway when the asset has none), one-shot gesture clips, emotes,
  * and a head and eye look-at layered over the clip pose every frame. Bones the clips do not drive are reset to
  * their rest pose before the mixer runs, so the per-frame deltas from the look-at and the FaceDriver never
- * accumulate.
+ * accumulate. Under reduced motion the figure holds the clip's first pose and plays no gesture clip; the face still
+ * blinks and speaks.
  */
 export class Rig {
   private readonly root: Object3D;
@@ -179,7 +180,9 @@ export class Rig {
     for (const [bone, quaternion] of this.rest) bone.quaternion.copy(quaternion);
 
     if (this.mixer) {
-      this.mixer.update(dtSeconds);
+      // Under reduced motion the clip holds its first pose: the mixer still applies it each frame (the bones above
+      // were just reset), but its clock never moves.
+      this.mixer.update(this.reducedMotion ? 0 : dtSeconds);
     } else if (!this.reducedMotion) {
       // No clips at all: a slow sway and bob keep the figure from looking like a statue.
       this.root.rotation.y = Math.sin(this.elapsed * 0.45) * 0.03;
@@ -194,12 +197,14 @@ export class Rig {
     // The neck carries a quarter of the turn, the head the rest; the eyes lead so the gaze lands on the pointer.
     const neckShare = this.bones.neck ? (this.bones.head ? 0.25 : 0.7) : 0;
     const headShare = this.bones.head ? 0.45 : 0;
-    if (this.bones.neck) applyWorldRotation(this.bones.neck, yaw * neckShare, pitch * neckShare, 0);
-    if (this.bones.head) applyWorldRotation(this.bones.head, yaw * headShare, pitch * headShare, 0);
+    // The turns are taken in the figure's own space, so they stay a nod and a glance however the turntable has her.
+    const space = this.root;
+    if (this.bones.neck) applyWorldRotation(this.bones.neck, yaw * neckShare, pitch * neckShare, 0, space);
+    if (this.bones.head) applyWorldRotation(this.bones.head, yaw * headShare, pitch * headShare, 0, space);
     const eyeYaw = MathUtils.clamp(this.look.x * 0.6, -1, 1) * MathUtils.degToRad(EYE_LIMITS.yaw);
     const eyePitch = MathUtils.clamp(this.look.y * 0.6, -1, 1) * MathUtils.degToRad(EYE_LIMITS.pitch);
-    if (this.bones.eyeL) applyWorldRotation(this.bones.eyeL, eyeYaw, eyePitch, 0);
-    if (this.bones.eyeR) applyWorldRotation(this.bones.eyeR, eyeYaw, eyePitch, 0);
+    if (this.bones.eyeL) applyWorldRotation(this.bones.eyeL, eyeYaw, eyePitch, 0, space);
+    if (this.bones.eyeR) applyWorldRotation(this.bones.eyeR, eyeYaw, eyePitch, 0, space);
   }
 
   /** Pointer position in -1..1 (x right, y up). */
@@ -227,6 +232,8 @@ export class Rig {
 
   /** Switch the base loop to the Talking clip while a line plays, when the asset has one. */
   setSpeaking(on: boolean): void {
+    // The mixer's clock stands still under reduced motion, so a crossfade would never finish: the base stays.
+    if (this.reducedMotion) return;
     const next = on && this.talking ? this.talking : this.idle;
     if (!next || next === this.base) return;
     const previous = this.base;
@@ -265,6 +272,8 @@ export class Rig {
   private playClip(name: string): boolean {
     const clip = this.clip(name);
     if (!clip || !this.mixer) return false;
+    // A still figure makes no gesture; nothing stands in for the clip either.
+    if (this.reducedMotion) return true;
     const action = this.mixer.clipAction(clip);
     action.reset();
     action.setLoop(LoopOnce, 1);

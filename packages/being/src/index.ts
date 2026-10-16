@@ -1,9 +1,11 @@
 /**
  * The front door of the being runtime. createBeing() wires the stage, the avatar, the face, the rig and the data
  * visualisations together and returns the BeingHandle from types.ts, including speak() with clip playback and
- * caption timing. Nothing here knows about the page: the shell owns captions, the poster and the state classes.
+ * caption timing. The kinect cloud is a chunk of its own (cloud/index.ts), fetched only for the looks that draw it,
+ * and the pointer turns Emily and holds her (stage/gesture.ts, stage/orbit.ts). Nothing here knows about the page:
+ * the shell owns captions, the poster and the state classes.
  */
-import { Matrix4, type Mesh, type Object3D, Vector3 } from 'three';
+import { Group, Matrix4, type Mesh, type Object3D } from 'three';
 import { type HeadMeasure, measureHead } from './avatar/headMeasure.ts';
 import { type LoadedAvatar, loadAvatar } from './avatar/loadAvatar.ts';
 import { Rig } from './avatar/Rig.ts';
@@ -12,14 +14,11 @@ import { createSharedUniforms, WireBeingMaterial } from './avatar/WireBeingMater
 import { isCoarsePointer } from './capabilities.ts';
 import { AudioBands } from './data/AudioBands.ts';
 import { DataFan } from './data/DataFan.ts';
-import { BeingDepthSource } from './data/depth/BeingDepthSource.ts';
 import type { DepthSource } from './data/depth/DepthSource.ts';
-import { EYE_LINE_SHARE, SENSOR_BUST, scatterFor, sensorFrameHeight } from './data/depth/depthMath.ts';
 import { FAN_LINES, FAN_PLANE_M } from './data/fanMath.ts';
-import { type KeepZone, KINECT_DEFAULTS, KinectCloud } from './data/KinectCloud.ts';
-import { SurfaceFluid } from './data/SurfaceFluid.ts';
+import { scatterFor } from './data/scatter.ts';
 import { TokenMeter } from './data/TokenMeter.ts';
-import { FaceDriver } from './face/FaceDriver.ts';
+import { FaceDriver, hasArkitMorphs } from './face/FaceDriver.ts';
 import type { FaceSource } from './face/source.ts';
 import type { ArkitStreamSource } from './face/sources/ArkitStream.ts';
 import { IdleSource } from './face/sources/Idle.ts';
@@ -28,6 +27,8 @@ import { VisemeTimelineSource } from './face/sources/VisemeTimeline.ts';
 import { getAudioOutput, unlock } from './speech/audioUnlock.ts';
 import { RIM_HEIGHT_M, RIM_RADIUS_SHARE, RIM_RIGHT_SHARE } from './stage/Backdrop.ts';
 import { bustBounds, type HeadBounds } from './stage/framing.ts';
+import { type GestureEvent, GestureTracker, HOLD_MS } from './stage/gesture.ts';
+import { Orbit, RETURN_AFTER_S, RETURN_TALKING_S } from './stage/orbit.ts';
 import {
   bustGrid,
   CLOUD_GRIDS,
@@ -40,7 +41,10 @@ import { ORBIT_PITCH_DEG, ORBIT_YAW_DEG, PARALLAX_PITCH_DEG, PARALLAX_YAW_DEG, S
 import { ThemeUniforms } from './stage/ThemeUniforms.ts';
 import type {
   BeingHandle,
+  BeingHoldDetail,
   BeingOptions,
+  FramingMode,
+  KinectMode,
   Look,
   LookRequest,
   Quality,
@@ -51,55 +55,30 @@ import type {
 } from './types.ts';
 
 export { type Capabilities, detectCapabilities } from './capabilities.ts';
-// The being's own depth and the maths; the Kinectron and video sources are dev-only inputs and live on the
-// '@emersa/being/depth' subpath alone, so the home page never carries them (their types are free).
-export {
-  azureGreyToMm,
-  BeingDepthSource,
-  type BeingDepthSourceOptions,
-  backProject,
-  type CloudGrid,
-  cameraTangents,
-  DEFAULT_CLIPPING,
-  DEPTH_LAYER,
-  type DepthClipping,
-  type DepthEncoding,
-  type DepthSource,
-  type DepthSourceKind,
-  DISPARITY_FB,
-  DISPARITY_SUBPX,
-  DROPOUT_HZ,
-  disparityStep,
-  type FovTangents,
-  hash01,
-  isJump,
-  JUMP_SHARE,
-  KINECT_V1_TANGENTS,
-  KINECTRON_CLIPPING,
-  type KinectronClient,
-  type KinectronClientConfig,
-  type KinectronConstructor,
-  type KinectronDepthSourceOptions,
-  type KinectronFeed,
-  type KinectronImageFrame,
-  type KinectronKinectType,
-  type KinectronRawDepthFrame,
-  type KinectronRawDepthPayload,
-  kinectV2GreyToMm,
-  POINT_CSS_PX,
-  pcg,
-  pointAlpha,
-  pointSizePx,
-  quantiseDistance,
-  SENSOR_FACE,
-  SENSOR_HZ,
-  SENSOR_TANGENTS,
-  type SensorKind,
-  sensorFrame,
-  type VideoDepthSourceOptions,
+// The depth sources and their maths are values of the '@emersa/being/depth' subpath and of the cloud chunk alone,
+// so this core carries none of them; their types are free.
+export type {
+  BeingDepthSourceOptions,
+  CloudGrid,
+  DepthClipping,
+  DepthEncoding,
+  DepthSource,
+  DepthSourceKind,
+  FovTangents,
+  KinectronClient,
+  KinectronClientConfig,
+  KinectronConstructor,
+  KinectronDepthSourceOptions,
+  KinectronFeed,
+  KinectronImageFrame,
+  KinectronKinectType,
+  KinectronRawDepthFrame,
+  KinectronRawDepthPayload,
+  SensorKind,
+  VideoDepthSourceOptions,
 } from './data/depth/index.ts';
 export { DEFAULT_FAN_TARGETS, FAN_NODE_SHARES, FAN_PLANE_M } from './data/fanMath.ts';
-export { DEFAULT_POINT_SIZE_PX, KINECT_DEFAULTS, type KinectCloudOptions } from './data/KinectCloud.ts';
+export type { KinectCloudOptions } from './data/KinectCloud.ts';
 export { FACE_CHIN_AIR, FACE_CROWN_AIR, FACE_PORTRAIT_SHARE, faceLayoutT } from './stage/framing.ts';
 export type * from './types.ts';
 
@@ -108,6 +87,8 @@ type Extras = typeof import('./data/extras.ts');
 type DataRing = InstanceType<Extras['DataRing']>;
 type Ribbon = InstanceType<Extras['Ribbon']>;
 type FloorReflection = InstanceType<Extras['FloorReflection']>;
+type CloudModule = typeof import('./cloud/index.ts');
+type CloudLayer = InstanceType<CloudModule['CloudLayer']>;
 
 /** Captions-only speech reveals this many characters per second; the text-timed mouth follows the same clock. */
 const TYPEWRITER_CPS = 14;
@@ -137,11 +118,10 @@ const FACE_RIBBON_TUBE_M = 0.006;
 const FIGURE_RIM_Z = -0.6;
 const FIGURE_RIM_DIAMETER_M = 1.6;
 /**
- * The eyes and the mouth as shares of the head's height above the chin and forward of its centre, with radii, for
- * the zones the cloud's dropout never touches (the study: never drop on the eyes or the mouth).
+ * A conversation counts as on while the microphone is open, while a phone frames her as a portrait, or for this long
+ * after the last frame of her live face: a turned Emily then comes back to the visitor sooner (stage/orbit.ts).
  */
-const EYES_ZONE = { up: EYE_LINE_SHARE, forward: 0.3, radius: 0.34 } as const;
-const MOUTH_ZONE = { up: 0.27, forward: 0.38, radius: 0.2 } as const;
+const TALK_RECENT_MS = 30000;
 /**
  * Bloom for the face look: a head this large and bright hazes the whole canvas at the figure's radius, up to its
  * corners, which must stay the page's colour. Radius 0 keeps the tight glow and drops the wide mips to a third;
@@ -429,13 +409,8 @@ const clampUnit = (value: number): number => (Number.isFinite(value) ? Math.min(
 /** The shared contract's 'kinect-face' is the face look. */
 const normaliseLook = (look: LookRequest | undefined): Look => (look === 'kinect-face' ? 'face' : (look ?? 'hybrid'));
 
-/** The shards' liquid skin: metres along the sensor ray per unit of height, and how far its slope tilts the light. */
-const FLUID_AMP_M = 0.005;
-const FLUID_TILT = 20;
-/** The pointer stirs the front of the face, this far ahead of the head's centre. */
-const FACE_FRONT_M = 0.08;
-/** Once the pointer stops, its stir fades over about this time. */
-const STIR_EASE_S = 0.12;
+/** Every look but the wire draws the kinect cloud, whose code is the cloud chunk. */
+const drawsCloud = (look: Look): boolean => look !== 'wire';
 
 export function createBeing(options: BeingOptions): BeingHandle {
   const canvas = options.canvas;
@@ -471,6 +446,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
             uniforms: { uRim: theme.uRim, uIsLight: theme.uIsLight, uOpacity: shared.uOpacity },
             blending: theme.blending(),
           },
+    reducedMotion,
     onContextLost: options.onContextLost,
   });
   stage.setLightOutput(options.theme === 'light');
@@ -489,34 +465,17 @@ export function createBeing(options: BeingOptions): BeingHandle {
   let ribbon: Ribbon | null = null;
   let floor: FloorReflection | null = null;
 
-  // The kinect cloud and where it reads depth from: the being's own depth pass, rendered from a fixed sensor
-  // camera at 30 Hz, unless a sensor or a video is given.
-  const startGrid = profile.cloud ?? CLOUD_GRIDS.reduced;
-  const beingSource = new BeingDepthSource({
-    renderer: stage.renderer,
-    scene: stage.scene,
-    width: startGrid.cols,
-    height: startGrid.rows,
-    reducedMotion,
-  });
+  // The kinect cloud (cloud/index.ts) and where it reads depth from: the being's own depth pass, rendered from a
+  // fixed sensor camera at 30 Hz, unless a sensor or a video is given. Its chunk is fetched for the looks that draw
+  // it; until it arrives its knobs wait in line, the latest call of each.
   let external: DepthSource | null = options.depthSource ?? null;
-  const cloud = new KinectCloud(shared, theme.blending(), {
-    cols: startGrid.cols,
-    rows: startGrid.rows,
-    pixelRatio: caps.maxPixelRatio,
-    reducedMotion,
-  });
-  // The kinect-demo shards ride a liquid skin simulated on the GPU (data/SurfaceFluid.ts): Emily's voice rings out
-  // from her lips, the pointer stirs the surface, and a drop lands now and then. Nothing moves under reduced motion.
-  const fluid = new SurfaceFluid(stage.renderer, { reducedMotion });
-  /** The pointer over the face in sensor uv, when it last moved and how fast (sensor frames a second, eased). */
-  const stirred = { u: 0.5, v: 0.5, at: Number.NEGATIVE_INFINITY, speed: 0 };
-  const stirRay = new Vector3();
-  const stirPoint = new Vector3();
-  const lips = new Vector3();
-  // The grid material follows the theme's blending in wire mode and blends normally as a solid mesh (KinectCloud).
-  theme.register(cloud.material);
-  stage.scene.add(cloud.points, cloud.mesh);
+  let layer: CloudLayer | null = null;
+  /** The layer as it is now, for code the compiler would otherwise read as running before it can arrive. */
+  const currentLayer = (): CloudLayer | null => layer;
+  let layerLoading: Promise<CloudLayer | null> | null = null;
+  const pendingKnobs = new Map<string, (target: CloudLayer) => void>();
+  /** The cloud's mode as the page set it, reported until the layer can say so itself. */
+  let chosenMode: KinectMode | null = null;
   const fan = new DataFan(shared, theme.blending(), { reducedMotion, pixelRatio: caps.maxPixelRatio });
   theme.register(fan.lineMaterial);
   theme.register(fan.nodeMaterial);
@@ -530,6 +489,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
   let loaded = false;
   let disposed = false;
   let speaking = false;
+  let listening = false;
   let renderAllowed = true;
   let externalLevel = 0;
   let fade = reducedMotion ? 1 : 0;
@@ -548,31 +508,72 @@ export function createBeing(options: BeingOptions): BeingHandle {
   /** The head-and-shoulders crop under it (the kinect-demo look). */
   let headBust: HeadBounds | null = null;
   let headBone: Object3D | null = null;
+  /** The head bone's bind pose, inverted: the keep zones follow the bone's movement since then. */
   const headBind = new Matrix4();
-  /** The head bone's movement since the bind pose, and the keep zones carried along with it each frame. */
-  const headDelta = new Matrix4();
-  const zonePoint = new Vector3();
-  const eyesZone: KeepZone = { x: 0, y: 0, z: 0, radius: 0 };
-  const mouthZone: KeepZone = { x: 0, y: 0, z: 0, radius: 0 };
   /** The pieces: the amount drawn, the shell's last value and when it came, and when the intro began (stage time). */
   let shatter = 0;
   let shatterManual = 0;
   let shatterManualAt = Number.NEGATIVE_INFINITY;
   let introAt: number | null = null;
-  /** The kinect-demo look's wire head (off unless asked for), and whether the page picked the cloud's mode itself. */
+  /** The kinect-demo look's wire head (off unless asked for). */
   let demoHeadWire = options.headWire === true;
-  let modeChosen = false;
+  /** The framing the page asked for (setFraming): the hero's bust, or a phone conversation's portrait. */
+  let framingMode: FramingMode = 'bust';
+  /** When the live face last pushed a frame (performance.now), for the conversation's shorter return. */
+  let arkitAt = Number.NEGATIVE_INFINITY;
 
-  /** A keep zone from the head's bind-pose bounds, moved with the head bone. */
-  const placeZone = (zone: KeepZone, shape: { up: number; forward: number; radius: number }): void => {
-    const bounds = head?.bounds;
-    if (!bounds) return;
-    const h = Math.max(0.05, bounds.maxY - bounds.minY);
-    zonePoint.set(0, bounds.minY + shape.up * h, bounds.centreZ + shape.forward * h).applyMatrix4(headDelta);
-    zone.x = zonePoint.x;
-    zone.y = zonePoint.y;
-    zone.z = zonePoint.z;
-    zone.radius = shape.radius * h;
+  // Turning by hand: the avatar hangs from a turntable that turns about the head's vertical axis, so the kinect
+  // looks' fixed sensor sees the turned mesh; the drag's tilt is the camera's elevation (Stage.setElevation).
+  const turntable = new Group();
+  turntable.name = 'Turntable';
+  const orbit = new Orbit({ reducedMotion });
+
+  const placeTurntable = (): void => {
+    const yaw = orbit.yaw;
+    const pivotZ = head?.bounds.centreZ ?? 0;
+    turntable.rotation.y = yaw;
+    // About (0, y, pivotZ) rather than the origin: the head turns where it stands instead of swinging round.
+    turntable.position.set(-pivotZ * Math.sin(yaw), 0, pivotZ - pivotZ * Math.cos(yaw));
+    stage.setElevation(orbit.pitchDeg());
+  };
+
+  /** The floor's mirrored draw of the cloud, once both are there. */
+  const mirrorCloud = (target: FloorReflection, cloud: CloudLayer): void => {
+    target.mirror(cloud.cloud.points, cloud.cloud.material);
+    target.mirror(cloud.cloud.mesh, cloud.cloud.gridMaterial);
+  };
+
+  /** Fetch the cloud chunk once and build the layer; it joins the scene as soon as it is built. */
+  const loadLayer = (): Promise<CloudLayer | null> => {
+    layerLoading ??= import('./cloud/index.ts').then((module) => {
+      if (disposed) return null;
+      const grid = profile.cloud ?? CLOUD_GRIDS.reduced;
+      const next = new module.CloudLayer({
+        renderer: stage.renderer,
+        scene: stage.scene,
+        shared,
+        blending: theme.blending(),
+        grid,
+        pixelRatio: stage.getPixelRatio(),
+        reducedMotion,
+      });
+      // The grid material follows the theme's blending in wire mode and blends normally as a solid mesh (KinectCloud).
+      theme.register(next.cloud.material);
+      for (const apply of pendingKnobs.values()) apply(next);
+      pendingKnobs.clear();
+      if (head) next.setHead(head.bounds, headBone, headBind);
+      if (floor) mirrorCloud(floor, next);
+      layer = next;
+      applyScene();
+      return next;
+    });
+    return layerLoading;
+  };
+
+  /** A knob of the cloud: applied at once when the layer is there, otherwise when it arrives. */
+  const knob = (name: string, apply: (target: CloudLayer) => void): void => {
+    if (layer) apply(layer);
+    else pendingKnobs.set(name, apply);
   };
 
   /**
@@ -599,44 +600,27 @@ export function createBeing(options: BeingOptions): BeingHandle {
         if (!bodyWire && !isFace) casters.push(avatar.body);
       }
     }
-    if (!modeChosen) cloud.setMode(isDemo ? 'shards' : KINECT_DEFAULTS.mode);
     stage.setOrbit(
       isDemo ? ORBIT_YAW_DEG : PARALLAX_YAW_DEG,
       isDemo ? ORBIT_PITCH_DEG : PARALLAX_PITCH_DEG,
       isDemo && !reducedMotion,
     );
-    // With a sensor or a video the cloud is theirs, and the being's own depth pass has nothing to add.
-    beingSource.setMeshes(external ? [] : casters);
-    cloud.setSource(external ?? beingSource);
-    // The bust lattice follows the sensor frame's size on screen, so a shard stays a couple of pixels across however
-    // large the hero is (touch devices at most bustTouch).
-    const ceiling =
-      touch && profile.bustCloud && profile.bustCloud.rows > CLOUD_GRIDS.bustTouch.rows
-        ? CLOUD_GRIDS.bustTouch
-        : profile.bustCloud;
-    const frameM = stage.frameSize().height;
-    const framePx = frameM > 0 ? (stage.size().height / frameM) * sensorFrameHeight(SENSOR_BUST) : 0;
-    const demoGrid = ceiling ? bustGrid(framePx, ceiling) : null;
-    const grid = (isDemo ? demoGrid : isFace ? profile.headCloud : profile.cloud) ?? CLOUD_GRIDS.reduced;
-    cloud.setGrid(grid.cols, grid.rows);
-    beingSource.setSize(grid.cols, grid.rows);
-    cloud.setEnabled(effective !== 'wire');
     const headBounds = headLook && head ? head.bounds : null;
     // One object per head: the stage compares bounds by identity, and its layout calls back into this function.
     const bust = isDemo && headBounds ? headBust : null;
     const bounds = bust ?? headBounds;
-    cloud.setCrop(bust ? bust.minY : null);
-    // The sensor stands in front of the head in the face look and on its tripod before the figure otherwise; the
-    // cloud's ramp is centred on what it looks at until the probe has measured the figure.
-    if (bust) {
-      beingSource.placeForBust(bust);
-      cloud.setSubject(0, (bust.minY + bust.maxY) / 2, bust.centreZ);
-    } else if (bounds) {
-      beingSource.placeForHead(bounds);
-      cloud.setSubject(0, bounds.minY + (bounds.maxY - bounds.minY) * EYE_LINE_SHARE, bounds.centreZ);
-    } else {
-      beingSource.placeForFigure();
-      cloud.setSubject(0, 1, 0);
+    if (layer) {
+      // The bust lattice follows the sensor frame's size on screen, so a shard stays a couple of pixels across
+      // however large the hero is (touch devices at most bustTouch).
+      const ceiling =
+        touch && profile.bustCloud && profile.bustCloud.rows > CLOUD_GRIDS.bustTouch.rows
+          ? CLOUD_GRIDS.bustTouch
+          : profile.bustCloud;
+      const frameM = stage.frameSize().height;
+      const framePx = frameM > 0 ? (stage.size().height / frameM) * layer.bustFrameM : 0;
+      const demoGrid = ceiling ? bustGrid(framePx, ceiling) : null;
+      const grid = (isDemo ? demoGrid : isFace ? profile.headCloud : profile.cloud) ?? CLOUD_GRIDS.reduced;
+      layer.apply({ look: effective, casters, external, grid, head: headBounds, bust });
     }
     // The dev harness's product-shot extras follow the head in the face look: the ribbon swirls under the chin
     // and the glossy plinth and its reflection sit just under the lowest head vertex.
@@ -687,7 +671,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
     stage.setBloom(profile.bloom, profile.bloomRadius);
     ring?.setHalf(profile.halfPoints);
     ring?.setPixelRatio(stage.getPixelRatio());
-    cloud.setPixelRatio(stage.getPixelRatio());
+    layer?.setPixelRatio(stage.getPixelRatio());
     fan.setPixelRatio(stage.getPixelRatio());
     renderAllowed = profile.render;
     applyScene();
@@ -705,6 +689,115 @@ export function createBeing(options: BeingOptions): BeingHandle {
   stage.onLayout(() => {
     if (head && (effective === 'face' || effective === 'kinect-demo')) applyScene();
   });
+  // The look asked for draws the cloud: its chunk is on its way now, beside the avatar's.
+  const layerAtStart: Promise<CloudLayer | null> = drawsCloud(look) ? loadLayer() : Promise.resolve(null);
+
+  /* Gestures ------------------------------------------------------------------------------------------------ */
+
+  /** The canvas's width when the press began: a drag across all of it is one full turn. */
+  let gestureWidth = 1;
+  let captured: number | null = null;
+  let holdTimer = 0;
+  let lastPointerType = 'mouse';
+
+  /**
+   * The press is the canvas's from the moment it lands: a drag or a hold that strays over the hero's copy, or off the
+   * window, still ends here (and a hold is never left open by a release the canvas did not see).
+   */
+  const capturePointer = (id: number): void => {
+    try {
+      canvas.setPointerCapture(id);
+      captured = id;
+    } catch {
+      // The pointer is already gone; its release or cancel still ends the gesture.
+    }
+  };
+  const releasePointer = (): void => {
+    const id = captured;
+    captured = null;
+    if (id === null) return;
+    try {
+      if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    } catch {
+      // Released already.
+    }
+  };
+  /** Talk listens on the stage: a hold on Emily opens the microphone, its end closes it. */
+  const announceHold = (active: boolean): void => {
+    canvas.dispatchEvent(new CustomEvent<BeingHoldDetail>('em:being-hold', { detail: { active }, bubbles: true }));
+  };
+
+  const onGesture = (event: GestureEvent): void => {
+    switch (event.type) {
+      case 'drag-start':
+        orbit.grab();
+        break;
+      case 'drag':
+        orbit.drag(event.dx, event.dy, gestureWidth);
+        break;
+      case 'drag-end':
+        // A cancelled drag was the start of a page scroll on touch (or a pinch): she goes back to where it found her.
+        if (event.cancelled) orbit.cancel();
+        else orbit.release(event.vx, event.vy, gestureWidth);
+        break;
+      case 'hold-start':
+        announceHold(true);
+        break;
+      case 'hold-end':
+        announceHold(false);
+        break;
+      default:
+        // A hover and a tap belong to the page (being-mount.ts looks and loads with them).
+        break;
+    }
+  };
+  const gestures = new GestureTracker(onGesture);
+
+  /** The pointer in CSS pixels within the canvas, and the event's time on the performance clock. */
+  const pointAt = (event: PointerEvent): { x: number; y: number; t: number; width: number } => {
+    const box = canvas.getBoundingClientRect();
+    const t = event.timeStamp > 0 ? event.timeStamp : performance.now();
+    return { x: event.clientX - box.left, y: event.clientY - box.top, t, width: box.width };
+  };
+  const onPointerDown = (event: PointerEvent): void => {
+    lastPointerType = event.pointerType;
+    if (!loaded || disposed || !avatar) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const p = pointAt(event);
+    if (!gestures.pressing()) gestureWidth = Math.max(1, p.width);
+    gestures.down(event.pointerId, p.x, p.y, p.t);
+    if (gestures.pointerId() === event.pointerId) capturePointer(event.pointerId);
+    // A press may become a drag on its next event: the loop leaves the idle cap at once rather than a frame later.
+    stage.setBusy(true);
+    window.clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => gestures.tick(performance.now()), HOLD_MS + 10);
+  };
+  const onPointerMove = (event: PointerEvent): void => {
+    if (!gestures.pressing()) return;
+    const p = pointAt(event);
+    gestures.move(event.pointerId, p.x, p.y, p.t);
+  };
+  const onPointerUp = (event: PointerEvent): void => {
+    const p = pointAt(event);
+    gestures.up(event.pointerId, p.x, p.y, p.t);
+    if (!gestures.pressing()) window.clearTimeout(holdTimer);
+  };
+  // The browser took the pointer over (a vertical scroll on touch, a pinch) or the capture went away: whatever the
+  // press was doing ends, a drag without coasting.
+  const onPointerCancel = (event: PointerEvent): void => {
+    gestures.cancel(event.pointerId);
+    if (!gestures.pressing()) window.clearTimeout(holdTimer);
+  };
+  // A long press is a hold, never the browser's menu: on touch always, and with a mouse while a hold is on.
+  const onContextMenu = (event: Event): void => {
+    if (gestures.holding() || lastPointerType === 'touch' || lastPointerType === 'pen') event.preventDefault();
+  };
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerCancel);
+  canvas.addEventListener('lostpointercapture', onPointerCancel);
+  canvas.addEventListener('contextmenu', onContextMenu);
 
   stage.onFrame((dt, elapsed) => {
     const now = performance.now();
@@ -712,7 +805,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
     bands.update(dt);
     rig?.update(dt);
     face?.update(now, dt);
-    shared.uTime.value = elapsed;
+    // Under reduced motion every shader clock stands still: no shimmer, no swell, no scan drift, no dust.
+    shared.uTime.value = reducedMotion ? 0 : elapsed;
     stage.renderer.getDrawingBufferSize(shared.uViewport.value);
     const tokenRate = reducedMotion ? 0 : tokenMeter.normalized();
     const tokenPulse = reducedMotion ? 0 : tokenMeter.pulse();
@@ -729,13 +823,23 @@ export function createBeing(options: BeingOptions): BeingHandle {
     // The pieces: the intro assembles the head once the being shows; from then on the shell's value holds for two
     // seconds after it was set and the token meter pulses the rest of the time.
     if (intro && loaded && introAt === null) introAt = elapsed;
-    if (introAt !== null && elapsed - introAt < INTRO_S) {
+    const inIntro = introAt !== null && elapsed - introAt < INTRO_S;
+    if (introAt !== null && inIntro) {
       shatter = introShatter(elapsed - introAt);
     } else {
       const goal = shatterGoal(shatterManual, now - shatterManualAt, tokenRate, tokenPulse);
       shatter += (goal - shatter) * (1 - Math.exp(-dt / SHATTER_EASE_S));
     }
     shared.uShatter.value = shatter;
+    // The turn: a drag, its coast, and the way back to the visitor, sooner in a conversation and at once when she
+    // speaks. It is placed before the depth pass below, so the sensor sees her as she is turned this frame.
+    const voiced = speaking || (arkit?.active(now) ?? false);
+    const talking = listening || framingMode === 'portrait' || now - arkitAt < TALK_RECENT_MS;
+    orbit.update(dt, voiced ? 0 : talking ? RETURN_TALKING_S : RETURN_AFTER_S);
+    placeTurntable();
+    // While she speaks or moves, or the camera eases to a new framing, the loop runs at the display rate: a touch
+    // device's idle cap would halve the lip sync and the drag.
+    stage.setBusy(voiced || gestures.pressing() || orbit.moving() || inIntro || stage.isEasing());
     // The ring circles the hips, which a head-and-shoulders framing leaves out; drawing it there would only put a
     // bright band across the face. The face look leaves the hips out too.
     if (ring) {
@@ -743,43 +847,19 @@ export function createBeing(options: BeingOptions): BeingHandle {
       ring.update(bands.bands, dt);
     }
     // The cloud scatters with the token meter, like the sparkle: data leaving the body while the being thinks; and
-    // with the pieces, so the head's cloud comes apart and together with its wire.
+    // with the pieces, so the head's cloud comes apart and together with its wire. The kinect-demo face is all
+    // cloud, millimetre shards with no wire to hold it: it scatters for the intro (and a page's explicit setShatter)
+    // only, never with the token meter, so a speaking face stays a face.
     scatter += (scatterFor(tokenRate, tokenPulse) - scatter) * (1 - Math.exp(-dt / SCATTER_EASE_S));
-    // The kinect-demo face is all cloud, millimetre shards with no wire to hold it: it scatters for the intro (and
-    // a page's explicit setShatter) only, never with the token meter, so a speaking face stays a face.
-    const demo = effective === 'kinect-demo';
-    const inIntro = introAt !== null && elapsed - introAt < INTRO_S;
     const manual = shatterGoal(shatterManual, now - shatterManualAt, 0, 0);
-    cloud.setScatter(demo ? (inIntro ? shatter : manual) : Math.max(scatter, shatter));
-    // The eyes and the mouth travel with the head bone; the dropout leaves them alone.
-    if ((effective === 'face' || effective === 'kinect-demo') && head) {
-      if (headBone) headDelta.multiplyMatrices(headBone.matrixWorld, headBind);
-      placeZone(eyesZone, EYES_ZONE);
-      placeZone(mouthZone, MOUTH_ZONE);
-      cloud.setKeepZones(eyesZone, mouthZone);
-    } else {
-      cloud.setKeepZones(null, null);
-    }
-    (external ?? beingSource).update(dt);
-    // The liquid skin, for the kinect-demo shards cast from the being's own depth.
-    if (demo && !external && fluid.supported && cloud.showing()) {
-      const sensor = beingSource.camera;
-      lips.set(mouthZone.x, mouthZone.y, mouthZone.z).project(sensor);
-      stirred.speed *= Math.exp(-dt / STIR_EASE_S);
-      fluid.setDepth(beingSource.texture, 'perspective', sensor.near, sensor.far);
-      fluid.update(dt, {
-        voiceU: 0.5 * (lips.x + 1),
-        voiceV: 0.5 * (lips.y + 1),
-        voice: shared.uAudioLevel.value,
-        stirU: stirred.u,
-        stirV: stirred.v,
-        stir: stirred.speed,
-      });
-      cloud.setFluid(fluid.texture, FLUID_AMP_M, FLUID_TILT);
-    } else {
-      cloud.setFluid(null, 0, 0);
-    }
-    cloud.update(stage.camera, stage.distance(), dt, elapsed);
+    layer?.update({
+      dt,
+      elapsed,
+      camera: stage.camera,
+      distance: stage.distance(),
+      scatter: effective === 'kinect-demo' ? (inIntro ? shatter : manual) : Math.max(scatter, shatter),
+      voice: shared.uAudioLevel.value,
+    });
     // Packets flow only while a line plays (or when the page asks); the fan is otherwise still.
     fan.update(stage.camera, headBone, (head?.bounds.centreZ ?? 0) + FAN_PLANE_M, speaking ? SPEAKING_FLOW : 0, dt);
     ribbon?.update(dt);
@@ -788,7 +868,13 @@ export function createBeing(options: BeingOptions): BeingHandle {
   });
 
   const ready: Promise<void> = (async () => {
-    const [result, post, extras] = await Promise.all([loadAvatar(options.assetUrl), postprocessing, extrasLoading]);
+    const [result, post, extras] = await Promise.all([
+      loadAvatar(options.assetUrl),
+      postprocessing,
+      extrasLoading,
+      // The look's cloud is part of being ready: a kinect-demo being shows nothing without it.
+      layerAtStart,
+    ]);
     if (disposed) {
       disposeAvatar(result);
       return;
@@ -810,8 +896,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
         floor = new extras.FloorReflection(shared, theme.blending());
         theme.register(floor.floorMaterial);
         stage.scene.add(floor.group);
-        floor.mirror(cloud.points, cloud.material);
-        floor.mirror(cloud.mesh, cloud.gridMaterial);
+        const cloud = currentLayer();
+        if (cloud) mirrorCloud(floor, cloud);
         if (ribbon) for (const mesh of ribbon.meshes) floor.mirror(mesh, ribbon.material);
       }
       FIGURE_RIBBON_PROFILE = extras.FIGURE_RIBBON;
@@ -823,6 +909,7 @@ export function createBeing(options: BeingOptions): BeingHandle {
     headBust = bustBounds(head.bounds);
     headBone = result.bones.head ?? null;
     if (headBone) headBind.copy(headBone.matrixWorld).invert();
+    currentLayer()?.setHead(head.bounds, headBone, headBind);
     fan.setPoints(head.points, headBone ? headBone.matrixWorld : new Matrix4());
     const headMaterial = new WireBeingMaterial('head', shared, theme.blending());
     result.head.material = headMaterial;
@@ -835,13 +922,21 @@ export function createBeing(options: BeingOptions): BeingHandle {
       materials.push(bodyMaterial);
       theme.register(bodyMaterial);
     }
-    const driver = new FaceDriver({ mesh: result.head, bones: result.bones, morphs: result.morphs });
-    driver.add(new IdleSource());
+    // Head and eye turns are taken in the figure's own space, so a nod stays a nod while the turntable has her.
+    const driver = new FaceDriver({
+      mesh: result.head,
+      bones: result.bones,
+      morphs: result.morphs,
+      space: result.root,
+    });
+    // Under reduced motion the idle face holds still and only blinks; speech still moves the mouth.
+    driver.add(new IdleSource({ still: reducedMotion }));
     face = driver;
     rig = new Rig({ root: result.root, clips: result.clips, bones: result.bones, face: driver, reducedMotion });
     if (pendingLook.set) rig.lookAt(pendingLook.x, pendingLook.y);
     for (const action of pendingActions.splice(0)) rig.pose(action);
-    stage.scene.add(result.root);
+    turntable.add(result.root);
+    stage.scene.add(turntable);
     if (post) stage.attachBloom(post.createBloomChain);
     // The wire is mirrored below the floor too; a mesh the cloud stands in for has no wire to mirror, and the
     // cloud's own reflection takes its place.
@@ -867,14 +962,13 @@ export function createBeing(options: BeingOptions): BeingHandle {
     bands,
     tokens: tokenMeter,
     face: () => face,
+    // The frame loop reads `speaking` for its rate and for the turn's return.
     onStart: () => {
       speaking = true;
-      stage.setBusy(true);
       rig?.setSpeaking(true);
     },
     onEnd: () => {
       speaking = false;
-      stage.setBusy(false);
       rig?.setSpeaking(false);
     },
   };
@@ -915,16 +1009,20 @@ export function createBeing(options: BeingOptions): BeingHandle {
   };
 
   // The ARKit stream joins the face only when a talk session pushes its first frame; the module is fetched then,
-  // so the home page's runtime chunk never carries it. Frames that arrive while it loads keep only the newest.
+  // so the home page's runtime chunk never carries it. Frames that arrive while it loads keep only the newest. An
+  // avatar that carries the 52 ARKit morphs (the guide does) takes the stream 1:1 (direct mode); the visemes stay
+  // for the tour's clips.
   let arkit: ArkitStreamSource | null = null;
   let arkitLoading = false;
   let arkitAttached = false;
   let arkitPending: Float32Array | null = null;
   const pushArkit = (frame: ArrayLike<number>): void => {
     if (disposed) return;
+    arkitAt = performance.now();
     if (arkit) {
       arkit.push(frame);
-      if (!arkitAttached && face) {
+      if (!arkitAttached && face && avatar) {
+        arkit.setDirect(hasArkitMorphs(avatar.morphs));
         face.add(arkit);
         arkitAttached = true;
       }
@@ -979,31 +1077,18 @@ export function createBeing(options: BeingOptions): BeingHandle {
       pendingLook.set = true;
       rig?.lookAt(x, y);
       // The view eases after the pointer too (a few degrees, or the kinect-demo orbit); the sensor camera stays put.
-      // On touch the demo's view only drifts: a finger dragging the orbit about would fight the page's scroll.
-      if (!reducedMotion && !(touch && effective === 'kinect-demo')) stage.setParallax(clampUnit(x), clampUnit(y));
+      // On touch the demo's view only drifts: a finger dragging the orbit about would fight the page's scroll. A
+      // press on her is a drag or a hold, which the view leaves alone until it ends.
+      if (!reducedMotion && !(touch && effective === 'kinect-demo') && !gestures.pressing()) {
+        stage.setParallax(clampUnit(x), clampUnit(y));
+      }
     },
     stir(x: number, y: number): void {
-      if (reducedMotion || !fluid.supported || !headBust || effective !== 'kinect-demo') return;
-      // The pointer's ray from the view camera meets the front of the face; the sensor sees that point at (u, v).
-      const camera = stage.camera;
-      stirRay.set(clampUnit(x), clampUnit(y), 0.5).unproject(camera).sub(camera.position).normalize();
-      if (Math.abs(stirRay.z) < 1e-4) return;
-      const along = (headBust.centreZ + FACE_FRONT_M - camera.position.z) / stirRay.z;
-      if (!(along > 0)) return;
-      stirPoint.copy(camera.position).addScaledVector(stirRay, along).project(beingSource.camera);
-      const u = 0.5 * (stirPoint.x + 1);
-      const v = 0.5 * (stirPoint.y + 1);
-      const now = performance.now();
-      const seconds = (now - stirred.at) / 1000;
-      // A pause longer than a quarter second starts a new stroke rather than a leap across the face.
-      if (seconds > 0 && seconds < 0.25) {
-        stirred.speed = Math.max(stirred.speed, Math.hypot(u - stirred.u, v - stirred.v) / seconds);
-      }
-      stirred.u = u;
-      stirred.v = v;
-      stirred.at = now;
+      if (reducedMotion || effective !== 'kinect-demo') return;
+      layer?.stir(clampUnit(x), clampUnit(y), stage.camera);
     },
     setListening(on: boolean): void {
+      listening = on;
       ring?.setListening(on);
     },
     setLook(next: LookRequest): void {
@@ -1011,8 +1096,20 @@ export function createBeing(options: BeingOptions): BeingHandle {
       if (wanted === look) return;
       look = wanted;
       applyScene();
+      // A look that draws the cloud fetches its chunk now, if no earlier look did; the layer joins when it lands.
+      if (drawsCloud(look) && !layerLoading) {
+        loadLayer().catch((error: unknown) => {
+          layerLoading = null;
+          if (!disposed) options.onError?.(error);
+        });
+      }
     },
     getLook: () => look,
+    setFraming(mode: FramingMode): void {
+      if (mode !== 'bust' && mode !== 'portrait') return;
+      framingMode = mode;
+      stage.setFraming(mode);
+    },
     isSpeaking: () => speaking,
     setShatter(value: number): void {
       shatterManual = clamp01(value);
@@ -1029,23 +1126,23 @@ export function createBeing(options: BeingOptions): BeingHandle {
       applyScene();
     },
     kinect: {
-      setClipping: (nearM, farM) => cloud.setClipping(nearM, farM),
-      setPointSize: (px) => cloud.setPointSize(px),
-      setZOffset: (m) => cloud.setZOffset(m),
+      setClipping: (nearM, farM) => knob('clipping', (target) => target.setClipping(nearM, farM)),
+      setPointSize: (px) => knob('pointSize', (target) => target.setPointSize(px)),
+      setZOffset: (m) => knob('zOffset', (target) => target.setZOffset(m)),
       setMode: (mode) => {
-        modeChosen = true;
-        cloud.setMode(mode);
+        chosenMode = mode;
+        knob('mode', (target) => target.setMode(mode));
       },
       setHeadWire: (on) => {
         demoHeadWire = on;
         applyScene();
       },
-      setDisplacement: (value) => cloud.setDisplacement(value),
-      setBrightness: (value) => cloud.setBrightness(value),
-      setContrast: (value) => cloud.setContrast(value),
-      setOpacity: (value) => cloud.setOpacity(value),
-      setLineWidth: (px) => cloud.setLineWidth(px),
-      setRipple: (m) => cloud.setRipple(m),
+      setDisplacement: (value) => knob('displacement', (target) => target.setDisplacement(value)),
+      setBrightness: (value) => knob('brightness', (target) => target.setBrightness(value)),
+      setContrast: (value) => knob('contrast', (target) => target.setContrast(value)),
+      setOpacity: (value) => knob('opacity', (target) => target.setOpacity(value)),
+      setLineWidth: (px) => knob('lineWidth', (target) => target.setLineWidth(px)),
+      setRipple: (m) => knob('ripple', (target) => target.setRipple(m)),
     },
     face: { pushArkit },
     stats: () => ({
@@ -1053,10 +1150,12 @@ export function createBeing(options: BeingOptions): BeingHandle {
       drawCalls: stage.drawCalls(),
       triangles: stage.triangles(),
       quality: monitor.current(),
-      points: cloud.showing() ? cloud.count() : 0,
-      depth: cloud.clippingRange(),
+      points: layer ? layer.points() : 0,
+      depth: layer ? layer.clippingRange() : { near: 0, far: 0 },
       look,
-      mode: cloud.mode(),
+      // Until the cloud has arrived, the mode it will take: the page's, or the look's own (points is KINECT_DEFAULTS'
+      // mode, which lives in the cloud chunk).
+      mode: layer ? layer.mode() : (chosenMode ?? (effective === 'kinect-demo' ? 'shards' : 'points')),
     }),
     dispose(): void {
       if (disposed) return;
@@ -1064,15 +1163,26 @@ export function createBeing(options: BeingOptions): BeingHandle {
       stopRun();
       output.dispose();
       stage.stop();
+      window.clearTimeout(holdTimer);
+      // A hold that was on when the being went away has ended (its em:being-hold says so) and a drag lets go.
+      gestures.cancel();
+      releasePointer();
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
+      canvas.removeEventListener('lostpointercapture', onPointerCancel);
+      canvas.removeEventListener('contextmenu', onContextMenu);
       rig?.dispose();
       face?.dispose();
       floor?.dispose();
       fan.dispose();
       if (avatar) {
-        stage.scene.remove(avatar.root);
+        turntable.remove(avatar.root);
         disposeAvatar(avatar);
         avatar = null;
       }
+      stage.scene.remove(turntable);
       for (const material of materials) {
         theme.unregister(material);
         material.dispose();
@@ -1080,10 +1190,8 @@ export function createBeing(options: BeingOptions): BeingHandle {
       materials.length = 0;
       ring?.dispose();
       ribbon?.dispose();
-      cloud.dispose();
-      fluid.dispose();
-      // An external source belongs to whoever made it.
-      beingSource.dispose();
+      layer?.dispose();
+      layer = null;
       stage.dispose();
     },
   };
