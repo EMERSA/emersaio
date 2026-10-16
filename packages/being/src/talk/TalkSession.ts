@@ -42,8 +42,8 @@ export interface TalkSessionGrant {
   endUserId: string;
   turnsLeft: number;
   maxMinutes: number;
-  /** Which free conversation this is today, of how many, and whether it is the visitor's first day. */
-  allowance?: { used: number; of: number; firstDay: boolean };
+  /** Which free conversation this is today, of how many, and whether it is the visitor's first day; or a paid one. */
+  allowance?: { used: number; of: number; firstDay: boolean } | { paid: true; minutesLeft: number };
 }
 
 /** The voice the session drives; ConvaiBrain in the browser, a fake in tests. */
@@ -102,9 +102,11 @@ export const parseGrant = (payload: unknown): TalkSessionGrant | undefined => {
     endUserId,
     turnsLeft,
     maxMinutes: maxMinutes > 0 ? Math.min(maxMinutes, MAX_SESSION_MINUTES) : MAX_SESSION_MINUTES,
-    ...(isRecord(allowance) && typeof allowance.used === 'number' && typeof allowance.of === 'number'
-      ? { allowance: { used: allowance.used, of: allowance.of, firstDay: allowance.firstDay === true } }
-      : {}),
+    ...(isRecord(allowance) && allowance.paid === true && typeof allowance.minutesLeft === 'number'
+      ? { allowance: { paid: true as const, minutesLeft: allowance.minutesLeft } }
+      : isRecord(allowance) && typeof allowance.used === 'number' && typeof allowance.of === 'number'
+        ? { allowance: { used: allowance.used, of: allowance.of, firstDay: allowance.firstDay === true } }
+        : {}),
   };
 };
 
@@ -139,6 +141,7 @@ export class TalkSession {
   private voice: TalkVoice | null = null;
   private stateValue: TalkState = 'idle';
   private grantValue: TalkSessionGrant | undefined;
+  private refusalValue: { reason: string; buy: boolean } | undefined;
   private capTimer: unknown;
   private reconnects = 0;
   private listening = false;
@@ -162,6 +165,11 @@ export class TalkSession {
 
   get state(): TalkState {
     return this.stateValue;
+  }
+
+  /** Why the Worker refused the session (its reason), and whether it offers buying minutes. */
+  get refusal(): { reason: string; buy: boolean } | undefined {
+    return this.refusalValue;
   }
 
   get grant(): TalkSessionGrant | undefined {
@@ -338,6 +346,10 @@ export class TalkSession {
     const payload: unknown = await response.json().catch(() => undefined);
     const message = isRecord(payload) && typeof payload.error === 'string' ? payload.error : undefined;
     if (response.status === 429) {
+      this.refusalValue = {
+        reason: isRecord(payload) && typeof payload.reason === 'string' ? payload.reason : '',
+        buy: isRecord(payload) && payload.buy === true,
+      };
       this.setState('limited', message);
       return undefined;
     }

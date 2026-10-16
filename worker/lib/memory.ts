@@ -114,11 +114,14 @@ export async function startSession(
   provider: string,
   nowMs = Date.now(),
   chargedSeconds = 0,
+  paid = false,
 ): Promise<string> {
   const id = newId();
   await db
-    .prepare('INSERT INTO session (id, visitor_id, provider, started_at, charged_seconds) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, visitorId, provider, nowMs, chargedSeconds)
+    .prepare(
+      'INSERT INTO session (id, visitor_id, provider, started_at, charged_seconds, paid) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    .bind(id, visitorId, provider, nowMs, chargedSeconds, paid ? 1 : 0)
     .run();
   return id;
 }
@@ -129,9 +132,11 @@ export interface SessionRow {
   ended_at: number | null;
   turns: number;
   charged_seconds: number;
+  /** 1 when the session was paid for from credit. */
+  paid: number;
 }
 
-const SESSION_COLUMNS = 'id, started_at, ended_at, turns, charged_seconds';
+const SESSION_COLUMNS = 'id, started_at, ended_at, turns, charged_seconds, paid';
 
 /** The visitor's newest session that has not ended. */
 export const openSession = (db: MemoryDb, visitorId: string): Promise<SessionRow | null> =>
@@ -285,7 +290,7 @@ export async function documentContext(db: MemoryDb, visitorId: string, maxChars 
   return out.trim();
 }
 
-const TABLES = ['document', 'quota', 'fact', 'turn', 'session'] as const;
+const TABLES = ['document', 'quota', 'fact', 'turn', 'session', 'credit'] as const;
 
 /** Every row of one visitor, in one transaction. */
 export async function deleteVisitor(db: MemoryDb, visitorId: string): Promise<void> {
@@ -293,6 +298,41 @@ export async function deleteVisitor(db: MemoryDb, visitorId: string): Promise<vo
     ...TABLES.map((t) => db.prepare(`DELETE FROM ${t} WHERE visitor_id = ?`).bind(visitorId)),
     db.prepare('DELETE FROM visitor WHERE id = ?').bind(visitorId),
   ]);
+}
+
+/** A visitor's bought talk time, in seconds; 0 when they have none. */
+export async function creditSeconds(db: MemoryDb, visitorId: string): Promise<number> {
+  const n = await db
+    .prepare('SELECT seconds FROM credit WHERE visitor_id = ?')
+    .bind(visitorId)
+    .first<number>('seconds');
+  return typeof n === 'number' ? n : 0;
+}
+
+/** Add (or, negative, spend) bought seconds, never below zero; returns the new balance. */
+export async function addCredit(db: MemoryDb, visitorId: string, seconds: number): Promise<number> {
+  const n = await db
+    .prepare(
+      'INSERT INTO credit (visitor_id, seconds) VALUES (?, max(0, ?)) ON CONFLICT (visitor_id) DO UPDATE SET seconds = max(0, seconds + ?) RETURNING seconds',
+    )
+    .bind(visitorId, seconds, seconds)
+    .first<number>('seconds');
+  return typeof n === 'number' ? n : 0;
+}
+
+/** One completed Checkout, recorded once: true the first time this id is seen (the caller then credits it). */
+export async function recordPayment(
+  db: MemoryDb,
+  payment: { id: string; visitorId: string; seconds: number; amount: number; currency: string },
+  nowMs = Date.now(),
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      'INSERT INTO payment (id, visitor_id, seconds, amount, currency, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING RETURNING id',
+    )
+    .bind(payment.id, payment.visitorId, payment.seconds, payment.amount, payment.currency, nowMs)
+    .first<string>('id');
+  return typeof row === 'string';
 }
 
 /** The retention purge: visitors idle longer than RETENTION_MS and everything of theirs. Returns visitors removed. */

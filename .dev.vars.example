@@ -19,3 +19,9 @@ CONVAI_API_KEY=
 
 # Phase 2, dev and beta only: NVIDIA NIM key for the text brain, POST /api/brain (needs NIM_BASE_URL set).
 NVIDIA_API_KEY=
+
+# Stripe (routes/pay.ts): the secret key opens Checkout for "Buy 60 minutes" and reads it back; the webhook
+# signing secret checks POST /api/pay/webhook. Use the sk_test_ / whsec_ pair from Stripe's test mode first.
+# Without the secret key Talk offers no Buy button and the pay routes answer 503.
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=

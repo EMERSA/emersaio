@@ -50,4 +50,6 @@ if (panel) {
     link.addEventListener('focus', () => void warm(), { once: true });
   }
   document.addEventListener('em:talk-request', () => open());
+  // Back from Stripe: Talk opens by itself and says whether the minutes are there (talk.ts paidReturn).
+  if (new URLSearchParams(window.location.search).has('paid')) open();
 }

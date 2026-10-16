@@ -18,9 +18,11 @@ import {
 import { apiBase, ConvaiError, connect, revoke } from '../lib/convai.ts';
 import { contentType, fail, json, noContent, SITE_HOST } from '../lib/http.ts';
 import {
+  addCredit,
   addDocument,
   bump,
   capsFor,
+  creditSeconds,
   endSessions,
   getVisitor,
   lastActivity,
@@ -61,10 +63,18 @@ export const TALK_PER_NETWORK: Counter = {
   cap: 12,
   full: 'Your network has used today’s free conversations with Emily. Please try again tomorrow, or write to 4d@emersa.io.',
 };
-const MORE =
-  ' To keep talking now, write to 4d@emersa.io; buying minutes and a short form for 10 free minutes are coming soon. Our QR code generator is free to use any time.';
-export const FIRST_DAY_DONE = `That is your three free conversations for today. From tomorrow you get one a day.${MORE}`;
-export const DAILY_DONE = `That is your free conversation for today; you get another tomorrow.${MORE}`;
+const QR = ' Our QR code generator is free to use any time.';
+/** The refusal once the free conversations are used: what is left, and how to go on now (Buy when it is on). */
+export const allowanceDone = (firstDay: boolean, buy: boolean): string =>
+  (firstDay
+    ? 'That is your three free conversations for today. From tomorrow you get one a day.'
+    : 'That is your free conversation for today; you get another tomorrow.') +
+  (buy
+    ? ' To keep talking now, buy 60 minutes for £5 below, or write to 4d@emersa.io.'
+    : ' To keep talking now, write to 4d@emersa.io; buying minutes is coming soon.') +
+  QR;
+export const FIRST_DAY_DONE = allowanceDone(true, false);
+export const DAILY_DONE = allowanceDone(false, false);
 export const VPN_REFUSED =
   'Free conversations are not available through a VPN, proxy or Tor. Turn it off and try again, or write to 4d@emersa.io.';
 export const UPLOADS_FULL = 'That is all the files for today. Please come back tomorrow.';
@@ -89,7 +99,13 @@ async function settle(db: MemoryDb, id: string, nowMs = Date.now(), abandoned = 
       const last = (await lastActivity(db, id, session.started_at)) ?? session.started_at;
       until = Math.min(nowMs, last + ABANDONED_GRACE_MS);
     }
-    back += unusedSeconds(session, until);
+    const unused = unusedSeconds(session, until);
+    // A paid session's unused time goes back to the visitor's bought minutes, a free one's to the day.
+    if (session.paid) {
+      if (unused > 0) await addCredit(db, id, unused);
+    } else {
+      back += unused;
+    }
   }
   if (back > 0) await refund(db, id, 'talk_seconds', back, nowMs);
   return back;
@@ -142,19 +158,30 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   const firstDay = !row || dayKey(row.created_at) === dayKey();
   const allowed = firstDay ? FIRST_DAY_CONVERSATIONS : DAILY_CONVERSATIONS;
   const had = await usage(s.db, id, 'sessions');
-  if (had >= allowed) {
+  // Free conversations first; then bought minutes, if the visitor has any (routes/pay.ts).
+  const credit = had >= allowed && known ? await creditSeconds(s.db, id) : 0;
+  const paid = had >= allowed && credit >= 60;
+  if (had >= allowed && !paid) {
     writePoint(env, c.route, '429-allowance');
-    return json({ ok: false, error: firstDay ? FIRST_DAY_DONE : DAILY_DONE, reason: 'allowance' }, 429, {
-      ...tomorrow(),
-      ...cookie,
-    });
+    return json(
+      {
+        ok: false,
+        error: allowanceDone(firstDay, Boolean(env.STRIPE_SECRET_KEY)),
+        reason: 'allowance',
+        buy: Boolean(env.STRIPE_SECRET_KEY),
+      },
+      429,
+      { ...tomorrow(), ...cookie },
+    );
   }
-  if (anonymousNetwork(c.request.cf as RequestOrigin | undefined)) {
+  if (!paid && anonymousNetwork(c.request.cf as RequestOrigin | undefined)) {
     writePoint(env, c.route, '429-vpn');
     return json({ ok: false, error: VPN_REFUSED, reason: 'vpn' }, 429, cookie);
   }
   // Future: a paywall attaches here.
-  const maxMinutes = Math.min(SESSION_MINUTES, FREE_SESSION_MINUTES);
+  const maxMinutes = paid
+    ? Math.min(SESSION_MINUTES, Math.floor(credit / 60))
+    : Math.min(SESSION_MINUTES, FREE_SESSION_MINUTES);
 
   // The sitewide brake first: the atomic slot under TALK_SESSIONS is taken before the voice service is asked for
   // anything that costs money (the quota() middleware did the cheap read). A mint the service then refuses gives
@@ -166,7 +193,7 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   }
   // Then the network's share: free conversations from one address a day (the address is kept only as an HMAC).
   const ip = c.request.headers.get('cf-connecting-ip');
-  const network: Counter | null = ip ? { ...TALK_PER_NETWORK, key: await networkKey(s.key, ip) } : null;
+  const network: Counter | null = ip && !paid ? { ...TALK_PER_NETWORK, key: await networkKey(s.key, ip) } : null;
   if (network && !(await reserve(s.db, network, day)).allowed) {
     await release(s.db, TALK_SESSIONS, day);
     writePoint(env, c.route, '429-network');
@@ -185,10 +212,14 @@ export async function talkSession(c: ApiContext): Promise<Response> {
   }
   // Granted: now the visitor exists, with their consent, the session counted and the time charged.
   await recordConsent(s.db, id, version);
-  await bump(s.db, id, 'sessions');
   const charged = maxMinutes * 60;
-  await bump(s.db, id, 'talk_seconds', charged);
-  await startSession(s.db, id, 'convai', Date.now(), charged);
+  if (paid) {
+    await addCredit(s.db, id, -charged);
+  } else {
+    await bump(s.db, id, 'sessions');
+    await bump(s.db, id, 'talk_seconds', charged);
+  }
+  await startSession(s.db, id, 'convai', Date.now(), charged, paid);
   writePoint(env, c.route, guarded ? 'guarded' : 'unguarded-session');
   return json(
     {
@@ -199,7 +230,9 @@ export async function talkSession(c: ApiContext): Promise<Response> {
       characterId: env.CONVAI_CHARACTER_ID,
       endUserId: await endUserId(s.key, id),
       session: { turnsLeft, maxMinutes, secondsLeft: maxMinutes * 60 },
-      allowance: { used: had + 1, of: allowed, firstDay },
+      allowance: paid
+        ? { paid: true, minutesLeft: Math.floor((credit - charged) / 60) }
+        : { used: had + 1, of: allowed, firstDay },
     },
     200,
     cookie,

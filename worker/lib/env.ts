@@ -45,6 +45,10 @@ export interface Env {
   CONVAI_API_KEY?: string;
   /** Dev/test only: origin of a mock Convai (tests/browser/talk-flow.mjs). Ignored when ENV is production. */
   CONVAI_API_BASE?: string;
+  /** Stripe secret key (sk_test_... or sk_live_...): opens Checkout and reads it back (routes/pay.ts). */
+  STRIPE_SECRET_KEY?: string;
+  /** Stripe webhook signing secret (whsec_...) for POST /api/pay/webhook. */
+  STRIPE_WEBHOOK_SECRET?: string;
   /** Phase 2, dev and beta only: the hosted NIM key behind POST /api/brain. */
   NVIDIA_API_KEY?: string;
 

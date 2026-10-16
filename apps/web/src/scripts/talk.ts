@@ -137,6 +137,8 @@ interface Ui {
   more: HTMLDetailsElement;
   moreButton: HTMLElement;
   file: HTMLInputElement;
+  buy: HTMLElement;
+  buyGo: HTMLButtonElement;
   attach: HTMLButtonElement;
   fileNote: HTMLElement;
   fileCancel: HTMLButtonElement;
@@ -193,6 +195,8 @@ function collect(panel: HTMLElement): Ui | null {
     more: q('[data-talk-more]', HTMLDetailsElement),
     moreButton: q('[data-talk-more] > summary', HTMLElement),
     file: q('[data-talk-file]', HTMLInputElement),
+    buy: q('[data-talk-buy]', HTMLElement),
+    buyGo: q('[data-talk-buy-go]', HTMLButtonElement),
     attach: q('[data-talk-attach]', HTMLButtonElement),
     fileNote: q('[data-talk-file-note]', HTMLElement),
     fileCancel: q('[data-talk-file-cancel]', HTMLButtonElement),
@@ -322,6 +326,8 @@ class Controller {
       ui.start.addEventListener(type, () => void import('@emersa/being/talk').catch(() => undefined), { once: true });
     }
     ui.close.addEventListener('click', () => void this.end(true));
+    ui.buyGo.addEventListener('click', () => void this.buy());
+    void this.paidReturn();
     // Emily mostly out of view while talking: the conversation becomes the pinned HUD at the window's foot.
     if (ui.stage && 'IntersectionObserver' in window) {
       new IntersectionObserver(
@@ -537,6 +543,8 @@ class Controller {
     this.notice(null);
     let failed: Notice | null = null;
     let detail = '';
+    let offerBuy = false;
+    ui.buy.hidden = true;
     let reached: TalkState = 'idle';
     // A policy that blocks the voice service shows up here, not as an error the SDK can name.
     let blocked = false;
@@ -569,6 +577,7 @@ class Controller {
           const notice = FAILED_STATES[state];
           if (notice) {
             failed = notice;
+            if (state === 'limited') offerBuy = session.refusal?.buy === true;
             // The Worker's own sentence (the free minutes, the day's cap) is more precise than the generic line.
             detail = state === 'limited' || state === 'unavailable' ? (why ?? '') : '';
             // Where it broke: the site itself unreachable, or the voice service after the grant.
@@ -600,7 +609,13 @@ class Controller {
       performance.measure('talk:tap-to-live', 'talk:tap', 'talk:live');
       // Which free conversation this is: the visitor always knows where they stand.
       const allowance = session.grant?.allowance;
-      if (allowance) {
+      if (allowance && 'paid' in allowance) {
+        this.status(
+          copy.allowancePaid
+            .replace('{max}', String(session.grant?.maxMinutes ?? 0))
+            .replace('{left}', String(allowance.minutesLeft)),
+        );
+      } else if (allowance) {
         const line = allowance.firstDay ? copy.allowanceFirstDay : copy.allowanceDaily;
         this.status(line.replace('{used}', String(allowance.used)).replace('{of}', String(allowance.of)));
       }
@@ -609,6 +624,9 @@ class Controller {
       this.session = null;
       if (detail) this.fail(detail, true);
       else this.fail(blocked ? 'policyBlocked' : (failed ?? 'failed'));
+      // Out of free conversations: Buy is offered under the sentence that says so (routes/pay.ts).
+      ui.buy.hidden = !offerBuy;
+      if (offerBuy) ui.retry.hidden = true;
       ui.session.hidden = true;
       ui.consent.hidden = false;
       ui.label.textContent = copy.monitorConsentLabel;
@@ -753,6 +771,63 @@ class Controller {
     } catch {
       this.notice('fileFailed');
     }
+  }
+
+  /** Buy minutes: the Worker opens a Stripe Checkout for this visitor and the page goes to it. */
+  private async buy(): Promise<void> {
+    const { ui } = this;
+    ui.buyGo.setAttribute('aria-disabled', 'true');
+    try {
+      const response = await fetch('/api/pay/checkout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      const payload = (await response.json().catch(() => null)) as { url?: unknown; error?: unknown } | null;
+      const url = typeof payload?.url === 'string' ? payload.url : '';
+      if (response.ok && url.startsWith('https://checkout.stripe.com/')) {
+        window.location.assign(url);
+        return;
+      }
+      this.status(typeof payload?.error === 'string' ? payload.error : copy.notices.payFailed);
+    } catch {
+      this.status(copy.notices.payFailed);
+    } finally {
+      ui.buyGo.removeAttribute('aria-disabled');
+    }
+  }
+
+  /**
+   * Back from Stripe (?paid=<Checkout id> or ?paid=cancelled): the address is cleaned, and the Worker confirms
+   * the payment (the webhook may still be on its way, so it is asked a few times) before the minutes are announced.
+   */
+  private async paidReturn(): Promise<void> {
+    const params = new URLSearchParams(window.location.search);
+    const paid = params.get('paid');
+    if (!paid) return;
+    params.delete('paid');
+    const query = params.toString();
+    history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+    if (paid === 'cancelled') {
+      this.status(copy.notices.payCancelled);
+      return;
+    }
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        const response = await fetch(`/api/pay/status?id=${encodeURIComponent(paid)}`, { credentials: 'same-origin' });
+        const payload = (await response.json().catch(() => null)) as { seconds?: unknown } | null;
+        const seconds = typeof payload?.seconds === 'number' ? payload.seconds : 0;
+        if (seconds >= 60) {
+          this.status(copy.notices.payThanks.replace('{minutes}', String(Math.floor(seconds / 60))));
+          return;
+        }
+      } catch {
+        // Try again in a moment.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    this.status(copy.notices.payPending);
   }
 
   /** What Emily remembers, in the log's place while it is open (hud.css); the log comes back when it closes. */

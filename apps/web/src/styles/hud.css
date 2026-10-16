@@ -740,6 +740,13 @@ html.is-talking .being-stage {
   color: var(--phos);
 }
 
+/* Buy minutes, under the sentence that says the free conversations are used. */
+.talk-buy {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
 /* ---------- Touring: a flat band on the page colour at the bottom edge, one hairline, nothing else ---------- */
 html.is-touring .monitor {
   position: fixed;

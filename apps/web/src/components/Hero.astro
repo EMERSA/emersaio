@@ -167,6 +167,10 @@ const { hero, tour, talk, a11y } = site;
     </div>
 
     <p class="monitor-note talk-notice" data-talk-notice role="status" hidden></p>
+    <div class="talk-buy" data-talk-buy hidden>
+      <p class="monitor-note">{talk.buyNote}</p>
+      <button type="button" class="monitor-btn monitor-btn-primary" data-talk-buy-go>{talk.buy}</button>
+    </div>
     <p class="talk-retry">
       <button type="button" class="monitor-btn" data-talk-retry hidden>{talk.retry}</button>
     </p>

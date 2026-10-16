@@ -116,6 +116,11 @@ export const site = {
     allowanceFirstDay:
       'Conversation {used} of {of} today, on us, up to five minutes each. From tomorrow it is one a day.',
     allowanceDaily: 'Your free conversation for today, up to five minutes.',
+    allowancePaid: 'A paid conversation of up to {max} minutes. {left} minutes left after it.',
+    /** Offered when the free conversations are used. */
+    buyNote:
+      '60 minutes with Emily for £5, paid securely through Stripe; we never see your card. The minutes are yours at once, on this browser.',
+    buy: 'Buy 60 minutes · £5',
     fileCancel: 'Cancel',
     uploaded: 'Emily has read',
     typeLabel: 'Type to Emily',
@@ -158,6 +163,11 @@ export const site = {
         'Emily reads .txt files only. Save your document as plain text first (in Word: File, Save As, Plain Text; from a PDF, copy the text into Notepad and save it), then add it again.',
       fileFailed: 'Emily could not read that file.',
       reconnecting: 'Reconnecting',
+      payThanks: 'Thank you. You have {minutes} minutes with Emily: press Start talking.',
+      payPending:
+        'Thank you. Your payment is being confirmed and your minutes will be there in a moment: press Start talking.',
+      payCancelled: 'No payment was taken.',
+      payFailed: 'The payment page could not be opened. Please try again in a minute.',
     },
   },
 

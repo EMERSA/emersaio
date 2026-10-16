@@ -167,7 +167,7 @@ test('the allowance: three conversations on the first day, each told which it is
   const over = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
   assert.equal(over.status, 429);
   assert.ok(Number(over.headers.get('retry-after')) > 0);
-  assert.deepEqual(await body(over), { ok: false, error: FIRST_DAY_DONE, reason: 'allowance' });
+  assert.deepEqual(await body(over), { ok: false, error: FIRST_DAY_DONE, reason: 'allowance', buy: false });
   assert.match(FIRST_DAY_DONE, /4d@emersa.io/);
   assert.match(FIRST_DAY_DONE, /QR code generator is free/);
 });
@@ -182,7 +182,7 @@ test('the allowance: a visitor from an earlier day gets one conversation a day',
   assert.deepEqual((await body(ok)).allowance, { used: 1, of: DAILY_CONVERSATIONS, firstDay: false });
   const over = await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
   assert.equal(over.status, 429);
-  assert.deepEqual(await body(over), { ok: false, error: DAILY_DONE, reason: 'allowance' });
+  assert.deepEqual(await body(over), { ok: false, error: DAILY_DONE, reason: 'allowance', buy: false });
 });
 
 test('one network shares a daily cap of free conversations, kept under an HMAC of the address, not the address', async () => {

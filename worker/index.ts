@@ -18,6 +18,7 @@ import { brain, MAX_BRAIN_BYTES } from './routes/brain.ts';
 import { cspReport } from './routes/csp.ts';
 import { health } from './routes/health.ts';
 import { MAX_TURN_BYTES, memoryDelete, memoryGet, memoryTurn } from './routes/memory.ts';
+import { payCheckout, payStatus, payWebhook } from './routes/pay.ts';
 import { MAX_SESSION_BYTES, talkRevoke, talkSession, talkUpload } from './routes/talk.ts';
 import { runScheduled } from './scheduled.ts';
 
@@ -57,6 +58,17 @@ const API: Readonly<Record<string, Route>> = {
   // No readBody: multipart, read by the handler under its own 2 MB cap.
   'talk/upload': {
     POST: compose('talk-upload', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('UPLOAD_LIMITER')], talkUpload),
+  },
+  // Paid talk time (routes/pay.ts). The webhook comes from Stripe, not the page: no same-site check, its own
+  // signature instead, and it reads its own raw body.
+  'pay/checkout': {
+    POST: compose('pay-checkout', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('TALK_LIMITER')], payCheckout),
+  },
+  'pay/status': {
+    GET: compose('pay-status', [traversalGuard, hostCheck, rateLimit('MEMORY_LIMITER')], payStatus),
+  },
+  'pay/webhook': {
+    POST: compose('pay-webhook', [traversalGuard, hostCheck], payWebhook),
   },
   brain: {
     POST: compose(
