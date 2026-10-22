@@ -77,4 +77,6 @@ export interface Env {
   CONVAI_CHARACTER_ID: string;
   TURNSTILE_SITEKEY: string;
   PUBLIC_BRAIN: string;
+  /** "on" switches the "10 free minutes" form on (routes/form.ts); off until Email Sending is set up for emersa.io. */
+  FORM_MINUTES?: string;
 }

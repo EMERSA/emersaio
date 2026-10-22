@@ -41,7 +41,7 @@ const send = (env: Parameters<typeof call>[2], b: string, cookie?: string) =>
 
 test('the form mails the team with a reply-to, then adds 10 minutes, once', async () => {
   const box = mailbox();
-  const { env, db } = talkEnv({ guarded: false, EMAIL: box.EMAIL });
+  const { env, db } = talkEnv({ guarded: false, EMAIL: box.EMAIL, FORM_MINUTES: 'on' });
   const v = await visitor(db);
   const ok = await send(env, fields(), v.cookie);
   assert.equal(ok.status, 200);
@@ -67,19 +67,23 @@ test('the form mails the team with a reply-to, then adds 10 minutes, once', asyn
 });
 
 test('a failed send adds nothing and can be tried again', async () => {
-  const { env, db } = talkEnv({ guarded: false, EMAIL: mailbox(true).EMAIL });
+  const { env, db } = talkEnv({ guarded: false, EMAIL: mailbox(true).EMAIL, FORM_MINUTES: 'on' });
   const v = await visitor(db);
   assert.equal((await send(env, fields(), v.cookie)).status, 502);
   assert.equal(await creditSeconds(asD1(db), v.id), 0);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM reward').get()?.n, 0);
 });
 
-test('refused: without the binding, before any conversation, or with a field missing', async () => {
-  const off = talkEnv({ guarded: false });
+test('refused: switched off, without the binding, before any conversation, or with a field missing', async () => {
+  const off = talkEnv({ guarded: false, FORM_MINUTES: 'on' });
   const v0 = await visitor(off.db);
-  assert.equal((await send(off.env, fields(), v0.cookie)).status, 503);
+  assert.equal((await send(off.env, fields(), v0.cookie)).status, 503, 'no binding');
+  const switchedOff = talkEnv({ guarded: false, EMAIL: mailbox().EMAIL });
+  const v1 = await visitor(switchedOff.db);
+  assert.equal((await send(switchedOff.env, fields(), v1.cookie)).status, 503, 'FORM_MINUTES not on');
+  assert.equal((await body(await call(ALLOWANCE, { headers: { cookie: v1.cookie } }, switchedOff.env))).earn, false);
 
-  const { env, db } = talkEnv({ guarded: false, EMAIL: mailbox().EMAIL });
+  const { env, db } = talkEnv({ guarded: false, EMAIL: mailbox().EMAIL, FORM_MINUTES: 'on' });
   const stranger = await send(env, fields());
   assert.equal(stranger.status, 403);
   assert.equal((await body(stranger)).error, FORM_TALK_FIRST);
@@ -93,7 +97,7 @@ test('refused: without the binding, before any conversation, or with a field mis
 
 test('the allowance offers the form until it is claimed', async () => {
   const box = mailbox();
-  const { env, db } = talkEnv({ guarded: false, EMAIL: box.EMAIL });
+  const { env, db } = talkEnv({ guarded: false, EMAIL: box.EMAIL, FORM_MINUTES: 'on' });
   assert.equal((await body(await call(ALLOWANCE, { headers: {} }, env))).earn, false, 'not before a conversation');
   const v = await visitor(db);
   assert.equal((await body(await call(ALLOWANCE, { headers: { cookie: v.cookie } }, env))).earn, true);

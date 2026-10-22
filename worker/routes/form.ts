@@ -56,6 +56,10 @@ export async function emailKey(secret: string, email: string): Promise<string> {
   return Array.from(mac, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** The form runs when it is switched on (FORM_MINUTES "on") and the email binding is there. */
+export const formOn = (env: { EMAIL?: unknown; FORM_MINUTES?: string }): boolean =>
+  env.FORM_MINUTES === 'on' && Boolean(env.EMAIL);
+
 /** Whether this visitor has already claimed the form's minutes. */
 export async function rewarded(db: D1Database | Pick<D1Database, 'prepare'>, visitorId: string): Promise<boolean> {
   const row = await db.prepare('SELECT 1 AS y FROM reward WHERE visitor_id = ?').bind(visitorId).first<number>('y');
@@ -64,7 +68,8 @@ export async function rewarded(db: D1Database | Pick<D1Database, 'prepare'>, vis
 
 export async function formMinutes(c: ApiContext): Promise<Response> {
   const { env } = c;
-  if (!env.EMAIL) return fail(503, FORM_OFF);
+  if (!formOn(env)) return fail(503, FORM_OFF);
+  const mail = env.EMAIL as NonNullable<typeof env.EMAIL>;
   const s = store(c);
   if (s instanceof Response) return s;
   const id = await cookieVisitor(c.request, s.key);
@@ -110,7 +115,7 @@ export async function formMinutes(c: ApiContext): Promise<Response> {
     `Sent from the Talk form on emersa.io on ${new Date().toUTCString()}. They were given ${FORM_SECONDS / 60} minutes with Emily. Reply to this email to answer them.`,
   ];
   try {
-    await env.EMAIL.send({
+    await mail.send({
       from: { email: FORM_FROM, name: 'Emily at emersa.io' },
       to: FORM_TO,
       replyTo: { email, name },

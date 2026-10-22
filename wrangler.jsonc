@@ -45,7 +45,10 @@
     "NIM_MODEL": "nvidia/nemotron-nano-3-30b-a3b",
     "CONVAI_CHARACTER_ID": "1d0a37ce-c9a4-11ef-a59e-42010a7be016",
     "TURNSTILE_SITEKEY": "",
-    "PUBLIC_BRAIN": "convai"
+    "PUBLIC_BRAIN": "convai",
+    // The "10 free minutes" form (worker/routes/form.ts): "on" once emersa.io is onboarded under Email Sending,
+    // anything else keeps it off (Talk does not offer it and the route answers 503).
+    "FORM_MINUTES": "off"
   },
 
   // Per-connection limits enforced at the edge. They are advisory (per location, eventually consistent), so the
@@ -104,6 +107,7 @@
       "workers_dev": true,
       "vars": {
         "ENV": "beta",
+        "FORM_MINUTES": "off",
         "NIM_BASE_URL": "https://integrate.api.nvidia.com/v1",
         "NIM_MODEL": "nvidia/nemotron-nano-3-30b-a3b",
         "CONVAI_CHARACTER_ID": "1d0a37ce-c9a4-11ef-a59e-42010a7be016",

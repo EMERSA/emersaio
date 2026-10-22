@@ -42,7 +42,7 @@ import { type Counter, dayKey, release, reserve, secondsUntilTomorrow, TALK_SESS
 import { multiLine, oneLine } from '../lib/text.ts';
 import { verify } from '../lib/turnstile.ts';
 import { consented, OLD_CONSENT, secureCookie, store } from '../lib/visitor.ts';
-import { rewarded } from './form.ts';
+import { formOn, rewarded } from './form.ts';
 
 export const MAX_SESSION_BYTES = 4096;
 export const VOICE_OFF = 'Voice is not connected yet.';
@@ -128,7 +128,7 @@ export async function talkAllowance(c: ApiContext): Promise<Response> {
   const buy = Boolean(c.env.STRIPE_SECRET_KEY);
   const out = used >= of && creditMinutes < 1;
   // The form is offered once a visitor has talked and has not claimed it yet (routes/form.ts).
-  const earn = Boolean(c.env.EMAIL) && Boolean(row) && !(known && (await rewarded(s.db, known)));
+  const earn = formOn(c.env) && Boolean(row) && !(known && (await rewarded(s.db, known)));
   return json({
     ok: true,
     earn,
