@@ -83,6 +83,12 @@ const { hero, tour, talk, a11y } = site;
 
     <div class="monitor-view talk-consent" data-talk-consent hidden>
       <div class="talk-consent-body" data-talk-consent-body>
+        <section class="talk-alert" role="note" aria-labelledby="talk-alert-title">
+          <h3 id="talk-alert-title" class="talk-alert-title">{talk.alert.title}</h3>
+          <ul>
+            {talk.alert.items.map((item) => <li>{item}</li>)}
+          </ul>
+        </section>
         <p class="monitor-copy">{talk.intro}</p>
         <dl class="talk-terms">
           {
@@ -100,6 +106,12 @@ const { hero, tour, talk, a11y } = site;
         </p>
       </div>
       <div class="talk-consent-foot">
+        <p class="talk-agree">
+          {talk.alert.agreeBefore} <a href={talk.alert.terms.href}>{talk.alert.terms.label}</a> {talk.alert.and}{' '}
+          <a href={talk.alert.privacy.href}>{talk.alert.privacy.label}</a>.{' '}
+          <span data-talk-left hidden></span>{' '}
+          <span data-talk-paid-line data-paid-on={talk.alert.paidOn}>{talk.alert.paidSoon}</span>
+        </p>
         <div class="talk-turnstile" data-talk-turnstile data-sitekey={TURNSTILE_SITEKEY}></div>
         <p class="talk-start">
           <button type="button" class="monitor-btn monitor-btn-primary" data-talk-start>{talk.start}</button>

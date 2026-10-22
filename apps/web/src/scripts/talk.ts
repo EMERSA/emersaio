@@ -137,6 +137,8 @@ interface Ui {
   more: HTMLDetailsElement;
   moreButton: HTMLElement;
   file: HTMLInputElement;
+  paidLine: HTMLElement;
+  left: HTMLElement;
   buy: HTMLElement;
   buyGo: HTMLButtonElement;
   attach: HTMLButtonElement;
@@ -195,6 +197,8 @@ function collect(panel: HTMLElement): Ui | null {
     more: q('[data-talk-more]', HTMLDetailsElement),
     moreButton: q('[data-talk-more] > summary', HTMLElement),
     file: q('[data-talk-file]', HTMLInputElement),
+    paidLine: q('[data-talk-paid-line]', HTMLElement),
+    left: q('[data-talk-left]', HTMLElement),
     buy: q('[data-talk-buy]', HTMLElement),
     buyGo: q('[data-talk-buy-go]', HTMLButtonElement),
     attach: q('[data-talk-attach]', HTMLButtonElement),
@@ -487,6 +491,42 @@ class Controller {
     ui.label.textContent = copy.monitorConsentLabel;
     this.guarded = Boolean(ui.turnstile.dataset.sitekey);
     ui.start.focus({ preventScroll: true });
+    void this.readAllowance();
+  }
+
+  /**
+   * What the visitor has left today, shown in the red notice as Talk opens. With nothing left (and no bought
+   * minutes) the sentence that says so takes Start's place, with Buy under it when buying is switched on.
+   */
+  private async readAllowance(): Promise<void> {
+    const { ui } = this;
+    let a: { left?: unknown; of?: unknown; creditMinutes?: unknown; buy?: unknown; message?: unknown } | null = null;
+    try {
+      const response = await fetch('/api/talk/allowance', { credentials: 'same-origin' });
+      if (response.ok) a = await response.json();
+    } catch {
+      return;
+    }
+    if (!a || this.session) return;
+    const buy = a.buy === true;
+    if (buy && ui.paidLine.dataset.paidOn) ui.paidLine.textContent = ui.paidLine.dataset.paidOn;
+    const left = typeof a.left === 'number' ? a.left : 0;
+    const of = typeof a.of === 'number' ? a.of : 0;
+    const minutes = typeof a.creditMinutes === 'number' ? a.creditMinutes : 0;
+    const parts = [copy.alert.left.replace('{left}', String(left)).replace('{of}', String(of))];
+    if (minutes > 0) parts.push(copy.alert.credit.replace('{minutes}', String(minutes)));
+    ui.left.textContent = parts.join(' ');
+    ui.left.hidden = false;
+    const message = typeof a.message === 'string' ? a.message : '';
+    if (message) {
+      // Nothing left today: say so straight away, offer Buy, and Start (which would only be refused) goes.
+      this.status(message);
+      ui.buy.hidden = !buy;
+      ui.start.hidden = true;
+      if (buy) ui.buyGo.focus({ preventScroll: true });
+    } else {
+      ui.start.hidden = false;
+    }
   }
 
   /**

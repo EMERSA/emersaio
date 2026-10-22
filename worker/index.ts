@@ -19,7 +19,7 @@ import { cspReport } from './routes/csp.ts';
 import { health } from './routes/health.ts';
 import { MAX_TURN_BYTES, memoryDelete, memoryGet, memoryTurn } from './routes/memory.ts';
 import { payCheckout, payStatus, payWebhook } from './routes/pay.ts';
-import { MAX_SESSION_BYTES, talkRevoke, talkSession, talkUpload } from './routes/talk.ts';
+import { MAX_SESSION_BYTES, talkAllowance, talkRevoke, talkSession, talkUpload } from './routes/talk.ts';
 import { runScheduled } from './scheduled.ts';
 
 /** Every /api/* path. The key is the path after /api/, without a trailing slash. */
@@ -51,6 +51,9 @@ const API: Readonly<Record<string, Route>> = {
       ],
       talkSession,
     ),
+  },
+  'talk/allowance': {
+    GET: compose('talk-allowance', [traversalGuard, hostCheck, rateLimit('MEMORY_LIMITER')], talkAllowance),
   },
   'talk/revoke': {
     POST: compose('talk-revoke', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('MEMORY_LIMITER')], talkRevoke),

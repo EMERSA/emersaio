@@ -111,6 +111,33 @@ async function settle(db: MemoryDb, id: string, nowMs = Date.now(), abandoned = 
   return back;
 }
 
+/**
+ * GET /api/talk/allowance: what the visitor has left today, read when Talk opens so a visitor with nothing left is
+ * told (and offered Buy) before pressing Start, not after. Writes nothing; a visitor without a cookie is new.
+ */
+export async function talkAllowance(c: ApiContext): Promise<Response> {
+  const s = store(c);
+  if (s instanceof Response) return s;
+  const known = await cookieVisitor(c.request, s.key);
+  const row = known ? await getVisitor(s.db, known) : null;
+  const firstDay = !row || dayKey(row.created_at) === dayKey();
+  const of = firstDay ? FIRST_DAY_CONVERSATIONS : DAILY_CONVERSATIONS;
+  const used = known ? await usage(s.db, known, 'sessions') : 0;
+  const creditMinutes = known ? Math.floor((await creditSeconds(s.db, known)) / 60) : 0;
+  const buy = Boolean(c.env.STRIPE_SECRET_KEY);
+  const out = used >= of && creditMinutes < 1;
+  return json({
+    ok: true,
+    firstDay,
+    of,
+    used,
+    left: Math.max(0, of - used),
+    creditMinutes,
+    buy,
+    message: out ? allowanceDone(firstDay, buy) : '',
+  });
+}
+
 export async function talkSession(c: ApiContext): Promise<Response> {
   const { env } = c;
   if (!env.CONVAI_API_KEY || !env.CONVAI_CHARACTER_ID) {

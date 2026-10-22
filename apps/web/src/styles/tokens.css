@@ -68,6 +68,8 @@
   /* The monitor: the Talk and tour text drawn over the being in phosphor green. The halo is a text-shadow in the
      page colour that keeps the letters readable over the bright shards (flat contrast 14:1; over a shard 1.7:1). */
   --phos: #7af0b0;
+  /* The one warning colour: the notice to read before talking to Emily. */
+  --alert: #ff7b72;
   --phos-dim: #3fae73;
   --phos-halo: 0 0 2px #040918, 0 0 6px #040918, 0 1px 3px rgba(4, 9, 24, 0.9);
 
@@ -194,6 +196,7 @@
   --bloom: 0;
 
   --phos: #0b5d3a;
+  --alert: #b3261e;
   --phos-dim: #1f7a4f;
   --phos-halo: 0 0 2px #faf6ee, 0 0 6px #faf6ee, 0 1px 3px rgba(250, 246, 238, 0.9);
 

@@ -740,6 +740,82 @@ html.is-talking .being-stage {
   color: var(--phos);
 }
 
+/* The notice to read before Start talking: the alert red, a rule beside it, and one flash as Talk opens. */
+.talk-alert {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  border-left: 3px solid var(--alert);
+  color: var(--alert);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  animation: talk-alert-flash 1.6s ease-out 1;
+}
+
+.talk-alert-title {
+  margin: 0 0 0.35rem;
+  color: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.talk-alert ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.talk-alert a {
+  color: inherit;
+  font-weight: 700;
+  text-underline-offset: 0.2em;
+}
+
+/* The agreement, right above Start talking and never scrolled away: what pressing it means. */
+.talk-agree {
+  margin: 0 0 0.6rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--alert);
+  color: var(--alert);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.5;
+  animation: talk-alert-flash 1.6s ease-out 1;
+}
+
+.talk-agree a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talk-agree {
+    animation: none;
+  }
+}
+
+@keyframes talk-alert-flash {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  20%,
+  60% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talk-alert {
+    animation: none;
+  }
+}
+
 /* Buy minutes, under the sentence that says the free conversations are used. */
 .talk-buy {
   display: grid;

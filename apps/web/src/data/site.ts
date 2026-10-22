@@ -76,6 +76,24 @@ export const site = {
     monitorConsentLabel: 'Before you start',
     tourLabel: 'Tour',
     intro: 'Before you start, here is what happens when you talk to Emily.',
+    /** The red notice at the top of the consent view: the essentials, before Start talking is pressed. */
+    alert: {
+      title: 'Please read before you press Start talking',
+      items: [
+        'Emily is free for up to 5 minutes a conversation: three conversations on your first day, then one a day.',
+        'What you type or say goes to third parties: Convai Technologies in the United States runs Emily, and Cloudflare runs this site. We keep your conversation for 12 months so Emily remembers you.',
+        'Do not share passwords, bank, health or other sensitive details, or anyone else’s personal data.',
+      ],
+      agreeBefore: 'By pressing Start talking you agree to our',
+      terms: { label: 'Terms', href: '/terms' },
+      and: 'and',
+      privacy: { label: 'Privacy policy', href: '/privacy#voice' },
+      paidSoon: 'Need more time? A paid option is coming soon, by popular demand.',
+      paidOn: 'Need more time? You can buy 60 minutes for £5.',
+      /** What is left today, filled in when Talk opens ({left}, {of}, {minutes}). */
+      left: 'Free today: {left} of {of} left.',
+      credit: 'You also have {minutes} bought minutes.',
+    },
     consent: [
       {
         term: 'Who handles it',
@@ -94,7 +112,7 @@ export const site = {
         text: 'We delete everything 12 months after your last visit, or straight away when you tap Forget me.',
       },
     ],
-    freeMinutes: 'Five free minutes a day. More for your organisation: email 4d@emersa.io.',
+    freeMinutes: 'More for your organisation: email 4d@emersa.io.',
     aiNotice: 'Emily is an AI and may make mistakes.',
     privacyLink: { label: 'Read the privacy policy', href: '/privacy#voice' },
     start: 'Start talking',

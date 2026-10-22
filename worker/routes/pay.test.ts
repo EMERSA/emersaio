@@ -156,3 +156,23 @@ test('Talk: the free conversations first, then bought minutes; a paid session re
   const left = await creditSeconds(asD1(db), v.id);
   assert.ok(left >= 3498 && left <= 3500, `left ${left}`);
 });
+
+test('the allowance as Talk opens: three left for someone new, the refusal and Buy once they are used', async () => {
+  const { env, db } = payEnv();
+  const ALLOWANCE = 'https://emersa.io/api/talk/allowance';
+  const fresh = await body(await call(ALLOWANCE, { headers: {} }, env));
+  assert.deepEqual(
+    { left: fresh.left, of: fresh.of, buy: fresh.buy, message: fresh.message },
+    { left: 3, of: 3, buy: true, message: '' },
+  );
+  const v = await visitor(db);
+  restore = upstreams();
+  for (let n = 0; n < FIRST_DAY_CONVERSATIONS; n++) await call(SESSION, jsonPost(good, { cookie: v.cookie }), env);
+  const out = await body(await call(ALLOWANCE, { headers: { cookie: v.cookie } }, env));
+  assert.equal(out.left, 0);
+  assert.match(out.message, /buy 60 minutes for £5/);
+  await deliver(env, completed(v.id));
+  const paid = await body(await call(ALLOWANCE, { headers: { cookie: v.cookie } }, env));
+  assert.equal(paid.creditMinutes, 60);
+  assert.equal(paid.message, '', 'bought minutes mean Start stays');
+});
