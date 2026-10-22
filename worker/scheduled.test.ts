@@ -22,12 +22,14 @@ test('with the database: counters older than two days go, and what is left is lo
     purged: 2,
     visitors: 0,
     quota: 0,
+    rewards: 0,
     totals: [{ scope: 'talk', key: 'sessions', days: 2, total: 3 }],
   });
   assert.deepEqual(await runScheduled({ MEMORY: asD1(db) }, AT), {
     purged: 0,
     visitors: 0,
     quota: 0,
+    rewards: 0,
     totals: [{ scope: 'talk', key: 'sessions', days: 2, total: 3 }],
   });
   db.close();

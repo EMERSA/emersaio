@@ -89,6 +89,69 @@ try {
     await ctx.close();
   }
 
+  // Nothing left as Talk opens: the sentence, Buy and the form at once; the form sent gives 10 minutes and Start.
+  {
+    const { ctx, page } = await newPage(browser);
+    await ctx.route('**/api/talk/allowance', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, left: 0, of: 1, creditMinutes: 0, buy: true, earn: true, message: REFUSAL }),
+      }),
+    );
+    let sent = null;
+    await ctx.route('**/api/form/minutes', (route) => {
+      sent = JSON.parse(route.request().postData() ?? '{}');
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, minutes: 10 }),
+      });
+    });
+    await page.goto(`${base}/`, { waitUntil: 'load' });
+    await page.locator('.hero-ctas [data-talk-open]').click();
+    const early = await until(
+      () =>
+        page.evaluate(() => ({
+          buy: !document.querySelector('[data-talk-buy]')?.hidden,
+          earn: !document.querySelector('[data-talk-earn]')?.hidden,
+          start: !document.querySelector('[data-talk-start]')?.hidden,
+        })),
+      { timeout: 10000 },
+    );
+    await page.waitForTimeout(500);
+    const now = await page.evaluate(() => ({
+      buy: !document.querySelector('[data-talk-buy]')?.hidden,
+      earn: !document.querySelector('[data-talk-earn]')?.hidden,
+      start: !document.querySelector('[data-talk-start]')?.hidden,
+    }));
+    check(
+      'nothing left: told as Talk opens, Buy and the form, no Start',
+      now.buy && now.earn && !now.start,
+      JSON.stringify(early && now),
+    );
+    await page.locator('[data-talk-earn-open]').click();
+    await page.fill('[data-talk-earn-form] [name=name]', 'Ada Lovelace');
+    await page.fill('[data-talk-earn-form] [name=email]', 'ada@example.com');
+    await page.check('[data-talk-earn-form] [name=role][value=investor]');
+    await page.check('[data-talk-earn-form] [name=agree]');
+    await page.locator('[data-talk-earn-send]').click();
+    const thanks = await until(async () => ((await notice(page)).includes('10 minutes') ? notice(page) : ''), {
+      timeout: 10000,
+    });
+    check(
+      'the form sends its fields',
+      sent?.email === 'ada@example.com' && sent?.role === 'investor' && sent?.agree === 'yes',
+      JSON.stringify(sent),
+    );
+    check(
+      'the form gives 10 minutes and Start comes back',
+      Boolean(thanks) && (await page.evaluate(() => !document.querySelector('[data-talk-start]')?.hidden)),
+      thanks,
+    );
+    await ctx.close();
+  }
+
   // Back from Stripe, cancelled.
   {
     const { ctx, page } = await newPage(browser);

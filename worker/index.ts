@@ -16,6 +16,7 @@ import { dispatch, looksLikeTraversal, notFound, type Route } from './lib/http.t
 import { TALK_SESSIONS } from './lib/quota.ts';
 import { brain, MAX_BRAIN_BYTES } from './routes/brain.ts';
 import { cspReport } from './routes/csp.ts';
+import { formMinutes, MAX_FORM_BYTES } from './routes/form.ts';
 import { health } from './routes/health.ts';
 import { MAX_TURN_BYTES, memoryDelete, memoryGet, memoryTurn } from './routes/memory.ts';
 import { payCheckout, payStatus, payWebhook } from './routes/pay.ts';
@@ -64,6 +65,14 @@ const API: Readonly<Record<string, Route>> = {
   },
   // Paid talk time (routes/pay.ts). The webhook comes from Stripe, not the page: no same-site check, its own
   // signature instead, and it reads its own raw body.
+  // The "10 free minutes" form (routes/form.ts): mails the team, then adds the minutes.
+  'form/minutes': {
+    POST: compose(
+      'form-minutes',
+      [traversalGuard, hostCheck, sameSiteOnly(), readBody(MAX_FORM_BYTES), rateLimit('UPLOAD_LIMITER')],
+      formMinutes,
+    ),
+  },
   'pay/checkout': {
     POST: compose('pay-checkout', [traversalGuard, hostCheck, sameSiteOnly(), rateLimit('TALK_LIMITER')], payCheckout),
   },

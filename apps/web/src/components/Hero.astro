@@ -183,6 +183,49 @@ const { hero, tour, talk, a11y } = site;
       <p class="monitor-note">{talk.buyNote}</p>
       <button type="button" class="monitor-btn monitor-btn-primary" data-talk-buy-go>{talk.buy}</button>
     </div>
+    <div class="talk-earn" data-talk-earn hidden>
+      <button
+        type="button"
+        class="monitor-btn"
+        aria-expanded="false"
+        aria-controls="talk-earn-form"
+        data-talk-earn-open>{talk.earn.open}</button>
+      <form id="talk-earn-form" class="talk-earn-form" data-talk-earn-form hidden>
+        <p class="monitor-note">{talk.earn.lead}</p>
+        <label class="talk-earn-field">
+          <span>{talk.earn.name}</span>
+          <input name="name" autocomplete="name" maxlength="100" required />
+        </label>
+        <label class="talk-earn-field">
+          <span>{talk.earn.email}</span>
+          <input name="email" type="email" autocomplete="email" maxlength="200" required />
+        </label>
+        <label class="talk-earn-field">
+          <span>{talk.earn.organisation}</span>
+          <input name="organisation" autocomplete="organization" maxlength="120" />
+        </label>
+        <fieldset class="talk-earn-roles">
+          <legend>{talk.earn.role}</legend>
+          {
+            talk.earn.roles.map(([value, label], i) => (
+              <label>
+                <input type="radio" name="role" value={value} required={i === 0} />
+                {label}
+              </label>
+            ))
+          }
+        </fieldset>
+        <label class="talk-earn-field">
+          <span>{talk.earn.message}</span>
+          <textarea name="message" rows="3" maxlength="1000"></textarea>
+        </label>
+        <label class="talk-earn-agree">
+          <input type="checkbox" name="agree" value="yes" required />
+          <span>{talk.earn.agree}</span>
+        </label>
+        <button type="submit" class="monitor-btn monitor-btn-primary" data-talk-earn-send>{talk.earn.submit}</button>
+      </form>
+    </div>
     <p class="talk-retry">
       <button type="button" class="monitor-btn" data-talk-retry hidden>{talk.retry}</button>
     </p>

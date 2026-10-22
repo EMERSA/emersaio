@@ -12,6 +12,18 @@
  * a visitor a day instead of 20 and 200). The sitewide TALK_SESSIONS counter (lib/quota.ts) and the free
  * talk-time budget apply either way.
  */
+/** The part of the send_email binding the form uses (Cloudflare Email Sending's builder form). */
+export interface EmailSender {
+  send(message: {
+    from: string | { email: string; name?: string };
+    to: string;
+    replyTo?: string | { email: string; name?: string };
+    subject: string;
+    text?: string;
+    html?: string;
+  }): Promise<{ messageId: string }>;
+}
+
 export interface Env {
   /** The static site in apps/web/dist; every non-API request falls through to it. */
   ASSETS: Fetcher;
@@ -45,6 +57,12 @@ export interface Env {
   CONVAI_API_KEY?: string;
   /** Dev/test only: origin of a mock Convai (tests/browser/talk-flow.mjs). Ignored when ENV is production. */
   CONVAI_API_BASE?: string;
+  /**
+   * Cloudflare Email Sending (wrangler.jsonc "send_email"): the "10 free minutes" form mails the team from
+   * emily@emersa.io (routes/form.ts). Needs emersa.io onboarded under Email Service > Email Sending; without the
+   * binding the form answers 503 and Talk does not offer it.
+   */
+  EMAIL?: EmailSender;
   /** Stripe secret key (sk_test_... or sk_live_...): opens Checkout and reads it back (routes/pay.ts). */
   STRIPE_SECRET_KEY?: string;
   /** Stripe webhook signing secret (whsec_...) for POST /api/pay/webhook. */

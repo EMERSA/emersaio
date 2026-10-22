@@ -138,6 +138,10 @@ interface Ui {
   moreButton: HTMLElement;
   file: HTMLInputElement;
   paidLine: HTMLElement;
+  earn: HTMLElement;
+  earnOpen: HTMLButtonElement;
+  earnForm: HTMLFormElement;
+  earnSend: HTMLButtonElement;
   left: HTMLElement;
   buy: HTMLElement;
   buyGo: HTMLButtonElement;
@@ -198,6 +202,10 @@ function collect(panel: HTMLElement): Ui | null {
     moreButton: q('[data-talk-more] > summary', HTMLElement),
     file: q('[data-talk-file]', HTMLInputElement),
     paidLine: q('[data-talk-paid-line]', HTMLElement),
+    earn: q('[data-talk-earn]', HTMLElement),
+    earnOpen: q('[data-talk-earn-open]', HTMLButtonElement),
+    earnForm: q('[data-talk-earn-form]', HTMLFormElement),
+    earnSend: q('[data-talk-earn-send]', HTMLButtonElement),
     left: q('[data-talk-left]', HTMLElement),
     buy: q('[data-talk-buy]', HTMLElement),
     buyGo: q('[data-talk-buy-go]', HTMLButtonElement),
@@ -331,6 +339,16 @@ class Controller {
     }
     ui.close.addEventListener('click', () => void this.end(true));
     ui.buyGo.addEventListener('click', () => void this.buy());
+    ui.earnOpen.addEventListener('click', () => {
+      const open = ui.earnForm.hidden;
+      ui.earnForm.hidden = !open;
+      ui.earnOpen.setAttribute('aria-expanded', String(open));
+      if (open) ui.earnForm.querySelector('input')?.focus();
+    });
+    ui.earnForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void this.earn();
+    });
     void this.paidReturn();
     // Emily mostly out of view while talking: the conversation becomes the pinned HUD at the window's foot.
     if (ui.stage && 'IntersectionObserver' in window) {
@@ -500,7 +518,14 @@ class Controller {
    */
   private async readAllowance(): Promise<void> {
     const { ui } = this;
-    let a: { left?: unknown; of?: unknown; creditMinutes?: unknown; buy?: unknown; message?: unknown } | null = null;
+    let a: {
+      left?: unknown;
+      of?: unknown;
+      creditMinutes?: unknown;
+      buy?: unknown;
+      earn?: unknown;
+      message?: unknown;
+    } | null = null;
     try {
       const response = await fetch('/api/talk/allowance', { credentials: 'same-origin' });
       if (response.ok) a = await response.json();
@@ -522,6 +547,7 @@ class Controller {
       // Nothing left today: say so straight away, offer Buy, and Start (which would only be refused) goes.
       this.status(message);
       ui.buy.hidden = !buy;
+      ui.earn.hidden = a.earn !== true;
       ui.start.hidden = true;
       if (buy) ui.buyGo.focus({ preventScroll: true });
     } else {
@@ -664,9 +690,11 @@ class Controller {
       this.session = null;
       if (detail) this.fail(detail, true);
       else this.fail(blocked ? 'policyBlocked' : (failed ?? 'failed'));
-      // Out of free conversations: Buy is offered under the sentence that says so (routes/pay.ts).
+      // Out of free conversations: Buy is offered under the sentence that says so (routes/pay.ts), and the form
+      // if the visitor has not had its minutes (the allowance says).
       ui.buy.hidden = !offerBuy;
       if (offerBuy) ui.retry.hidden = true;
+      if (failed === 'limit') void this.readAllowance();
       ui.session.hidden = true;
       ui.consent.hidden = false;
       ui.label.textContent = copy.monitorConsentLabel;
@@ -810,6 +838,49 @@ class Controller {
       this.status(`${copy.uploaded} ${doc.name}`);
     } catch {
       this.notice('fileFailed');
+    }
+  }
+
+  /** The form: the details go to the team, and once they are sent the visitor has 10 minutes and Start is back. */
+  private async earn(): Promise<void> {
+    const { ui } = this;
+    const data = new FormData(ui.earnForm);
+    const turnstile = this.guarded ? await takeTurnstileToken(ui) : '';
+    const fields = {
+      name: String(data.get('name') ?? ''),
+      email: String(data.get('email') ?? ''),
+      organisation: String(data.get('organisation') ?? ''),
+      role: String(data.get('role') ?? ''),
+      message: String(data.get('message') ?? ''),
+      agree: data.get('agree') === 'yes' ? 'yes' : '',
+      turnstile: turnstile ?? '',
+    };
+    ui.earnSend.setAttribute('aria-disabled', 'true');
+    ui.earnSend.textContent = copy.earn.sending;
+    try {
+      const response = await fetch('/api/form/minutes', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(fields),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: unknown } | null;
+      if (response.ok) {
+        ui.earnForm.reset();
+        ui.earn.hidden = true;
+        ui.buy.hidden = true;
+        ui.start.hidden = false;
+        ui.retry.hidden = true;
+        this.status(copy.earn.thanks);
+        ui.start.focus({ preventScroll: true });
+        return;
+      }
+      this.status(typeof payload?.error === 'string' ? payload.error : copy.earn.failed);
+    } catch {
+      this.status(copy.earn.failed);
+    } finally {
+      ui.earnSend.removeAttribute('aria-disabled');
+      ui.earnSend.textContent = copy.earn.submit;
     }
   }
 

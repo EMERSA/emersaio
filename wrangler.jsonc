@@ -82,6 +82,11 @@
     }
   ],
 
+  // Cloudflare Email Sending: the "10 free minutes" form mails 4d@emersa.io from emily@emersa.io (routes/form.ts).
+  // emersa.io must be onboarded under Email Service > Email Sending (records on cf-bounce.emersa.io only; the
+  // Google Workspace MX at the root is untouched). Needs the Workers Paid plan.
+  "send_email": [{ "name": "EMAIL", "remote": true }],
+
   // Daily housekeeping (worker/scheduled.ts): retention purge and counter cleanup. Without a database it logs that it skipped.
   "triggers": { "crons": ["0 3 * * *"] },
 

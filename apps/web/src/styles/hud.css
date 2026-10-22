@@ -816,6 +816,77 @@ html.is-talking .being-stage {
   }
 }
 
+/* The "10 free minutes" form: monitor type, fields ruled in phosphor, no boxes. */
+.talk-earn {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}
+
+.talk-earn-form {
+  display: grid;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.talk-earn-field {
+  display: grid;
+  gap: 0.2rem;
+  font-size: var(--text-xs);
+  color: var(--phos-dim);
+}
+
+.talk-earn-field input,
+.talk-earn-field textarea {
+  width: 100%;
+  padding: 0.35rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--phos-dim);
+  background: transparent;
+  color: var(--phos);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.talk-earn-field input:focus-visible,
+.talk-earn-field textarea:focus-visible,
+.talk-earn-roles input:focus-visible,
+.talk-earn-agree input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.talk-earn-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-sm);
+}
+
+.talk-earn-roles legend {
+  width: 100%;
+  margin-bottom: 0.2rem;
+  font-size: var(--text-xs);
+  color: var(--phos-dim);
+}
+
+.talk-earn-roles label,
+.talk-earn-agree {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  min-height: 24px;
+  font-size: var(--text-sm);
+}
+
+.talk-earn-roles input,
+.talk-earn-agree input {
+  accent-color: var(--phos);
+}
+
 /* Buy minutes, under the sentence that says the free conversations are used. */
 .talk-buy {
   display: grid;

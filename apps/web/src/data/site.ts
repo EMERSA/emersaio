@@ -139,6 +139,27 @@ export const site = {
     buyNote:
       '60 minutes with Emily for £5, paid securely through Stripe; we never see your card. The minutes are yours at once, on this browser.',
     buy: 'Buy 60 minutes · £5',
+    /** The "10 free minutes" form, offered when the free conversations are used (worker/routes/form.ts). */
+    earn: {
+      open: 'Get 10 free minutes: tell us who you are',
+      lead: 'Your details go to our team at 4d@emersa.io, who may get in touch about Emersa, and Emily gets 10 more minutes with you. Once per person.',
+      name: 'Name',
+      email: 'Email',
+      organisation: 'Organisation (optional)',
+      role: 'You are',
+      roles: [
+        ['customer', 'A potential customer'],
+        ['investor', 'An investor'],
+        ['partner', 'A partner'],
+        ['other', 'Something else'],
+      ],
+      message: 'What interests you (optional)',
+      agree: 'Emersa may contact me about this. I have read the privacy policy.',
+      submit: 'Send and get 10 minutes',
+      sending: 'Sending…',
+      thanks: 'Thank you. 10 minutes added: press Start talking.',
+      failed: 'Your details could not be sent. Please try again in a minute.',
+    },
     fileCancel: 'Cancel',
     uploaded: 'Emily has read',
     typeLabel: 'Type to Emily',
